@@ -15,6 +15,7 @@
   --green:#2D7D5A;--green-lt:#D4EDE3;
   --amber:#D97706;--amber-lt:#FEF3C7;
   --red:#C0392B;--red-lt:#FDECEA;
+  --purple:#6D3BB0;--purple-lt:#EDE5F7;
   --gray:#94A3B8;--gray-lt:#F1F5F9;
   --text:#1E1E2E;--text-2:#64748B;--white:#FFFFFF;--border:#E8E0D5;
   --shadow:0 2px 12px rgba(0,0,0,0.08);--shadow-lg:0 8px 32px rgba(0,0,0,0.14);
@@ -25,7 +26,7 @@ body{font-family:var(--font-b);background:var(--cream);color:var(--text);min-hei
 .btn{display:inline-flex;align-items:center;gap:6px;padding:10px 20px;border-radius:8px;border:none;font-family:var(--font-b);font-size:14px;font-weight:500;cursor:pointer;transition:all .18s ease}
 .btn-primary{background:var(--gold);color:var(--white)}.btn-primary:hover{background:#b07d20}
 .btn-secondary{background:var(--white);color:var(--text);border:1.5px solid var(--border)}.btn-secondary:hover{background:var(--gray-lt)}
-.btn-danger{background:var(--red-lt);color:var(--red);border:1.5px solid #f5c6c2}.btn-danger:hover{background:#f5c6c2}
+.btn-danger{background:var(--red-lt);color:var(--red);border:1.5px solid #f5c6c2}
 .btn-sm{padding:7px 14px;font-size:13px}
 .btn-icon{padding:8px;border-radius:8px;background:none;border:1.5px solid var(--border);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:all .15s;font-size:16px}.btn-icon:hover{background:var(--gray-lt)}
 input,select,textarea{width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font-b);font-size:14px;color:var(--text);background:var(--white);outline:none;transition:border-color .15s}
@@ -35,18 +36,15 @@ label{display:block;font-size:13px;font-weight:500;color:var(--text-2);margin-bo
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 @media(max-width:600px){.form-row{grid-template-columns:1fr}}
 
-/* Toast */
 #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--text);color:var(--white);padding:12px 22px;border-radius:10px;font-size:14px;font-weight:500;z-index:9999;transition:transform .3s ease;pointer-events:none}
 #toast.show{transform:translateX(-50%) translateY(0)}
 #toast.success{background:var(--green)}#toast.error{background:var(--red)}
 
-/* Loading */
 #loading-overlay{position:fixed;inset:0;background:rgba(253,248,242,.85);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:8000;backdrop-filter:blur(4px)}
 .spinner{width:40px;height:40px;border:3px solid var(--gold-lt);border-top-color:var(--gold);border-radius:50%;animation:spin .8s linear infinite;margin-bottom:14px}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
 
-/* Modal */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:5000;padding:20px}
 .modal-overlay.open{display:flex}
 .modal{background:var(--white);border-radius:var(--radius);padding:32px;max-width:460px;width:100%;box-shadow:var(--shadow-lg);max-height:90vh;overflow-y:auto}
@@ -60,7 +58,6 @@ label{display:block;font-size:13px;font-weight:500;color:var(--text-2);margin-bo
 .setup-card h1{font-family:var(--font-h);font-size:28px;text-align:center;color:var(--gold);margin-bottom:6px}
 .setup-card p{text-align:center;color:var(--text-2);font-size:14px;margin-bottom:32px}
 .setup-help{background:var(--gold-lt);border-radius:8px;padding:12px 14px;font-size:12px;color:var(--text-2);margin-top:16px;line-height:1.6}
-.setup-help strong{color:var(--text)}
 
 /* App shell */
 #app{display:none;flex-direction:column;min-height:100vh}
@@ -71,15 +68,20 @@ header{background:var(--white);border-bottom:1px solid var(--border);padding:0 2
 .header-actions{display:flex;gap:8px}
 main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
 
-/* Section label */
 .section-label{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--text-2);font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px}
 .section-label::after{content:'';flex:1;height:1px;background:var(--border)}
 
-/* Date tabs */
 .date-tabs{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
 .date-tab{padding:8px 16px;border-radius:8px;border:1.5px solid var(--border);background:var(--white);font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;color:var(--text-2)}
 .date-tab.active{background:var(--gold);color:var(--white);border-color:var(--gold)}
 .date-tab:hover:not(.active){background:var(--gray-lt)}
+
+/* Journey type toggle */
+.journey-toggle{display:flex;gap:0;border-radius:10px;overflow:hidden;border:1.5px solid var(--border);width:fit-content;margin-bottom:20px}
+.jt-btn{padding:9px 22px;border:none;font-family:var(--font-b);font-size:13px;font-weight:600;cursor:pointer;background:var(--white);color:var(--text-2);transition:all .15s}
+.jt-btn.active-arrival{background:var(--green);color:var(--white)}
+.jt-btn.active-departure{background:var(--purple);color:var(--white)}
+.jt-btn:not(:last-child){border-right:1.5px solid var(--border)}
 
 /* Pooling */
 #pooling-section{margin-bottom:24px}
@@ -92,41 +94,55 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
 .pooling-card-actions{display:flex;gap:8px}
 
 /* Guest cards */
-.cards-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:32px}
+.cards-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:24px}
 @media(max-width:640px){.cards-grid{grid-template-columns:1fr}}
 .guest-card{background:var(--white);border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow);overflow:hidden;transition:box-shadow .2s;cursor:pointer}
 .guest-card:hover{box-shadow:var(--shadow-lg)}
+.guest-card.priority-high{border:2px solid var(--red)}
+
 .card-strip{height:5px;width:100%}
 .strip-green{background:var(--green)}.strip-amber{background:var(--amber)}.strip-red{background:var(--red)}.strip-gray{background:var(--gray)}
+
 .card-body{padding:16px 18px}
-.card-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px;gap:8px}
+.card-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px;gap:8px}
 .card-name{font-family:var(--font-h);font-size:17px;color:var(--text);line-height:1.3}
 .card-pax{background:var(--gold-lt);color:var(--gold);font-size:12px;font-weight:600;padding:3px 9px;border-radius:20px;white-space:nowrap;flex-shrink:0}
-.card-meta{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.card-badges{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px;min-height:4px}
+.card-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+
 .location-badge{font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;text-transform:uppercase;letter-spacing:.4px}
 .loc-rail{background:var(--saffron-lt);color:var(--saffron)}.loc-airport{background:var(--blue-lt);color:var(--blue)}
+.journey-badge-arrival{background:var(--green-lt);color:var(--green);font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;text-transform:uppercase;letter-spacing:.4px}
+.journey-badge-departure{background:var(--purple-lt);color:var(--purple);font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;text-transform:uppercase;letter-spacing:.4px}
+.no-driver-badge{background:var(--red-lt);color:var(--red);font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;animation:pulse 2s ease infinite}
+.soon-badge{background:var(--amber-lt);color:var(--amber);font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px}
+
 .card-time{font-size:13px;color:var(--text-2)}
 .card-status-text{font-size:12px;font-weight:500;margin-left:auto}
 .status-on-time{color:var(--green)}.status-delayed{color:var(--amber)}.status-late{color:var(--red)}.status-unknown{color:var(--gray)}
+
 .card-expanded{border-top:1px solid var(--border);padding:16px 18px;display:none;flex-direction:column;gap:14px}
 .card-expanded.open{display:flex}
 .detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 @media(max-width:480px){.detail-grid{grid-template-columns:1fr}}
 .detail-item .d-label{font-size:11px;color:var(--text-2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px}
 .detail-item .d-value{font-size:14px;font-weight:500;color:var(--text)}
-.detail-item .d-value a{color:var(--blue);text-decoration:none}.detail-item .d-value a:hover{text-decoration:underline}
+.detail-item .d-value a{color:var(--blue);text-decoration:none}
+
 .live-status-box{background:var(--gray-lt);border-radius:8px;padding:12px 14px;font-size:13px;color:var(--text-2);line-height:1.6;display:flex;align-items:flex-start;gap:10px}
-.live-status-box .ls-icon{font-size:16px;flex-shrink:0;margin-top:1px}
-.live-status-box .ls-text{flex:1}
+.ls-icon{font-size:16px;flex-shrink:0;margin-top:1px}
+.ls-text{flex:1}
 .ls-timestamp{font-size:11px;color:var(--gray);margin-top:4px}
 .card-actions{display:flex;gap:8px;flex-wrap:wrap;padding-top:4px;border-top:1px solid var(--border)}
+
+.section-block{margin-bottom:32px}
 .completed-toggle{width:100%;background:none;border:1.5px dashed var(--border);border-radius:10px;padding:14px;font-family:var(--font-b);font-size:14px;font-weight:500;color:var(--text-2);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .15s;margin-bottom:16px}
-.completed-toggle:hover{background:var(--white);color:var(--text)}
+.completed-toggle:hover{background:var(--white)}
 .completed-cards{display:none}.completed-cards.open{display:block}
 .completed-cards .guest-card{opacity:.6}.completed-cards .guest-card:hover{opacity:1}
-.empty-state{text-align:center;padding:60px 20px;color:var(--text-2);grid-column:1/-1}
-.empty-state .e-icon{font-size:48px;margin-bottom:12px}
-.empty-state h3{font-family:var(--font-h);font-size:20px;color:var(--text);margin-bottom:6px}
+.empty-state{text-align:center;padding:48px 20px;color:var(--text-2);grid-column:1/-1}
+.empty-state .e-icon{font-size:40px;margin-bottom:10px}
+.empty-state h3{font-family:var(--font-h);font-size:18px;color:var(--text);margin-bottom:4px}
 
 /* Driver analytics */
 #screen-drivers{display:none}
@@ -141,26 +157,30 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
 .driver-name-block{display:flex;flex-direction:column;gap:2px}
 .driver-name{font-family:var(--font-h);font-size:16px;color:var(--text)}
 .driver-car{font-size:12px;color:var(--text-2)}
-.driver-token{background:var(--gold-lt);color:var(--gold);font-size:13px;font-weight:700;padding:4px 10px;border-radius:8px;letter-spacing:1px}
-.driver-card.unassigned .driver-token{background:var(--amber-lt);color:var(--amber)}
-.driver-card-body{padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.driver-car-no{background:var(--gold-lt);color:var(--gold);font-size:13px;font-weight:700;padding:4px 10px;border-radius:8px;letter-spacing:1px}
+.driver-card.unassigned .driver-car-no{background:var(--amber-lt);color:var(--amber)}
+.driver-card-body{padding:14px 16px;display:flex;flex-direction:column;gap:12px}
 .driver-assignment{background:var(--gray-lt);border-radius:8px;padding:10px 12px;font-size:13px}
-.driver-assignment .da-label{font-size:11px;color:var(--text-2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px}
-.driver-assignment .da-group{font-weight:600;color:var(--text);margin-bottom:2px}
-.driver-assignment .da-detail{color:var(--text-2);line-height:1.6}
+.driver-assignment.dep-assignment{background:var(--purple-lt)}
+.da-label{font-size:11px;color:var(--text-2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;display:flex;align-items:center;gap:6px}
+.da-group{font-weight:600;color:var(--text);margin-bottom:2px}
+.da-detail{color:var(--text-2);line-height:1.6}
 .driver-timing{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
-.timing-box{background:var(--cream);border-radius:8px;padding:8px 10px;text-align:center}
+.timing-box{background:var(--cream);border-radius:8px;padding:8px 10px;text-align:center;position:relative}
 .timing-box .tb-label{font-size:10px;color:var(--text-2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px}
 .timing-box .tb-value{font-size:15px;font-weight:600;color:var(--text)}
 .timing-box.urgent .tb-value{color:var(--red)}
+.delay-badge{position:absolute;top:-8px;right:-6px;background:var(--amber);color:var(--white);font-size:10px;font-weight:700;padding:2px 6px;border-radius:20px;white-space:nowrap}
 .driver-toggles{display:flex;gap:8px;flex-wrap:wrap}
 .toggle-btn{flex:1;min-width:120px;padding:8px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--white);font-family:var(--font-b);font-size:12px;font-weight:500;cursor:pointer;transition:all .15s;text-align:center;color:var(--text-2)}
 .toggle-btn.active-green{background:var(--green-lt);border-color:var(--green);color:var(--green)}
 .toggle-btn.active-blue{background:var(--blue-lt);border-color:var(--blue);color:var(--blue)}
-.toggle-btn:hover:not(.active-green):not(.active-blue){background:var(--gray-lt)}
-.unassigned-badge{background:var(--amber);color:var(--white);font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;text-transform:uppercase;letter-spacing:.4px}
+.toggle-btn.active-purple{background:var(--purple-lt);border-color:var(--purple);color:var(--purple)}
+.toggle-btn.active-gold{background:var(--gold-lt);border-color:var(--gold);color:var(--gold)}
+.toggle-btn:hover:not(.active-green):not(.active-blue):not(.active-purple):not(.active-gold){background:var(--gray-lt)}
+.unassigned-badge{background:var(--amber);color:var(--white);font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px}
 
-/* Add/edit guest */
+/* Form */
 #screen-guest{display:none}
 .upload-zone{border:2px dashed var(--gold);border-radius:var(--radius);background:var(--gold-lt);padding:32px 24px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:24px;position:relative}
 .upload-zone:hover{background:#EDD9A3}
@@ -174,15 +194,15 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
 .form-card h3{font-family:var(--font-h);font-size:17px;color:var(--text);margin-bottom:18px;padding-bottom:10px;border-bottom:1px solid var(--border)}
 .form-actions{display:flex;gap:12px;justify-content:flex-end;margin-top:8px}
 
-/* Summary modal */
-.summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:8px}
+/* Summary */
+.summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .summary-tile{background:var(--cream);border-radius:10px;padding:16px;border:1px solid var(--border);text-align:center}
 .summary-tile .st-label{font-size:11px;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
 .summary-tile .st-value{font-size:28px;font-weight:700;font-family:var(--font-h);color:var(--gold)}
 .summary-tile .st-sub{font-size:11px;color:var(--text-2);margin-top:2px}
 
-/* Conflict modal */
 .conflict-detail{background:var(--red-lt);border:1px solid #f5c6c2;border-radius:8px;padding:12px 14px;font-size:13px;color:var(--red);line-height:1.7;margin-bottom:4px}
+.car-opt-detail{background:var(--green-lt);border:1px solid #a8d5c2;border-radius:8px;padding:12px 14px;font-size:13px;color:var(--green);line-height:1.7;margin-bottom:4px}
 </style>
 </head>
 <body>
@@ -199,16 +219,10 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
     <div class="mandala">🪔</div>
     <h1>Wedding Guest Tracker</h1>
     <p>Enter your credentials to get started. Saved locally on your device.</p>
-    <div class="form-group">
-      <label>Google Apps Script Web App URL</label>
-      <input type="url" id="setup-script-url" placeholder="https://script.google.com/macros/s/…/exec"/>
-    </div>
-    <div class="form-group">
-      <label>Gemini API Key</label>
-      <input type="password" id="setup-gemini-key" placeholder="AIza…"/>
-    </div>
+    <div class="form-group"><label>Google Apps Script Web App URL</label><input type="url" id="setup-script-url" placeholder="https://script.google.com/macros/s/…/exec"/></div>
+    <div class="form-group"><label>Gemini API Key</label><input type="password" id="setup-gemini-key" placeholder="AIza…"/></div>
     <button class="btn btn-primary" style="width:100%;justify-content:center;padding:14px" onclick="saveSetup()">🎉 Open Dashboard</button>
-    <div class="setup-help"><strong>Where to get these?</strong><br>See the README setup guide included with this project.</div>
+    <div class="setup-help"><strong>Where to get these?</strong> See the README setup guide included with this project.</div>
   </div>
 </div>
 
@@ -225,15 +239,14 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
   </header>
 
   <main>
-
     <!-- DASHBOARD -->
     <div id="screen-dashboard">
       <div class="date-tabs" id="date-tabs"></div>
       <div id="pooling-section"></div>
-      <div class="section-label">Arriving</div>
-      <div class="cards-grid" id="active-cards"></div>
+      <div id="arrivals-section"></div>
+      <div id="departures-section"></div>
       <button class="completed-toggle" id="completed-toggle" onclick="toggleCompleted()">
-        <span>✅</span><span id="completed-label">Show Completed Pickups</span>
+        <span>✅</span><span id="completed-label">Show Completed</span>
       </button>
       <div class="completed-cards" id="completed-cards"></div>
     </div>
@@ -254,21 +267,33 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
         <button class="btn-icon" onclick="showDashboard()">←</button>
         <h2 id="guest-form-title">Add Guest Group</h2>
       </div>
+
+      <!-- Journey type toggle -->
+      <div style="margin-bottom:20px">
+        <label style="margin-bottom:8px">Journey Type</label>
+        <div class="journey-toggle">
+          <button type="button" class="jt-btn" id="jt-arrival" onclick="setJourneyType('arrival')">✈️ Arrival</button>
+          <button type="button" class="jt-btn" id="jt-departure" onclick="setJourneyType('departure')">🛫 Departure</button>
+        </div>
+      </div>
+      <input type="hidden" id="f-journey-type" value="arrival"/>
+
       <div class="upload-zone">
         <input type="file" accept="image/*,.pdf" id="ticket-file" onchange="handleFileUpload(event)"/>
         <div class="uz-icon">📄</div>
         <h3>Upload Ticket / Booking</h3>
-        <p>Tap to upload an image or PDF — Gemini will extract the details automatically</p>
+        <p>Gemini will extract details and auto-detect journey type</p>
       </div>
       <div class="extraction-result" id="extraction-result">✅ Details extracted! Please verify below before saving.</div>
 
       <form id="guest-form" onsubmit="submitGuestForm(event)">
         <input type="hidden" id="f-group-id"/>
+
         <div class="form-card">
           <h3>👨‍👩‍👧 Guest Group Details</h3>
           <div class="form-row">
             <div class="form-group"><label>Merged Group Name *</label><input type="text" id="f-group-name" placeholder="e.g. Sharma Family" required/></div>
-            <div class="form-group"><label>Total Pax *</label><input type="number" id="f-pax" min="1" max="20" placeholder="4" required/></div>
+            <div class="form-group"><label>Total Pax *</label><input type="number" id="f-pax" min="1" max="30" placeholder="4" required/></div>
           </div>
           <div class="form-group"><label>Individual Names (for records)</label><input type="text" id="f-individual-names" placeholder="Ramesh, Sunita, Priya, Arjun"/></div>
           <div class="form-row">
@@ -291,7 +316,8 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
           </div>
           <div class="form-row">
             <div class="form-group"><label>PNR Number</label><input type="text" id="f-pnr" placeholder="e.g. 4567890123"/></div>
-            <div class="form-group"><label>Pickup Location *</label>
+            <div class="form-group">
+              <label id="location-label">Pickup Station *</label>
               <select id="f-pickup-location" required>
                 <option value="">Select station…</option>
                 <option value="Howrah">Howrah</option>
@@ -302,28 +328,29 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
             </div>
           </div>
           <div class="form-row">
-            <div class="form-group"><label>Arrival Date *</label><input type="date" id="f-arrival-date" required/></div>
-            <div class="form-group"><label>Arrival Time *</label><input type="time" id="f-arrival-time" required/></div>
+            <div class="form-group"><label id="date-label">Arrival Date *</label><input type="date" id="f-arrival-date" required/></div>
+            <div class="form-group"><label id="time-label">Arrival Time *</label><input type="time" id="f-arrival-time" required/></div>
           </div>
         </div>
 
         <div class="form-card">
           <h3>🚗 Car & Driver Assignment</h3>
-          <div class="form-row">
-            <div class="form-group"><label>Car Type</label>
-              <select id="f-car-type"><option value="">Select…</option><option>Innova</option><option>Ertiga</option><option>Tempo Traveller</option><option>Scorpio</option><option>Other</option></select>
-            </div>
-            <div class="form-group"><label>Car Token (4-digit)</label><input type="text" id="f-car-token" placeholder="e.g. 1042" maxlength="4" pattern="[0-9]{4}"/></div>
+          <div class="form-group">
+            <label>Select Driver</label>
+            <select id="f-driver-select" onchange="onDriverSelect()">
+              <option value="">— No driver assigned —</option>
+            </select>
           </div>
-          <div class="form-row">
-            <div class="form-group"><label>Driver Name</label><input type="text" id="f-driver-name" placeholder="Suresh Kumar"/></div>
-            <div class="form-group"><label>Driver Phone</label><input type="tel" id="f-driver-phone" placeholder="+91 98765 00000"/></div>
-          </div>
+          <input type="hidden" id="f-car-type"/>
+          <input type="hidden" id="f-car-no"/>
+          <input type="hidden" id="f-driver-name"/>
+          <input type="hidden" id="f-driver-phone"/>
+          <div id="driver-detail-row" style="display:none;background:var(--gray-lt);border-radius:8px;padding:12px 14px;font-size:13px;color:var(--text-2);margin-top:4px"></div>
         </div>
 
         <div class="form-card">
           <h3>📝 Notes</h3>
-          <div class="form-group"><textarea id="f-notes" rows="3" placeholder="Elderly passenger, wheelchair needed / 6 large bags…"></textarea></div>
+          <div class="form-group"><textarea id="f-notes" rows="3" placeholder="Elderly passenger / lots of luggage / 6 large bags / wheelchair needed…"></textarea></div>
         </div>
 
         <div class="form-actions">
@@ -332,7 +359,6 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
         </div>
       </form>
     </div>
-
   </main>
 </div>
 
@@ -361,7 +387,7 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
   <div class="modal">
     <h3>⚠️ Driver Conflict Detected</h3>
     <div class="conflict-detail" id="conflict-detail"></div>
-    <p style="font-size:13px;color:var(--text-2);margin-top:12px">Gap is less than 120 minutes. The driver may not have enough time for both pickups.</p>
+    <p style="font-size:13px;color:var(--text-2);margin-top:12px">Gap is less than 120 minutes. Driver may not have enough time for both trips.</p>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeConflictModal()">Cancel</button>
       <button class="btn btn-danger" id="conflict-save-anyway">Save Anyway</button>
@@ -380,16 +406,41 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
   </div>
 </div>
 
+<div class="modal-overlay" id="car-opt-modal">
+  <div class="modal">
+    <h3>💡 Smaller Car Available</h3>
+    <div class="car-opt-detail" id="car-opt-detail"></div>
+    <p style="font-size:13px;color:var(--text-2);margin-top:12px">Using a smaller car keeps larger vehicles free for bigger groups.</p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="car-opt-keep">Keep Current</button>
+      <button class="btn btn-primary" id="car-opt-switch">Switch to Smaller Car</button>
+    </div>
+  </div>
+</div>
+
 <script>
-// ── Config ───────────────────────────────────────────────────
-const TRAVEL_MINS = 90;
+// ── Config ────────────────────────────────────────────────────
+const TRAVEL_MINS   = 90;
 const CONFLICT_MINS = 120;
+const LUGGAGE_KW    = ['luggage','bag','suitcase','baggage','wheelchair','equipment','heavy','lots','bulky','cargo'];
+const KOLKATA_ORIGINS = ['howrah','sealdah','kolkata','kolkata station','nscbi','dumdum','netaji','calcutta'];
+
+// Departure buffer: [trainSmall, trainLarge, flightSmall, flightLarge] in mins before departure
+// train ≤3: 90+45+30=165, train 3+: 90+45+45=180
+// flight ≤3: 90+120+30=240, flight 3+: 90+120+45=255
+function departureBufMins(transportType, pax){
+  const p=parseInt(pax)||1;
+  const large=p>3;
+  if((transportType||'').toLowerCase()==='flight') return large?255:240;
+  return large?180:165;
+}
 
 // ── State ─────────────────────────────────────────────────────
-let SCRIPT_URL='', GEMINI_KEY='';
-let allGuests=[], allDrivers=[];
-let activeTab='all', editingId=null, completedOpen=false;
-let pendingSubmitData=null, pendingPooling=null, currentRecs=[];
+let SCRIPT_URL='',GEMINI_KEY='';
+let allGuests=[],allDrivers=[];
+let activeTab='all',editingId=null,completedOpen=false;
+let pendingSubmitData=null,pendingPooling=null,currentRecs=[];
+let carOptPendingData=null,carOptSmallerDriver=null;
 
 // ── Boot ──────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded',()=>{
@@ -406,7 +457,6 @@ function saveSetup(){
   localStorage.setItem('wgt_script_url',url);localStorage.setItem('wgt_gemini_key',key);
   SCRIPT_URL=url;GEMINI_KEY=key;launchApp();
 }
-
 async function launchApp(){
   document.getElementById('screen-setup').style.display='none';
   document.getElementById('app').style.display='flex';
@@ -415,13 +465,8 @@ async function launchApp(){
 
 // ── API ───────────────────────────────────────────────────────
 function showLoading(v){document.getElementById('loading-overlay').classList.toggle('hidden',!v)}
-
-async function apiGet(action){
-  const r=await fetch(`${SCRIPT_URL}?action=${action}`);return r.json();
-}
-async function apiPost(payload){
-  const r=await fetch(SCRIPT_URL,{method:'POST',body:JSON.stringify(payload)});return r.json();
-}
+async function apiGet(a){const r=await fetch(`${SCRIPT_URL}?action=${a}`);return r.json();}
+async function apiPost(p){const r=await fetch(SCRIPT_URL,{method:'POST',body:JSON.stringify(p)});return r.json();}
 
 async function initAndLoad(){
   showLoading(true);
@@ -435,11 +480,7 @@ async function initAndLoad(){
 }
 
 // ── Screen router ─────────────────────────────────────────────
-function screen(name){
-  ['dashboard','drivers','guest'].forEach(s=>{
-    document.getElementById('screen-'+s).style.display=s===name?'block':'none';
-  });
-}
+function screen(n){['dashboard','drivers','guest'].forEach(s=>{document.getElementById('screen-'+s).style.display=s===n?'block':'none';});}
 function showDashboard(){renderDashboard();}
 
 // ══════════════════════════════════════════════════════════════
@@ -449,22 +490,70 @@ function renderDashboard(){
   screen('dashboard');
   buildDateTabs();
   buildPooling();
+
+  const today=new Date().toISOString().slice(0,10);
   const active=filteredGuests();
-  const done=allGuests.filter(g=>g.status==='picked_up');
-  document.getElementById('active-cards').innerHTML=active.length?active.map(renderCard).join(''):emptyState();
+  const arrivals=active.filter(g=>journeyType(g)==='arrival');
+  const departures=active.filter(g=>journeyType(g)==='departure');
+  const done=allGuests.filter(g=>g.status==='picked_up'||g.status==='car_returned');
+
+  // Sort each section: priority (no driver + soon) first, then by time
+  const sortSection=list=>list.sort((a,b)=>{
+    const ap=isPriority(a)?0:1,bp=isPriority(b)?0:1;
+    if(ap!==bp) return ap-bp;
+    return ((a.arrival_date||'')+(a.arrival_time||'')).localeCompare((b.arrival_date||'')+(b.arrival_time||''));
+  });
+
+  // Dynamic section order — if today has arrivals show first, else departures first
+  const todayArrivals=arrivals.filter(g=>g.arrival_date===today);
+  const showArrFirst=todayArrivals.length>0||departures.filter(g=>g.arrival_date===today).length===0;
+
+  const arrHtml=buildSection(sortSection(arrivals),'arrival');
+  const depHtml=buildSection(sortSection(departures),'departure');
+
+  if(showArrFirst){
+    document.getElementById('arrivals-section').innerHTML=arrHtml;
+    document.getElementById('departures-section').innerHTML=depHtml;
+  } else {
+    document.getElementById('arrivals-section').innerHTML=depHtml;
+    document.getElementById('departures-section').innerHTML=arrHtml;
+  }
+
   document.getElementById('completed-cards').innerHTML=done.map(renderCard).join('');
-  document.getElementById('completed-label').textContent=(completedOpen?'Hide':'Show')+' Completed Pickups ('+done.length+')';
+  document.getElementById('completed-label').textContent=(completedOpen?'Hide':'Show')+' Completed ('+done.length+')';
   document.getElementById('completed-cards').classList.toggle('open',completedOpen);
 }
 
+function buildSection(list,type){
+  if(!list.length) return '';
+  const icon=type==='arrival'?'🛬':'🛫';
+  const label=type==='arrival'?'Arrivals':'Departures';
+  return `<div class="section-block">
+    <div class="section-label">${icon} ${label} (${list.length})</div>
+    <div class="cards-grid">${list.map(renderCard).join('')}</div>
+  </div>`;
+}
+
+function journeyType(g){
+  return (g.journey_type||'arrival').toLowerCase()==='departure'?'departure':'arrival';
+}
+
 function filteredGuests(){
-  let list=allGuests.filter(g=>g.status!=='picked_up');
+  let list=allGuests.filter(g=>g.status!=='picked_up'&&g.status!=='car_returned');
   if(activeTab!=='all') list=list.filter(g=>g.arrival_date===activeTab);
-  return list.sort((a,b)=>((a.arrival_date||'')+(a.arrival_time||'')).localeCompare((b.arrival_date||'')+(b.arrival_time||'')));
+  return list;
+}
+
+function isPriority(g){
+  if(g.driver_name) return false;
+  if(!g.arrival_date||!g.arrival_time) return false;
+  const arrMs=new Date(g.arrival_date+'T'+g.arrival_time+':00').getTime();
+  const diffMins=(arrMs-Date.now())/60000;
+  return diffMins>=0&&diffMins<=180;
 }
 
 function buildDateTabs(){
-  const dates=[...new Set(allGuests.filter(g=>g.status!=='picked_up').map(g=>g.arrival_date).filter(Boolean))].sort();
+  const dates=[...new Set(allGuests.filter(g=>g.status!=='picked_up'&&g.status!=='car_returned').map(g=>g.arrival_date).filter(Boolean))].sort();
   const today=new Date().toISOString().slice(0,10);
   const tabs=[{val:'all',label:'All Days'},...dates.map(d=>({val:d,label:d===today?'Today':fmtDate(d)}))];
   document.getElementById('date-tabs').innerHTML=tabs.map(t=>
@@ -477,32 +566,33 @@ function toggleCompleted(){completedOpen=!completedOpen;renderDashboard();}
 // ── Pooling ───────────────────────────────────────────────────
 function buildPooling(){
   currentRecs=[];
-  const active=allGuests.filter(g=>g.status!=='picked_up');
+  const active=allGuests.filter(g=>g.status!=='picked_up'&&g.status!=='car_returned');
   for(let i=0;i<active.length;i++){
     for(let j=i+1;j<active.length;j++){
       const a=active[i],b=active[j];
+      // Only pool same journey type
+      if(journeyType(a)!==journeyType(b)) continue;
       if(!a.arrival_date||!a.arrival_time||!b.arrival_date||!b.arrival_time) continue;
       if(a.pickup_location!==b.pickup_location) continue;
+      // Auto-dismiss if same driver
+      if(a.driver_name&&b.driver_name&&a.driver_name===b.driver_name) continue;
       const diff=Math.abs(toMins(a.arrival_date,a.arrival_time)-toMins(b.arrival_date,b.arrival_time));
       if(diff>30) continue;
       const combo=(parseInt(a.pax)||0)+(parseInt(b.pax)||0);
       let sd=null;
-      // Try A's driver first
-      if(a.driver_name&&a.car_token){
-        const dc=allDrivers.find(d=>d.car_token===a.car_token);
-        if(dc&&parseInt(dc.capacity||0)>=combo) sd={name:a.driver_name,token:a.car_token,car:a.car_type,phone:a.driver_phone,target:b};
+      if(a.driver_name&&a.car_no){
+        const dc=allDrivers.find(d=>(d.car_no||d.car_token)===a.car_no);
+        if(dc&&parseInt(dc.capacity||0)>=combo) sd={name:a.driver_name,car_no:a.car_no,car:a.car_type,phone:a.driver_phone,target:b};
       }
-      // Try B's driver
-      if(!sd&&b.driver_name&&b.car_token){
-        const dc=allDrivers.find(d=>d.car_token===b.car_token);
-        if(dc&&parseInt(dc.capacity||0)>=combo) sd={name:b.driver_name,token:b.car_token,car:b.car_type,phone:b.driver_phone,target:a};
+      if(!sd&&b.driver_name&&b.car_no){
+        const dc=allDrivers.find(d=>(d.car_no||d.car_token)===b.car_no);
+        if(dc&&parseInt(dc.capacity||0)>=combo) sd={name:b.driver_name,car_no:b.car_no,car:b.car_type,phone:b.driver_phone,target:a};
       }
-      // Try free driver
       if(!sd){
         const fd=allDrivers.find(d=>d.assigned!=='yes'&&parseInt(d.capacity||0)>=combo);
-        if(fd) sd={name:fd.driver_name,token:fd.car_token,car:fd.car_type,phone:fd.driver_phone,target:b,fd};
+        if(fd) sd={name:fd.driver_name,car_no:fd.car_no||fd.car_token,car:fd.car_type,phone:fd.driver_phone,target:b};
       }
-      currentRecs.push({a,b,diff,combo,sd});
+      currentRecs.push({a,b,diff,combo,sd,type:journeyType(a)});
     }
   }
   const sec=document.getElementById('pooling-section');
@@ -510,12 +600,12 @@ function buildPooling(){
   sec.innerHTML=`<div class="pooling-banner">
     <div class="pooling-banner-header">💡 Pooling Recommendations (${currentRecs.length})</div>
     ${currentRecs.map((r,i)=>`<div class="pooling-card" id="pc-${i}">
-      <div class="pooling-card-title">${esc(r.a.group_name)} + ${esc(r.b.group_name)} · ${esc(r.a.pickup_location)}</div>
+      <div class="pooling-card-title">${r.type==='departure'?'🛫':'🛬'} ${esc(r.a.group_name)} + ${esc(r.b.group_name)} · ${esc(r.a.pickup_location)}</div>
       <div class="pooling-card-detail">
-        ${esc(r.a.group_name)}: ${r.a.arrival_time} (${fmtDate(r.a.arrival_date)}) · ${r.a.pax} pax<br>
-        ${esc(r.b.group_name)}: ${r.b.arrival_time} (${fmtDate(r.b.arrival_date)}) · ${r.b.pax} pax<br>
+        ${esc(r.a.group_name)}: ${fmtAmPm(r.a.arrival_time)} (${fmtDate(r.a.arrival_date)}) · ${r.a.pax} pax<br>
+        ${esc(r.b.group_name)}: ${fmtAmPm(r.b.arrival_time)} (${fmtDate(r.b.arrival_date)}) · ${r.b.pax} pax<br>
         Combined: <strong>${r.combo} pax</strong> · Gap: <strong>${r.diff} min</strong>
-        ${r.sd?' · Suggested: '+esc(r.sd.car)+' Token '+esc(r.sd.token):''}
+        ${r.sd?' · '+esc(r.sd.car)+' ('+esc(r.sd.car_no)+')':''}
       </div>
       <div class="pooling-card-actions">
         ${r.sd
@@ -528,46 +618,55 @@ function buildPooling(){
 }
 
 function openPoolingConfirm(i){
-  pendingPooling=i;
-  const r=currentRecs[i];
-  const tgt=r.sd.target;
+  pendingPooling=i;const r=currentRecs[i];const tgt=r.sd.target;
   document.getElementById('pooling-modal-text').innerHTML=
-    `Assign <strong>${esc(r.sd.name)}</strong> (${esc(r.sd.car)}, Token ${esc(r.sd.token)}) to <strong>${esc(tgt.group_name)}</strong> as well?<br>
-    <span style="color:var(--text-2);font-size:12px">Combined ${r.combo} pax · Station: ${esc(r.a.pickup_location)}</span>`;
+    `Assign <strong>${esc(r.sd.name)}</strong> (${esc(r.sd.car)}, Car No. ${esc(r.sd.car_no)}) to <strong>${esc(tgt.group_name)}</strong> as well?<br>
+    <span style="color:var(--text-2);font-size:12px">Combined ${r.combo} pax · ${r.type==='departure'?'Departing from':'Arriving at'}: ${esc(r.a.pickup_location)}</span>`;
   document.getElementById('pooling-modal').classList.add('open');
 }
 function closePoolingModal(){document.getElementById('pooling-modal').classList.remove('open');pendingPooling=null;}
-
 document.getElementById('pooling-confirm-btn').addEventListener('click',async()=>{
   if(pendingPooling===null) return;
-  const r=currentRecs[pendingPooling];
-  const tgt=r.sd.target;
-  const sd=r.sd;
+  const r=currentRecs[pendingPooling];const tgt=r.sd.target;const sd=r.sd;
   showLoading(true);
-  const updated={...tgt,driver_name:sd.name,car_token:sd.token,car_type:sd.car,driver_phone:sd.phone||''};
+  const updated={...tgt,driver_name:sd.name,car_no:sd.car_no,car_type:sd.car,driver_phone:sd.phone||''};
   await apiPost({action:'updateGuest',data:updated});
   const idx=allGuests.findIndex(g=>g.group_id===tgt.group_id);
   if(idx>=0) allGuests[idx]={...allGuests[idx],...updated};
-  closePoolingModal();
-  showLoading(false);
-  renderDashboard();
+  closePoolingModal();showLoading(false);renderDashboard();
   showToast('Driver assigned to '+tgt.group_name+' ✓','success');
 });
 
 // ── Guest card ────────────────────────────────────────────────
 function renderCard(g){
+  const jt=journeyType(g);
+  const isDep=jt==='departure';
   const isAirport=g.pickup_location==='Airport';
-  const locClass=isAirport?'loc-airport':'loc-rail';
-  const timeStr=g.arrival_date&&g.arrival_time?fmtDate(g.arrival_date)+' · '+g.arrival_time:'—';
-  return `<div class="guest-card" id="card-${g.group_id}" onclick="toggleCard('${g.group_id}')">
+  const pri=isPriority(g);
+  const timeStr=g.arrival_date&&g.arrival_time?fmtDate(g.arrival_date)+' · '+fmtAmPm(g.arrival_time):'—';
+  const noDriverBadge=pri?'<span class="no-driver-badge">⚠️ No Driver</span>':'';
+  const soonBadge=(()=>{
+    if(!g.arrival_date||!g.arrival_time||!g.driver_name) return '';
+    const mins=(new Date(g.arrival_date+'T'+g.arrival_time+':00').getTime()-Date.now())/60000;
+    return (mins>=0&&mins<=180)?'<span class="soon-badge">🕐 Arriving Soon</span>':'';
+  })();
+  const jBadge=isDep
+    ?'<span class="journey-badge-departure">🛫 Departure</span>'
+    :'<span class="journey-badge-arrival">🛬 Arrival</span>';
+
+  // Departure cards show drop station label differently
+  const locLabel=isDep?'Drop: '+esc(g.pickup_location||'—'):'';
+
+  return `<div class="guest-card${pri?' priority-high':''}" id="card-${g.group_id}" onclick="toggleCard('${g.group_id}')">
     <div class="card-strip ${stripClass(g)}"></div>
     <div class="card-body">
       <div class="card-header">
         <div class="card-name">${esc(g.group_name)}</div>
         <div class="card-pax">👥 ${g.pax||0}</div>
       </div>
+      <div class="card-badges">${jBadge}${noDriverBadge}${soonBadge}</div>
       <div class="card-meta">
-        <span class="location-badge ${locClass}">${esc(g.pickup_location||'—')}</span>
+        <span class="location-badge ${isAirport?'loc-airport':'loc-rail'}">${isDep?'Drop: ':''}${esc(g.pickup_location||'—')}</span>
         <span class="card-time">🕐 ${timeStr}</span>
         <span class="card-status-text ${statusClass(g)}">${statusLabel(g)}</span>
       </div>
@@ -576,15 +675,14 @@ function renderCard(g){
       <div class="detail-grid">
         <div class="detail-item"><div class="d-label">Transport</div><div class="d-value">${esc(g.transport_type||'—')} · ${esc(g.transport_name||'')} ${esc(g.transport_number||'')}</div></div>
         <div class="detail-item"><div class="d-label">PNR</div><div class="d-value">${esc(g.pnr||'—')}</div></div>
-        <div class="detail-item"><div class="d-label">From</div><div class="d-value">${esc(g.journey_origin||'—')}</div></div>
-        <div class="detail-item"><div class="d-label">Arrival</div><div class="d-value">${g.arrival_date||''} ${g.arrival_time||''}</div></div>
-        <div class="detail-item"><div class="d-label">Car</div><div class="d-value">${esc(g.car_type||'—')} · Token <strong>${esc(g.car_token||'—')}</strong></div></div>
+        <div class="detail-item"><div class="d-label">Origin</div><div class="d-value">${esc(g.journey_origin||'—')}</div></div>
+        <div class="detail-item"><div class="d-label">${isDep?'Departure Time':'Arrival Time'}</div><div class="d-value">${g.arrival_date?fmtDate(g.arrival_date):''} ${g.arrival_time?fmtAmPm(g.arrival_time):''}</div></div>
+        <div class="detail-item"><div class="d-label">${isDep?'Drop Station':'Pickup Station'}</div><div class="d-value">${esc(g.pickup_location||'—')}</div></div>
+        <div class="detail-item"><div class="d-label">Car</div><div class="d-value">${esc(g.car_type||'—')} · Car No. <strong>${esc(g.car_no||'—')}</strong></div></div>
         <div class="detail-item"><div class="d-label">Driver</div><div class="d-value">${esc(g.driver_name||'—')}<br>
           ${g.driver_phone?`<a href="tel:${g.driver_phone}" onclick="event.stopPropagation()">📞 ${esc(g.driver_phone)}</a>`:''}</div></div>
-        <div class="detail-item"><div class="d-label">Guest Phone</div><div class="d-value">
-          ${g.phone_primary?`<a href="tel:${g.phone_primary}" onclick="event.stopPropagation()">📞 ${esc(g.phone_primary)}</a>`:'—'}</div></div>
-        <div class="detail-item"><div class="d-label">Backup Phone</div><div class="d-value">
-          ${g.phone_backup?`<a href="tel:${g.phone_backup}" onclick="event.stopPropagation()">📞 ${esc(g.phone_backup)}</a>`:'—'}</div></div>
+        <div class="detail-item"><div class="d-label">Guest Phone</div><div class="d-value">${g.phone_primary?`<a href="tel:${g.phone_primary}" onclick="event.stopPropagation()">📞 ${esc(g.phone_primary)}</a>`:'—'}</div></div>
+        <div class="detail-item"><div class="d-label">Backup Phone</div><div class="d-value">${g.phone_backup?`<a href="tel:${g.phone_backup}" onclick="event.stopPropagation()">📞 ${esc(g.phone_backup)}</a>`:'—'}</div></div>
       </div>
       ${g.notes?`<div class="detail-item"><div class="d-label">Notes</div><div class="d-value" style="color:var(--text-2)">${esc(g.notes)}</div></div>`:''}
       <div class="live-status-box" id="ls-${g.group_id}">
@@ -596,16 +694,35 @@ function renderCard(g){
       </div>
       <div class="card-actions" onclick="event.stopPropagation()">
         <button class="btn btn-secondary btn-sm" onclick="refreshStatus('${g.group_id}')">🔄 Refresh</button>
-        ${g.status!=='picked_up'?`
-          <button class="btn btn-secondary btn-sm" onclick="toggleDispatched('${g.group_id}','${g.dispatched||'no'}')">
-            ${g.dispatched==='yes'?'🚗 Dispatched ✓':'🚗 Dispatch'}
-          </button>
-          <button class="btn btn-primary btn-sm" onclick="markPickedUp('${g.group_id}')">✅ Picked Up</button>
-        `:`<button class="btn btn-secondary btn-sm" onclick="markActive('${g.group_id}')">↩ Mark Active</button>`}
+        ${cardActions(g)}
         <button class="btn btn-secondary btn-sm" onclick="editGuest('${g.group_id}')">✏️ Edit</button>
       </div>
     </div>
   </div>`;
+}
+
+function cardActions(g){
+  const jt=journeyType(g);
+  if(g.status==='picked_up'||g.status==='car_returned'){
+    return `<button class="btn btn-secondary btn-sm" onclick="markActive('${g.group_id}')">↩ Mark Active</button>`;
+  }
+  if(jt==='arrival'){
+    return `<button class="btn btn-secondary btn-sm" onclick="toggleField('${g.group_id}','dispatched','${g.dispatched||'no'}')">
+        ${g.dispatched==='yes'?'🚗 Dispatched ✓':'🚗 Dispatch'}</button>
+      <button class="btn btn-primary btn-sm" onclick="markFinal('${g.group_id}','arrival')">✅ Picked Up</button>`;
+  }
+  // Departure flow
+  if(g.car_returned==='yes'){
+    return `<button class="btn btn-secondary btn-sm" style="background:var(--gold-lt);border-color:var(--gold);color:var(--gold)" onclick="markFinal('${g.group_id}','departure')">🏁 Mark Complete</button>`;
+  }
+  if(g.dropped_off==='yes'){
+    return `<button class="btn btn-secondary btn-sm" onclick="toggleField('${g.group_id}','car_returned','no')">🔄 Car Back? Mark Complete</button>`;
+  }
+  return `<button class="btn btn-secondary btn-sm" onclick="toggleField('${g.group_id}','dispatched','${g.dispatched||'no'}')">
+      ${g.dispatched==='yes'?'🚗 Dispatched ✓':'🚗 Dispatch'}</button>
+    <button class="btn btn-secondary btn-sm" onclick="toggleField('${g.group_id}','guest_in_car','${g.guest_in_car||'no'}')">
+      ${g.guest_in_car==='yes'?'👤 In Car ✓':'👤 Guest in Car'}</button>
+    <button class="btn btn-primary btn-sm" onclick="toggleField('${g.group_id}','dropped_off','no')">🏁 Dropped Off</button>`;
 }
 
 function toggleCard(id){document.getElementById('exp-'+id)?.classList.toggle('open');}
@@ -627,16 +744,21 @@ function statusLabel(g){
   return m?m[0].slice(0,25):'See details';
 }
 function statusClass(g){const s=stripClass(g);return s==='strip-green'?'status-on-time':s==='strip-amber'?'status-delayed':s==='strip-red'?'status-late':'status-unknown';}
-function emptyState(){return`<div class="empty-state"><div class="e-icon">🎊</div><h3>No arrivals here yet</h3><p>Tap <strong>+ Add Guest</strong> to add a guest group</p></div>`;}
+function emptyState(msg){return`<div class="empty-state"><div class="e-icon">🎊</div><h3>${msg||'Nothing here yet'}</h3></div>`;}
 
 // ── Card actions ──────────────────────────────────────────────
 async function refreshStatus(id){
   const g=allGuests.find(x=>x.group_id===id);if(!g) return;
   const box=document.getElementById('ls-'+id);
   if(box) box.innerHTML='<span class="ls-icon">⏳</span><div class="ls-text">Fetching live status…</div>';
+  const isDep=journeyType(g)==='departure';
   const prompt=g.transport_type==='Flight'
-    ?`Current live status of flight ${g.transport_number} (${g.transport_name}) arriving Kolkata Airport today. Gate status, delay info, ETA. 2-3 sentences.`
-    :`Current running status of Indian Railways train ${g.transport_number} (${g.transport_name}), PNR ${g.pnr}. Current station, on time or delayed, ETA at ${g.pickup_location}. 2-3 sentences.`;
+    ?(isDep
+      ?`Current status of flight ${g.transport_number} (${g.transport_name}) departing from Kolkata Airport today. On time or delayed, scheduled departure time. 2-3 sentences.`
+      :`Current status of flight ${g.transport_number} (${g.transport_name}) arriving Kolkata Airport. Gate status, delay, ETA. 2-3 sentences.`)
+    :(isDep
+      ?`Current running status of Indian Railways train ${g.transport_number} (${g.transport_name}) departing from Kolkata area today. On time or delayed by how many minutes. 2-3 sentences.`
+      :`Current running status of Indian Railways train ${g.transport_number} (${g.transport_name}), PNR ${g.pnr}. Current station, on time or delayed, ETA at ${g.pickup_location}. 2-3 sentences.`);
   try{
     const result=await callGemini(prompt);
     await apiPost({action:'updateLiveStatus',group_id:id,live_status_text:result});
@@ -645,9 +767,10 @@ async function refreshStatus(id){
     if(box) box.innerHTML=`<span class="ls-icon">📡</span><div class="ls-text"><div>${esc(result)}</div><div class="ls-timestamp">Last checked: just now</div></div>`;
     const card=document.getElementById('card-'+id);
     if(card&&idx>=0){
+      const g2=allGuests[idx];
       const strip=card.querySelector('.card-strip');const sl=card.querySelector('.card-status-text');
-      if(strip) strip.className='card-strip '+stripClass(allGuests[idx]);
-      if(sl){sl.className='card-status-text '+statusClass(allGuests[idx]);sl.textContent=statusLabel(allGuests[idx]);}
+      if(strip) strip.className='card-strip '+stripClass(g2);
+      if(sl){sl.className='card-status-text '+statusClass(g2);sl.textContent=statusLabel(g2);}
     }
     showToast('Status updated','success');
   }catch(e){
@@ -656,20 +779,21 @@ async function refreshStatus(id){
   }
 }
 
-async function toggleDispatched(id,current){
-  const v=current==='yes'?'no':'yes';
-  showLoading(true);
-  await apiPost({action:'updateGuestStatus',group_id:id,field:'dispatched',value:v});
-  const idx=allGuests.findIndex(x=>x.group_id===id);if(idx>=0) allGuests[idx].dispatched=v;
+async function toggleField(id,field,current){
+  const newVal=current==='yes'?'no':'yes';showLoading(true);
+  await apiPost({action:'updateGuestStatus',group_id:id,field,value:newVal});
+  const idx=allGuests.findIndex(x=>x.group_id===id);if(idx>=0) allGuests[idx][field]=newVal;
   showLoading(false);renderDashboard();
-  showToast(v==='yes'?'Marked as dispatched':'Dispatch undone','success');
 }
 
-async function markPickedUp(id){
+async function markFinal(id,type){
+  const field=type==='arrival'?'status':'status';
+  const value=type==='arrival'?'picked_up':'car_returned';
   showLoading(true);
-  await apiPost({action:'updateGuestStatus',group_id:id,field:'status',value:'picked_up'});
-  const idx=allGuests.findIndex(x=>x.group_id===id);if(idx>=0) allGuests[idx].status='picked_up';
-  showLoading(false);renderDashboard();showToast('Marked as picked up 🎉','success');
+  await apiPost({action:'updateGuestStatus',group_id:id,field:'status',value});
+  const idx=allGuests.findIndex(x=>x.group_id===id);if(idx>=0) allGuests[idx].status=value;
+  showLoading(false);renderDashboard();
+  showToast(type==='arrival'?'Picked up 🎉':'Completed ✓','success');
 }
 
 async function markActive(id){
@@ -689,20 +813,18 @@ function renderDrivers(){
   const assigned=allDrivers.filter(d=>d.assigned==='yes');
   const uSec=document.getElementById('unassigned-drivers-section');
   const aSec=document.getElementById('assigned-drivers-section');
-
   if(!allDrivers.length){
-    uSec.innerHTML=`<div class="empty-state"><div class="e-icon">🚗</div><h3>No drivers added yet</h3><p>Add drivers in the <strong>drivers</strong> tab of your Google Sheet</p></div>`;
+    uSec.innerHTML=`<div class="empty-state"><div class="e-icon">🚗</div><h3>No drivers added yet</h3><p>Add in the drivers tab of your Google Sheet</p></div>`;
     aSec.innerHTML='';return;
   }
-
   uSec.innerHTML=unassigned.length
     ?`<div class="section-label">🔴 Unassigned Drivers (${unassigned.length})</div>
        <div class="driver-cards-grid">${unassigned.map(d=>driverCard(d,[])).join('')}</div>`
-    :`<div class="section-label">Unassigned Drivers</div><p style="color:var(--text-2);font-size:13px;margin-bottom:24px">All drivers are assigned ✓</p>`;
-
+    :`<div class="section-label">Unassigned Drivers</div><p style="color:var(--text-2);font-size:13px;margin-bottom:24px">All drivers assigned ✓</p>`;
   if(assigned.length){
     const cards=assigned.map(d=>{
-      const groups=allGuests.filter(g=>g.car_token===d.car_token&&g.status!=='picked_up');
+      const cn=d.car_no||d.car_token||'';
+      const groups=allGuests.filter(g=>(g.car_no===cn)&&g.status!=='picked_up'&&g.status!=='car_returned');
       return driverCard(d,groups);
     }).join('');
     aSec.innerHTML=`<div class="section-label">✅ Assigned Drivers (${assigned.length})</div>
@@ -710,41 +832,73 @@ function renderDrivers(){
   } else { aSec.innerHTML=''; }
 }
 
+function parseDelayMins(text){
+  if(!text) return 0;
+  const t=text.toLowerCase();
+  let m=t.match(/(\d+)\s*hour[s]?\s*(?:and\s*)?(\d+)?\s*min/);if(m) return parseInt(m[1])*60+(parseInt(m[2])||0);
+  m=t.match(/(\d+)\s*hr[s]?\s*(?:and\s*)?(\d+)?\s*min/);if(m) return parseInt(m[1])*60+(parseInt(m[2])||0);
+  m=t.match(/(\d+)\s*hour/);if(m) return parseInt(m[1])*60;
+  m=t.match(/(\d+)\s*min/);if(m) return parseInt(m[1]);
+  return 0;
+}
+function fmtDelayBadge(d){if(!d||d<=0) return '';return d<60?'+'+d+'m':`+${Math.floor(d/60)}h${d%60?' '+(d%60)+'m':''}`;}
+
 function driverCard(driver,groups){
   const isUnassigned=!groups||groups.length===0;
   const now=new Date();
+  const cn=driver.car_no||driver.car_token||'—';
 
   const assignmentHtml=isUnassigned
     ?`<div class="driver-assignment" style="background:var(--amber-lt)">
         <div class="da-label">Status</div>
-        <div class="da-group" style="color:var(--amber)">No assignment yet — available</div>
+        <div class="da-group" style="color:var(--amber)">No assignment — available</div>
       </div>`
     :groups.map(g=>{
-        const lb=leaveBy(g.arrival_date,g.arrival_time);
+        const jt=journeyType(g);
+        const isDep=jt==='departure';
+        const delayMins=parseDelayMins(g.live_status_text);
+        const delayBadge=fmtDelayBadge(delayMins);
+        const lb=isDep?leaveByDeparture(g):leaveByArrival(g.arrival_date,g.arrival_time,delayMins);
         const lbDate=lb?new Date(lb):null;
-        const urgent=lbDate&&(lbDate-now)<30*60*1000;
-        return `<div class="driver-assignment">
-          <div class="da-label">Assigned Guest</div>
-          <div class="da-group">${esc(g.group_name)} · ${g.pax} pax</div>
-          <div class="da-detail">📍 ${esc(g.pickup_location)} · 🕐 ${g.arrival_time||'—'} (${fmtDate(g.arrival_date)})<br>
-            🚦 ${g.live_status_text?esc(g.live_status_text.slice(0,60))+'…':'Status not refreshed'}</div>
-          <div class="driver-timing">
-            <div class="timing-box"><div class="tb-label">Train Arrives</div><div class="tb-value">${g.arrival_time||'—'}</div></div>
-            <div class="timing-box${urgent?' urgent':''}"><div class="tb-label">Leave By</div><div class="tb-value">${lb?lb.slice(11,16):'—'}</div></div>
+        const urgent=lbDate&&(lbDate-now)<30*60*1000&&(lbDate-now)>0;
+        const transportLabel=g.transport_type==='Flight'?(isDep?'Flight Departs':'Flight Arrives'):(isDep?'Train Departs':'Train Arrives');
+        return `<div class="driver-assignment${isDep?' dep-assignment':''}">
+          <div class="da-label">
+            <span>${isDep?'🛫 Departure':'🛬 Arrival'}</span>
           </div>
-        </div>`;
-      }).join('')+
-      groups.map(g=>`
+          <div class="da-group">${esc(g.group_name)} · ${g.pax} pax</div>
+          <div class="da-detail">📍 ${isDep?'Drop':'Pickup'}: ${esc(g.pickup_location)} · ${fmtAmPm(g.arrival_time)||'—'} (${fmtDate(g.arrival_date)})<br>
+            🚦 ${g.live_status_text?esc(g.live_status_text.slice(0,65))+'…':'Status not refreshed'}</div>
+          <div class="driver-timing">
+            <div class="timing-box" style="position:relative">
+              ${delayBadge?`<span class="delay-badge">${delayBadge}</span>`:''}
+              <div class="tb-label">${transportLabel}</div>
+              <div class="tb-value">${g.arrival_time?fmtAmPm(g.arrival_time):'—'}</div>
+            </div>
+            <div class="timing-box${urgent?' urgent':''}">
+              <div class="tb-label">Leave By</div>
+              <div class="tb-value">${lb?fmtAmPm(lb.slice(11,16)):'—'}</div>
+            </div>
+          </div>
+        </div>
         <div class="driver-toggles">
-          <button class="toggle-btn${g.driver_arrived==='yes'?' active-green':''}"
-            onclick="toggleDriverField('${g.group_id}','driver_arrived','${g.driver_arrived||'no'}')">
-            ${g.driver_arrived==='yes'?'📍 At Station ✓':'📍 Arrived at Station'}
-          </button>
-          <button class="toggle-btn${g.guest_in_car==='yes'?' active-blue':''}"
-            onclick="toggleDriverField('${g.group_id}','guest_in_car','${g.guest_in_car||'no'}')">
-            ${g.guest_in_car==='yes'?'🚗 En Route ✓':'🚗 Guest in Car'}
-          </button>
-        </div>`).join('');
+          ${isDep?`
+            <button class="toggle-btn${g.dispatched==='yes'?' active-green':''}" onclick="toggleDriverField('${g.group_id}','dispatched','${g.dispatched||'no'}')">
+              ${g.dispatched==='yes'?'🚗 Dispatched ✓':'🚗 Dispatch'}</button>
+            <button class="toggle-btn${g.guest_in_car==='yes'?' active-blue':''}" onclick="toggleDriverField('${g.group_id}','guest_in_car','${g.guest_in_car||'no'}')">
+              ${g.guest_in_car==='yes'?'👤 In Car ✓':'👤 Guest in Car'}</button>
+            <button class="toggle-btn${g.dropped_off==='yes'?' active-purple':''}" onclick="toggleDriverField('${g.group_id}','dropped_off','${g.dropped_off||'no'}')">
+              ${g.dropped_off==='yes'?'🏁 Dropped Off ✓':'🏁 Dropped Off'}</button>
+            <button class="toggle-btn${g.car_returned==='yes'?' active-gold':''}" onclick="toggleDriverField('${g.group_id}','car_returned','${g.car_returned||'no'}')">
+              ${g.car_returned==='yes'?'🔑 Car Returned ✓':'🔑 Car Returned'}</button>
+          `:`
+            <button class="toggle-btn${g.driver_arrived==='yes'?' active-green':''}" onclick="toggleDriverField('${g.group_id}','driver_arrived','${g.driver_arrived||'no'}')">
+              ${g.driver_arrived==='yes'?'📍 At Station ✓':'📍 At Station'}</button>
+            <button class="toggle-btn${g.guest_in_car==='yes'?' active-blue':''}" onclick="toggleDriverField('${g.group_id}','guest_in_car','${g.guest_in_car||'no'}')">
+              ${g.guest_in_car==='yes'?'🚗 En Route ✓':'🚗 Guest in Car'}</button>
+          `}
+        </div>`;
+      }).join('');
 
   return `<div class="driver-card${isUnassigned?' unassigned':''}">
     <div class="driver-card-head">
@@ -754,40 +908,93 @@ function driverCard(driver,groups){
       </div>
       <div style="display:flex;align-items:center;gap:8px">
         ${isUnassigned?'<span class="unassigned-badge">Free</span>':''}
-        <div class="driver-token">${esc(driver.car_token||'—')}</div>
+        <div class="driver-car-no">${esc(cn)}</div>
       </div>
     </div>
     <div class="driver-card-body">${assignmentHtml}</div>
   </div>`;
 }
 
-function leaveBy(date,time){
+function leaveByArrival(date,time,delayMins){
   if(!date||!time) return null;
   const dt=new Date(`${date}T${time}:00`);
-  dt.setMinutes(dt.getMinutes()-TRAVEL_MINS);
+  dt.setMinutes(dt.getMinutes()+(delayMins||0)-TRAVEL_MINS);
+  return dt.toISOString();
+}
+function leaveByDeparture(g){
+  if(!g.arrival_date||!g.arrival_time) return null;
+  const bufMins=departureBufMins(g.transport_type,g.pax);
+  const dt=new Date(`${g.arrival_date}T${g.arrival_time}:00`);
+  dt.setMinutes(dt.getMinutes()-bufMins);
   return dt.toISOString();
 }
 
 async function toggleDriverField(groupId,field,current){
-  const v=current==='yes'?'no':'yes';
-  showLoading(true);
+  const v=current==='yes'?'no':'yes';showLoading(true);
   await apiPost({action:'updateGuestStatus',group_id:groupId,field,value:v});
   const idx=allGuests.findIndex(g=>g.group_id===groupId);if(idx>=0) allGuests[idx][field]=v;
   showLoading(false);renderDrivers();showToast('Updated ✓','success');
 }
 
 // ══════════════════════════════════════════════════════════════
-// ADD / EDIT GUEST
+// ADD / EDIT GUEST FORM
 // ══════════════════════════════════════════════════════════════
+function setJourneyType(type){
+  document.getElementById('f-journey-type').value=type;
+  document.getElementById('jt-arrival').className='jt-btn'+(type==='arrival'?' active-arrival':'');
+  document.getElementById('jt-departure').className='jt-btn'+(type==='departure'?' active-departure':'');
+  document.getElementById('location-label').textContent=type==='departure'?'Drop Station *':'Pickup Station *';
+  document.getElementById('date-label').textContent=type==='departure'?'Departure Date *':'Arrival Date *';
+  document.getElementById('time-label').textContent=type==='departure'?'Departure Time *':'Arrival Time *';
+}
+
 function showGuestForm(id){
   editingId=id||null;screen('guest');
   document.getElementById('guest-form-title').textContent=id?'Edit Guest Group':'Add Guest Group';
   document.getElementById('form-submit-btn').textContent=id?'Save Changes':'Save Guest Group';
   document.getElementById('extraction-result').classList.remove('show');
-  if(id){const g=allGuests.find(x=>x.group_id===id);if(g) populateForm(g);}
-  else{document.getElementById('guest-form').reset();document.getElementById('f-group-id').value='';}
+  populateDriverDropdown();
+  if(id){
+    const g=allGuests.find(x=>x.group_id===id);
+    if(g){populateForm(g);setJourneyType(journeyType(g));}
+  } else {
+    document.getElementById('guest-form').reset();
+    document.getElementById('f-group-id').value='';
+    document.getElementById('driver-detail-row').style.display='none';
+    setJourneyType('arrival');
+  }
 }
 function editGuest(id){showGuestForm(id);}
+
+function populateDriverDropdown(){
+  const sel=document.getElementById('f-driver-select');
+  sel.innerHTML='<option value="">— No driver assigned —</option>';
+  allDrivers.forEach(d=>{
+    const cn=d.car_no||d.car_token||'';
+    const opt=document.createElement('option');
+    opt.value=d.driver_id||d.driver_name;
+    opt.textContent=`${d.driver_name} (${cn}) · ${d.car_type} · Cap: ${d.capacity}`;
+    opt.dataset.name=d.driver_name;opt.dataset.phone=d.driver_phone||'';
+    opt.dataset.carType=d.car_type||'';opt.dataset.carNo=cn;opt.dataset.capacity=d.capacity||'0';
+    sel.appendChild(opt);
+  });
+}
+
+function onDriverSelect(){
+  const sel=document.getElementById('f-driver-select');
+  const opt=sel.options[sel.selectedIndex];
+  const row=document.getElementById('driver-detail-row');
+  if(!opt||!opt.dataset.name){
+    ['f-driver-name','f-driver-phone','f-car-type','f-car-no'].forEach(id=>document.getElementById(id).value='');
+    row.style.display='none';return;
+  }
+  document.getElementById('f-driver-name').value=opt.dataset.name;
+  document.getElementById('f-driver-phone').value=opt.dataset.phone;
+  document.getElementById('f-car-type').value=opt.dataset.carType;
+  document.getElementById('f-car-no').value=opt.dataset.carNo;
+  row.style.display='block';
+  row.innerHTML=`<strong>${esc(opt.dataset.name)}</strong> · ${esc(opt.dataset.carType)} · Car No. ${esc(opt.dataset.carNo)} · Cap: ${opt.dataset.capacity} · 📞 ${esc(opt.dataset.phone)}`;
+}
 
 function populateForm(g){
   const m={'f-group-id':'group_id','f-group-name':'group_name','f-individual-names':'individual_names',
@@ -795,56 +1002,103 @@ function populateForm(g){
     'f-pickup-location':'pickup_location','f-journey-origin':'journey_origin',
     'f-arrival-date':'arrival_date','f-arrival-time':'arrival_time',
     'f-transport-type':'transport_type','f-transport-name':'transport_name',
-    'f-transport-number':'transport_number','f-pnr':'pnr','f-car-type':'car_type',
-    'f-car-token':'car_token','f-driver-name':'driver_name','f-driver-phone':'driver_phone','f-notes':'notes'};
+    'f-transport-number':'transport_number','f-pnr':'pnr','f-notes':'notes'};
   Object.entries(m).forEach(([el,k])=>{const e=document.getElementById(el);if(e) e.value=g[k]||'';});
+  document.getElementById('f-driver-name').value=g.driver_name||'';
+  document.getElementById('f-driver-phone').value=g.driver_phone||'';
+  document.getElementById('f-car-type').value=g.car_type||'';
+  document.getElementById('f-car-no').value=g.car_no||'';
+  const sel=document.getElementById('f-driver-select');
+  for(let i=0;i<sel.options.length;i++){
+    if(sel.options[i].dataset.name===g.driver_name){sel.selectedIndex=i;break;}
+  }
+  onDriverSelect();
 }
 
 function collectForm(){
-  return{group_id:v('f-group-id'),group_name:v('f-group-name'),individual_names:v('f-individual-names'),
+  return{
+    group_id:v('f-group-id'),group_name:v('f-group-name'),individual_names:v('f-individual-names'),
     pax:v('f-pax'),phone_primary:v('f-phone-primary'),phone_backup:v('f-phone-backup'),
     pickup_location:v('f-pickup-location'),journey_origin:v('f-journey-origin'),
     arrival_date:v('f-arrival-date'),arrival_time:v('f-arrival-time'),
     transport_type:v('f-transport-type'),transport_name:v('f-transport-name'),
-    transport_number:v('f-transport-number'),pnr:v('f-pnr'),car_type:v('f-car-type'),
-    car_token:v('f-car-token'),driver_name:v('f-driver-name'),driver_phone:v('f-driver-phone'),notes:v('f-notes')};
+    transport_number:v('f-transport-number'),pnr:v('f-pnr'),
+    car_type:v('f-car-type'),car_no:v('f-car-no'),
+    driver_name:v('f-driver-name'),driver_phone:v('f-driver-phone'),
+    notes:v('f-notes'),journey_type:v('f-journey-type')
+  };
 }
 function v(id){return document.getElementById(id)?.value||'';}
 
-// ── Conflict check ────────────────────────────────────────────
+// ── Conflict & car optimisation ───────────────────────────────
 function checkConflict(data){
   if(!data.driver_name||!data.arrival_date||!data.arrival_time) return null;
   const nm=toMins(data.arrival_date,data.arrival_time);
-  return allGuests.filter(g=>{
+  const conflicts=allGuests.filter(g=>{
     if(g.group_id===data.group_id) return false;
-    if(g.status==='picked_up') return false;
-    if(g.driver_name!==data.driver_name&&g.car_token!==data.car_token) return false;
+    if(g.status==='picked_up'||g.status==='car_returned') return false;
+    if(g.driver_name!==data.driver_name) return false;
     if(!g.arrival_date||!g.arrival_time) return false;
     return Math.abs(toMins(g.arrival_date,g.arrival_time)-nm)<CONFLICT_MINS;
   });
+  return conflicts.length?conflicts:null;
+}
+
+function hasLuggageNotes(notes){
+  if(!notes) return false;
+  return LUGGAGE_KW.some(k=>notes.toLowerCase().includes(k));
+}
+function checkCarOpt(data){
+  if(!data.driver_name||!data.car_no||!data.pax) return null;
+  if(hasLuggageNotes(data.notes)) return null;
+  const ad=allDrivers.find(d=>(d.car_no||d.car_token)===data.car_no);if(!ad) return null;
+  const assignedCap=parseInt(ad.capacity||0);const pax=parseInt(data.pax)||0;
+  const smaller=allDrivers.filter(d=>{
+    if(d.assigned==='yes') return false;
+    const cap=parseInt(d.capacity||0);return cap>=pax&&cap<assignedCap;
+  }).sort((a,b)=>parseInt(a.capacity)-parseInt(b.capacity));
+  return smaller.length?smaller[0]:null;
 }
 
 async function submitGuestForm(e){
-  e.preventDefault();
-  const data=collectForm();
+  e.preventDefault();const data=collectForm();
   const conflicts=checkConflict(data);
   if(conflicts&&conflicts.length){
     pendingSubmitData=data;
     document.getElementById('conflict-detail').innerHTML=
       `<strong>${esc(data.driver_name)}</strong> is already assigned to:<br>`+
-      conflicts.map(c=>`• <strong>${esc(c.group_name)}</strong> at ${esc(c.pickup_location)} · ${c.arrival_time} (${fmtDate(c.arrival_date)})`).join('<br>');
-    document.getElementById('conflict-modal').classList.add('open');
-    return;
+      conflicts.map(c=>`• <strong>${esc(c.group_name)}</strong> at ${esc(c.pickup_location)} · ${fmtAmPm(c.arrival_time)} (${fmtDate(c.arrival_date)})`).join('<br>');
+    document.getElementById('conflict-modal').classList.add('open');return;
+  }
+  const smallerDriver=checkCarOpt(data);
+  if(smallerDriver){
+    carOptPendingData=data;carOptSmallerDriver=smallerDriver;
+    const ad=allDrivers.find(d=>(d.car_no||d.car_token)===data.car_no);
+    const cn=smallerDriver.car_no||smallerDriver.car_token||'';
+    document.getElementById('car-opt-detail').innerHTML=
+      `You assigned a <strong>${esc(data.car_type)}</strong> (Cap: ${ad?.capacity||'?'}) for ${data.pax} pax.<br>
+      A smaller <strong>${esc(smallerDriver.car_type)}</strong> (Cap: ${smallerDriver.capacity}, Car No. ${esc(cn)}, Driver: ${esc(smallerDriver.driver_name)}) is free and fits this group.`;
+    document.getElementById('car-opt-modal').classList.add('open');return;
   }
   await doSave(data);
 }
 
 function closeConflictModal(){document.getElementById('conflict-modal').classList.remove('open');pendingSubmitData=null;}
-
 document.getElementById('conflict-save-anyway').addEventListener('click',async()=>{
   document.getElementById('conflict-modal').classList.remove('open');
-  if(pendingSubmitData) await doSave(pendingSubmitData);
-  pendingSubmitData=null;
+  const d=pendingSubmitData;pendingSubmitData=null;if(d) await doSave(d);
+});
+document.getElementById('car-opt-keep').addEventListener('click',async()=>{
+  document.getElementById('car-opt-modal').classList.remove('open');
+  const d=carOptPendingData;carOptPendingData=null;carOptSmallerDriver=null;if(d) await doSave(d);
+});
+document.getElementById('car-opt-switch').addEventListener('click',async()=>{
+  document.getElementById('car-opt-modal').classList.remove('open');
+  if(!carOptPendingData||!carOptSmallerDriver) return;
+  const d={...carOptPendingData,driver_name:carOptSmallerDriver.driver_name,
+    driver_phone:carOptSmallerDriver.driver_phone||'',car_type:carOptSmallerDriver.car_type,
+    car_no:carOptSmallerDriver.car_no||carOptSmallerDriver.car_token||''};
+  carOptPendingData=null;carOptSmallerDriver=null;await doSave(d);
 });
 
 async function doSave(data){
@@ -854,6 +1108,7 @@ async function doSave(data){
     const ex=allGuests.find(g=>g.group_id===editingId)||{};
     data.status=ex.status||'active';data.dispatched=ex.dispatched||'no';
     data.driver_arrived=ex.driver_arrived||'no';data.guest_in_car=ex.guest_in_car||'no';
+    data.dropped_off=ex.dropped_off||'no';data.car_returned=ex.car_returned||'no';
     data.last_refreshed=ex.last_refreshed||'';data.live_status_text=ex.live_status_text||'';
     await apiPost({action:'updateGuest',data});
     const idx=allGuests.findIndex(g=>g.group_id===editingId);
@@ -861,46 +1116,56 @@ async function doSave(data){
     showToast('Guest updated ✓','success');
   }else{
     const res=await apiPost({action:'addGuest',data});
-    data.group_id=res.group_id;data.status='active';data.dispatched='no';
-    data.driver_arrived='no';data.guest_in_car='no';
+    data.group_id=res.group_id;data.status='active';
+    data.dispatched='no';data.driver_arrived='no';data.guest_in_car='no';
+    data.dropped_off='no';data.car_returned='no';
     data.live_status_text='';data.last_refreshed='';
-    allGuests.push(data);
-    showToast('Guest added 🎉','success');
+    allGuests.push(data);showToast('Guest added 🎉','success');
   }
   showLoading(false);showDashboard();renderDashboard();
 }
 
-// ── File upload ────────────────────────────────────────────────
+// ── File upload ───────────────────────────────────────────────
 async function handleFileUpload(event){
   const file=event.target.files[0];if(!file) return;
   showLoading(true);document.getElementById('extraction-result').classList.remove('show');
   try{
     const b64=await toBase64(file);const mime=file.type||'image/jpeg';
-    const prompt=`Extract travel ticket data from this file. Return ONLY a valid JSON object with these exact keys (no markdown, no explanation):
-{"transport_type":"Train or Flight","transport_name":"","transport_number":"","pnr":"","journey_origin":"","pickup_location":"map to: Howrah, Sealdah, Airport, or Kolkata Station","arrival_date":"YYYY-MM-DD","arrival_time":"HH:MM","individual_names":"comma separated","pax":0}`;
+    const prompt=`Extract travel ticket data. Return ONLY valid JSON, no markdown:
+{"transport_type":"Train or Flight","transport_name":"","transport_number":"","pnr":"","journey_origin":"city/station of departure","destination":"city/station of arrival","arrival_date":"YYYY-MM-DD","arrival_time":"HH:MM","individual_names":"comma separated","pax":0}`;
     const raw=await callGeminiFile(prompt,b64,mime);
-    let ex={};
-    try{const clean=raw.replace(/```json|```/g,'').trim();ex=JSON.parse(clean);}catch{}
+    let ex={};try{ex=JSON.parse(raw.replace(/```json|```/g,'').trim());}catch{}
+
+    // Auto-detect journey type from origin/destination
+    const origin=(ex.journey_origin||'').toLowerCase();
+    const dest=(ex.destination||'').toLowerCase();
+    const originIsKolkata=KOLKATA_ORIGINS.some(k=>origin.includes(k));
+    const destIsKolkata=KOLKATA_ORIGINS.some(k=>dest.includes(k));
+    let detectedType='arrival';
+    if(originIsKolkata&&!destIsKolkata) detectedType='departure';
+    else if(destIsKolkata||(!originIsKolkata)) detectedType='arrival';
+    setJourneyType(detectedType);
+
     const fm={'f-transport-type':'transport_type','f-transport-name':'transport_name',
       'f-transport-number':'transport_number','f-pnr':'pnr','f-journey-origin':'journey_origin',
       'f-arrival-date':'arrival_date','f-arrival-time':'arrival_time',
       'f-individual-names':'individual_names','f-pax':'pax'};
     Object.entries(fm).forEach(([el,k])=>{if(ex[k]) document.getElementById(el).value=ex[k];});
-    const loc=(ex.pickup_location||'').toLowerCase();
+
+    // Map station
+    const stationSrc=detectedType==='departure'?origin:dest;
     const locEl=document.getElementById('f-pickup-location');
-    if(loc.includes('howrah')) locEl.value='Howrah';
-    else if(loc.includes('sealdah')) locEl.value='Sealdah';
-    else if(loc.includes('airport')||loc.includes('nscbi')) locEl.value='Airport';
-    else if(loc.includes('kolkata')) locEl.value='Kolkata Station';
+    if(stationSrc.includes('howrah')) locEl.value='Howrah';
+    else if(stationSrc.includes('sealdah')) locEl.value='Sealdah';
+    else if(stationSrc.includes('airport')||stationSrc.includes('nscbi')||stationSrc.includes('dumdum')) locEl.value='Airport';
+    else if(stationSrc.includes('kolkata')||stationSrc.includes('calcutta')) locEl.value='Kolkata Station';
+
     document.getElementById('extraction-result').classList.add('show');
-    showToast('Details extracted! Please verify.','success');
+    showToast(`Extracted as ${detectedType}. Please verify.`,'success');
   }catch(err){showToast('Extraction failed — please fill in manually','error');}
   showLoading(false);
 }
-
-function toBase64(file){
-  return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(file);});
-}
+function toBase64(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(file);});}
 
 // ── Gemini ────────────────────────────────────────────────────
 async function callGemini(prompt){
@@ -912,7 +1177,6 @@ async function callGemini(prompt){
   const d=await r.json();if(d.error) throw new Error(d.error.message);
   return d.candidates?.[0]?.content?.parts?.[0]?.text||'No response';
 }
-
 async function callGeminiFile(prompt,b64,mime){
   const r=await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${GEMINI_KEY}`,
@@ -923,19 +1187,22 @@ async function callGeminiFile(prompt,b64,mime){
   return d.candidates?.[0]?.content?.parts?.[0]?.text||'{}';
 }
 
-// ── Summary modal ─────────────────────────────────────────────
+// ── Summary ───────────────────────────────────────────────────
 function openSummaryModal(){
   const today=new Date().toISOString().slice(0,10);
-  const active=allGuests.filter(g=>g.status!=='picked_up');
+  const active=allGuests.filter(g=>g.status!=='picked_up'&&g.status!=='car_returned');
+  const arrivals=active.filter(g=>journeyType(g)==='arrival');
+  const departures=active.filter(g=>journeyType(g)==='departure');
+  const done=allGuests.filter(g=>g.status==='picked_up'||g.status==='car_returned');
   const tiles=[
-    {label:"Today's Arrivals",   value:active.filter(g=>g.arrival_date===today).length, sub:'groups'},
-    {label:'Total Pending Pax',  value:active.reduce((s,g)=>s+(parseInt(g.pax)||0),0),  sub:'people'},
-    {label:'Pending Pickup',     value:active.length,                                    sub:'groups'},
-    {label:'Picked Up',          value:allGuests.filter(g=>g.status==='picked_up').length,sub:'completed'},
-    {label:'Dispatched',         value:active.filter(g=>g.dispatched==='yes').length,    sub:'drivers sent'},
-    {label:'Driver at Station',  value:active.filter(g=>g.driver_arrived==='yes').length,sub:'waiting'},
-    {label:'Guest in Car',       value:active.filter(g=>g.guest_in_car==='yes').length,  sub:'en route'},
-    {label:'Free Drivers',       value:allDrivers.filter(d=>d.assigned!=='yes').length,  sub:'available'},
+    {label:"Today's Arrivals",   value:arrivals.filter(g=>g.arrival_date===today).length,  sub:'groups'},
+    {label:"Today's Departures", value:departures.filter(g=>g.arrival_date===today).length, sub:'groups'},
+    {label:'Pending Arrivals',   value:arrivals.length,                                      sub:'groups'},
+    {label:'Pending Departures', value:departures.length,                                    sub:'groups'},
+    {label:'Total Pending Pax',  value:active.reduce((s,g)=>s+(parseInt(g.pax)||0),0),      sub:'people'},
+    {label:'Completed',          value:done.length,                                          sub:'total'},
+    {label:'Dispatched',         value:active.filter(g=>g.dispatched==='yes').length,        sub:'drivers sent'},
+    {label:'Free Drivers',       value:allDrivers.filter(d=>d.assigned!=='yes').length,      sub:'available'},
   ];
   document.getElementById('summary-grid').innerHTML=tiles.map(t=>
     `<div class="summary-tile"><div class="st-label">${t.label}</div><div class="st-value">${t.value}</div><div class="st-sub">${t.sub}</div></div>`
@@ -961,15 +1228,22 @@ function saveSettings(){
 
 // ── Helpers ───────────────────────────────────────────────────
 function toMins(date,time){return new Date(`${date}T${time}:00`).getTime()/60000;}
-function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function fmtDate(d){
   if(!d) return '';
-  const parts = String(d).split('-');
-  if(parts.length !== 3) return d;
-  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  return parseInt(parts[2]) + ' ' + (months[parseInt(parts[1])-1] || '');
+  const p=String(d).split('-');if(p.length!==3) return d;
+  const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return parseInt(p[2])+' '+(months[parseInt(p[1])-1]||'');
 }
-function fmtTs(ts){try{return new Date(ts).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});}catch{return ts;}}
+function fmtAmPm(t){
+  if(!t) return '';
+  const p=String(t).split(':');if(p.length<2) return t;
+  let h=parseInt(p[0]),m=p[1];const ap=h>=12?'PM':'AM';h=h%12||12;
+  return `${h}:${m} ${ap}`;
+}
+function fmtTs(ts){
+  try{const d=new Date(ts);return fmtAmPm(d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:false}));}catch{return ts;}
+}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 let _tt;
 function showToast(msg,type=''){
   const t=document.getElementById('toast');t.textContent=msg;t.className='show '+type;
