@@ -51,7 +51,6 @@ label{display:block;font-size:13px;font-weight:500;color:var(--text-2);margin-bo
 .modal h3{font-family:var(--font-h);font-size:20px;margin-bottom:18px}
 .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px}
 
-/* Setup */
 #screen-setup{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
 .setup-card{background:var(--white);border-radius:20px;padding:48px 40px;max-width:480px;width:100%;box-shadow:var(--shadow-lg);border:1px solid var(--border)}
 .setup-card .mandala{text-align:center;font-size:48px;margin-bottom:8px;animation:pulse 3s ease infinite}
@@ -59,7 +58,6 @@ label{display:block;font-size:13px;font-weight:500;color:var(--text-2);margin-bo
 .setup-card p{text-align:center;color:var(--text-2);font-size:14px;margin-bottom:32px}
 .setup-help{background:var(--gold-lt);border-radius:8px;padding:12px 14px;font-size:12px;color:var(--text-2);margin-top:16px;line-height:1.6}
 
-/* App shell */
 #app{display:none;flex-direction:column;min-height:100vh}
 header{background:var(--white);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:64px;position:sticky;top:0;z-index:100}
 .header-brand{display:flex;align-items:center;gap:10px}
@@ -70,20 +68,17 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
 
 .section-label{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--text-2);font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px}
 .section-label::after{content:'';flex:1;height:1px;background:var(--border)}
-
 .date-tabs{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
 .date-tab{padding:8px 16px;border-radius:8px;border:1.5px solid var(--border);background:var(--white);font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;color:var(--text-2)}
 .date-tab.active{background:var(--gold);color:var(--white);border-color:var(--gold)}
 .date-tab:hover:not(.active){background:var(--gray-lt)}
 
-/* Journey type toggle */
-.journey-toggle{display:flex;gap:0;border-radius:10px;overflow:hidden;border:1.5px solid var(--border);width:fit-content;margin-bottom:20px}
+.journey-toggle{display:flex;border-radius:10px;overflow:hidden;border:1.5px solid var(--border);width:fit-content;margin-bottom:20px}
 .jt-btn{padding:9px 22px;border:none;font-family:var(--font-b);font-size:13px;font-weight:600;cursor:pointer;background:var(--white);color:var(--text-2);transition:all .15s}
 .jt-btn.active-arrival{background:var(--green);color:var(--white)}
 .jt-btn.active-departure{background:var(--purple);color:var(--white)}
 .jt-btn:not(:last-child){border-right:1.5px solid var(--border)}
 
-/* Pooling */
 #pooling-section{margin-bottom:24px}
 .pooling-banner{background:var(--amber-lt);border:1.5px solid #f6c752;border-radius:var(--radius);padding:16px 18px}
 .pooling-banner-header{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--amber);margin-bottom:10px}
@@ -93,7 +88,6 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
 .pooling-card-detail{font-size:13px;color:var(--text-2);margin-bottom:10px;line-height:1.6}
 .pooling-card-actions{display:flex;gap:8px}
 
-/* Guest cards */
 .cards-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:24px}
 @media(max-width:640px){.cards-grid{grid-template-columns:1fr}}
 .guest-card{background:var(--white);border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow);overflow:hidden;transition:box-shadow .2s;cursor:pointer}
@@ -109,14 +103,12 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
 .card-pax{background:var(--gold-lt);color:var(--gold);font-size:12px;font-weight:600;padding:3px 9px;border-radius:20px;white-space:nowrap;flex-shrink:0}
 .card-badges{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px;min-height:4px}
 .card-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-
 .location-badge{font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;text-transform:uppercase;letter-spacing:.4px}
 .loc-rail{background:var(--saffron-lt);color:var(--saffron)}.loc-airport{background:var(--blue-lt);color:var(--blue)}
 .journey-badge-arrival{background:var(--green-lt);color:var(--green);font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;text-transform:uppercase;letter-spacing:.4px}
 .journey-badge-departure{background:var(--purple-lt);color:var(--purple);font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;text-transform:uppercase;letter-spacing:.4px}
 .no-driver-badge{background:var(--red-lt);color:var(--red);font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;animation:pulse 2s ease infinite}
 .soon-badge{background:var(--amber-lt);color:var(--amber);font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px}
-
 .card-time{font-size:13px;color:var(--text-2)}
 .card-status-text{font-size:12px;font-weight:500;margin-left:auto}
 .status-on-time{color:var(--green)}.status-delayed{color:var(--amber)}.status-late{color:var(--red)}.status-unknown{color:var(--gray)}
@@ -128,10 +120,8 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
 .detail-item .d-label{font-size:11px;color:var(--text-2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px}
 .detail-item .d-value{font-size:14px;font-weight:500;color:var(--text)}
 .detail-item .d-value a{color:var(--blue);text-decoration:none}
-
 .live-status-box{background:var(--gray-lt);border-radius:8px;padding:12px 14px;font-size:13px;color:var(--text-2);line-height:1.6;display:flex;align-items:flex-start;gap:10px}
-.ls-icon{font-size:16px;flex-shrink:0;margin-top:1px}
-.ls-text{flex:1}
+.ls-icon{font-size:16px;flex-shrink:0;margin-top:1px}.ls-text{flex:1}
 .ls-timestamp{font-size:11px;color:var(--gray);margin-top:4px}
 .card-actions{display:flex;gap:8px;flex-wrap:wrap;padding-top:4px;border-top:1px solid var(--border)}
 
@@ -140,11 +130,10 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
 .completed-toggle:hover{background:var(--white)}
 .completed-cards{display:none}.completed-cards.open{display:block}
 .completed-cards .guest-card{opacity:.6}.completed-cards .guest-card:hover{opacity:1}
-.empty-state{text-align:center;padding:48px 20px;color:var(--text-2);grid-column:1/-1}
+.empty-state{text-align:center;padding:40px 20px;color:var(--text-2);grid-column:1/-1}
 .empty-state .e-icon{font-size:40px;margin-bottom:10px}
 .empty-state h3{font-family:var(--font-h);font-size:18px;color:var(--text);margin-bottom:4px}
 
-/* Driver analytics */
 #screen-drivers{display:none}
 .screen-header{display:flex;align-items:center;gap:14px;margin-bottom:28px}
 .screen-header h2{font-family:var(--font-h);font-size:24px;color:var(--text)}
@@ -162,7 +151,7 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
 .driver-card-body{padding:14px 16px;display:flex;flex-direction:column;gap:12px}
 .driver-assignment{background:var(--gray-lt);border-radius:8px;padding:10px 12px;font-size:13px}
 .driver-assignment.dep-assignment{background:var(--purple-lt)}
-.da-label{font-size:11px;color:var(--text-2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;display:flex;align-items:center;gap:6px}
+.da-label{font-size:11px;color:var(--text-2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px}
 .da-group{font-weight:600;color:var(--text);margin-bottom:2px}
 .da-detail{color:var(--text-2);line-height:1.6}
 .driver-timing{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
@@ -180,7 +169,6 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
 .toggle-btn:hover:not(.active-green):not(.active-blue):not(.active-purple):not(.active-gold){background:var(--gray-lt)}
 .unassigned-badge{background:var(--amber);color:var(--white);font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px}
 
-/* Form */
 #screen-guest{display:none}
 .upload-zone{border:2px dashed var(--gold);border-radius:var(--radius);background:var(--gold-lt);padding:32px 24px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:24px;position:relative}
 .upload-zone:hover{background:#EDD9A3}
@@ -194,13 +182,11 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
 .form-card h3{font-family:var(--font-h);font-size:17px;color:var(--text);margin-bottom:18px;padding-bottom:10px;border-bottom:1px solid var(--border)}
 .form-actions{display:flex;gap:12px;justify-content:flex-end;margin-top:8px}
 
-/* Summary */
 .summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .summary-tile{background:var(--cream);border-radius:10px;padding:16px;border:1px solid var(--border);text-align:center}
 .summary-tile .st-label{font-size:11px;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
 .summary-tile .st-value{font-size:28px;font-weight:700;font-family:var(--font-h);color:var(--gold)}
 .summary-tile .st-sub{font-size:11px;color:var(--text-2);margin-top:2px}
-
 .conflict-detail{background:var(--red-lt);border:1px solid #f5c6c2;border-radius:8px;padding:12px 14px;font-size:13px;color:var(--red);line-height:1.7;margin-bottom:4px}
 .car-opt-detail{background:var(--green-lt);border:1px solid #a8d5c2;border-radius:8px;padding:12px 14px;font-size:13px;color:var(--green);line-height:1.7;margin-bottom:4px}
 </style>
@@ -218,11 +204,11 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
   <div class="setup-card">
     <div class="mandala">🪔</div>
     <h1>Wedding Guest Tracker</h1>
-    <p>Enter your credentials to get started. Saved locally on your device.</p>
+    <p>Enter your credentials to get started. Saved locally on this device.</p>
     <div class="form-group"><label>Google Apps Script Web App URL</label><input type="url" id="setup-script-url" placeholder="https://script.google.com/macros/s/…/exec"/></div>
     <div class="form-group"><label>Gemini API Key</label><input type="password" id="setup-gemini-key" placeholder="AIza…"/></div>
     <button class="btn btn-primary" style="width:100%;justify-content:center;padding:14px" onclick="saveSetup()">🎉 Open Dashboard</button>
-    <div class="setup-help"><strong>Where to get these?</strong> See the README setup guide included with this project.</div>
+    <div class="setup-help"><strong>Where to get these?</strong> See the README setup guide.</div>
   </div>
 </div>
 
@@ -268,11 +254,10 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
         <h2 id="guest-form-title">Add Guest Group</h2>
       </div>
 
-      <!-- Journey type toggle -->
       <div style="margin-bottom:20px">
         <label style="margin-bottom:8px">Journey Type</label>
         <div class="journey-toggle">
-          <button type="button" class="jt-btn" id="jt-arrival" onclick="setJourneyType('arrival')">✈️ Arrival</button>
+          <button type="button" class="jt-btn" id="jt-arrival" onclick="setJourneyType('arrival')">🛬 Arrival</button>
           <button type="button" class="jt-btn" id="jt-departure" onclick="setJourneyType('departure')">🛫 Departure</button>
         </div>
       </div>
@@ -282,9 +267,9 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
         <input type="file" accept="image/*,.pdf" id="ticket-file" onchange="handleFileUpload(event)"/>
         <div class="uz-icon">📄</div>
         <h3>Upload Ticket / Booking</h3>
-        <p>Gemini will extract details and auto-detect journey type</p>
+        <p>Gemini extracts details and auto-detects journey type</p>
       </div>
-      <div class="extraction-result" id="extraction-result">✅ Details extracted! Please verify below before saving.</div>
+      <div class="extraction-result" id="extraction-result">✅ Details extracted! Please verify below.</div>
 
       <form id="guest-form" onsubmit="submitGuestForm(event)">
         <input type="hidden" id="f-group-id"/>
@@ -345,12 +330,12 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
           <input type="hidden" id="f-car-no"/>
           <input type="hidden" id="f-driver-name"/>
           <input type="hidden" id="f-driver-phone"/>
-          <div id="driver-detail-row" style="display:none;background:var(--gray-lt);border-radius:8px;padding:12px 14px;font-size:13px;color:var(--text-2);margin-top:4px"></div>
+          <div id="driver-detail-row" style="display:none;background:var(--gray-lt);border-radius:8px;padding:12px 14px;font-size:13px;color:var(--text-2);margin-top:4px;line-height:1.7"></div>
         </div>
 
         <div class="form-card">
           <h3>📝 Notes</h3>
-          <div class="form-group"><textarea id="f-notes" rows="3" placeholder="Elderly passenger / lots of luggage / 6 large bags / wheelchair needed…"></textarea></div>
+          <div class="form-group"><textarea id="f-notes" rows="3" placeholder="Elderly passenger / lots of luggage / wheelchair needed…"></textarea></div>
         </div>
 
         <div class="form-actions">
@@ -370,7 +355,6 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
     <div class="modal-actions"><button class="btn btn-secondary" onclick="document.getElementById('summary-modal').classList.remove('open')">Close</button></div>
   </div>
 </div>
-
 <div class="modal-overlay" id="settings-modal">
   <div class="modal">
     <h3>⚙️ Settings</h3>
@@ -382,19 +366,17 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
     </div>
   </div>
 </div>
-
 <div class="modal-overlay" id="conflict-modal">
   <div class="modal">
     <h3>⚠️ Driver Conflict Detected</h3>
     <div class="conflict-detail" id="conflict-detail"></div>
-    <p style="font-size:13px;color:var(--text-2);margin-top:12px">Gap is less than 120 minutes. Driver may not have enough time for both trips.</p>
+    <p style="font-size:13px;color:var(--text-2);margin-top:12px">Gap is less than 120 minutes. Driver may not have time for both trips.</p>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeConflictModal()">Cancel</button>
       <button class="btn btn-danger" id="conflict-save-anyway">Save Anyway</button>
     </div>
   </div>
 </div>
-
 <div class="modal-overlay" id="pooling-modal">
   <div class="modal">
     <h3>🚗 Confirm Pooling</h3>
@@ -405,7 +387,6 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
     </div>
   </div>
 </div>
-
 <div class="modal-overlay" id="car-opt-modal">
   <div class="modal">
     <h3>💡 Smaller Car Available</h3>
@@ -423,16 +404,11 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
 const TRAVEL_MINS   = 90;
 const CONFLICT_MINS = 120;
 const LUGGAGE_KW    = ['luggage','bag','suitcase','baggage','wheelchair','equipment','heavy','lots','bulky','cargo'];
-const KOLKATA_ORIGINS = ['howrah','sealdah','kolkata','kolkata station','nscbi','dumdum','netaji','calcutta'];
+const KOLKATA_STATIONS = ['howrah','sealdah','kolkata','kolkata station','nscbi','dumdum','netaji','calcutta'];
 
-// Departure buffer: [trainSmall, trainLarge, flightSmall, flightLarge] in mins before departure
-// train ≤3: 90+45+30=165, train 3+: 90+45+45=180
-// flight ≤3: 90+120+30=240, flight 3+: 90+120+45=255
-function departureBufMins(transportType, pax){
-  const p=parseInt(pax)||1;
-  const large=p>3;
-  if((transportType||'').toLowerCase()==='flight') return large?255:240;
-  return large?180:165;
+function departureBufMins(type, pax){
+  const large=(parseInt(pax)||0)>3;
+  return (type||'').toLowerCase()==='flight'?(large?255:240):(large?180:165);
 }
 
 // ── State ─────────────────────────────────────────────────────
@@ -483,6 +459,23 @@ async function initAndLoad(){
 function screen(n){['dashboard','drivers','guest'].forEach(s=>{document.getElementById('screen-'+s).style.display=s===n?'block':'none';});}
 function showDashboard(){renderDashboard();}
 
+// ── Journey type helpers ──────────────────────────────────────
+function journeyType(g){return (g.journey_type||'arrival').toLowerCase()==='departure'?'departure':'arrival';}
+
+function isKolkataStation(str){
+  const s=(str||'').toLowerCase();
+  return KOLKATA_STATIONS.some(k=>s.includes(k));
+}
+
+function mapToStation(str){
+  const s=(str||'').toLowerCase();
+  if(s.includes('howrah')) return 'Howrah';
+  if(s.includes('sealdah')) return 'Sealdah';
+  if(s.includes('airport')||s.includes('nscbi')||s.includes('dumdum')||s.includes('netaji')) return 'Airport';
+  if(s.includes('kolkata')||s.includes('calcutta')) return 'Kolkata Station';
+  return '';
+}
+
 // ══════════════════════════════════════════════════════════════
 // DASHBOARD
 // ══════════════════════════════════════════════════════════════
@@ -490,28 +483,23 @@ function renderDashboard(){
   screen('dashboard');
   buildDateTabs();
   buildPooling();
-
   const today=new Date().toISOString().slice(0,10);
   const active=filteredGuests();
   const arrivals=active.filter(g=>journeyType(g)==='arrival');
   const departures=active.filter(g=>journeyType(g)==='departure');
   const done=allGuests.filter(g=>g.status==='picked_up'||g.status==='car_returned');
 
-  // Sort each section: priority (no driver + soon) first, then by time
-  const sortSection=list=>list.sort((a,b)=>{
+  const sortSec=list=>list.sort((a,b)=>{
     const ap=isPriority(a)?0:1,bp=isPriority(b)?0:1;
     if(ap!==bp) return ap-bp;
     return ((a.arrival_date||'')+(a.arrival_time||'')).localeCompare((b.arrival_date||'')+(b.arrival_time||''));
   });
 
-  // Dynamic section order — if today has arrivals show first, else departures first
-  const todayArrivals=arrivals.filter(g=>g.arrival_date===today);
-  const showArrFirst=todayArrivals.length>0||departures.filter(g=>g.arrival_date===today).length===0;
+  const todayHasArrivals=arrivals.some(g=>g.arrival_date===today);
+  const arrHtml=buildSection(sortSec(arrivals),'arrival');
+  const depHtml=buildSection(sortSec(departures),'departure');
 
-  const arrHtml=buildSection(sortSection(arrivals),'arrival');
-  const depHtml=buildSection(sortSection(departures),'departure');
-
-  if(showArrFirst){
+  if(todayHasArrivals||!departures.some(g=>g.arrival_date===today)){
     document.getElementById('arrivals-section').innerHTML=arrHtml;
     document.getElementById('departures-section').innerHTML=depHtml;
   } else {
@@ -534,10 +522,6 @@ function buildSection(list,type){
   </div>`;
 }
 
-function journeyType(g){
-  return (g.journey_type||'arrival').toLowerCase()==='departure'?'departure':'arrival';
-}
-
 function filteredGuests(){
   let list=allGuests.filter(g=>g.status!=='picked_up'&&g.status!=='car_returned');
   if(activeTab!=='all') list=list.filter(g=>g.arrival_date===activeTab);
@@ -547,9 +531,9 @@ function filteredGuests(){
 function isPriority(g){
   if(g.driver_name) return false;
   if(!g.arrival_date||!g.arrival_time) return false;
-  const arrMs=new Date(g.arrival_date+'T'+g.arrival_time+':00').getTime();
-  const diffMins=(arrMs-Date.now())/60000;
-  return diffMins>=0&&diffMins<=180;
+  const ms=new Date(g.arrival_date+'T'+g.arrival_time+':00').getTime();
+  const diff=(ms-Date.now())/60000;
+  return diff>=0&&diff<=180;
 }
 
 function buildDateTabs(){
@@ -570,11 +554,9 @@ function buildPooling(){
   for(let i=0;i<active.length;i++){
     for(let j=i+1;j<active.length;j++){
       const a=active[i],b=active[j];
-      // Only pool same journey type
       if(journeyType(a)!==journeyType(b)) continue;
       if(!a.arrival_date||!a.arrival_time||!b.arrival_date||!b.arrival_time) continue;
       if(a.pickup_location!==b.pickup_location) continue;
-      // Auto-dismiss if same driver
       if(a.driver_name&&b.driver_name&&a.driver_name===b.driver_name) continue;
       const diff=Math.abs(toMins(a.arrival_date,a.arrival_time)-toMins(b.arrival_date,b.arrival_time));
       if(diff>30) continue;
@@ -608,9 +590,8 @@ function buildPooling(){
         ${r.sd?' · '+esc(r.sd.car)+' ('+esc(r.sd.car_no)+')':''}
       </div>
       <div class="pooling-card-actions">
-        ${r.sd
-          ?`<button class="btn btn-primary btn-sm" onclick="openPoolingConfirm(${i})">Assign ${esc(r.sd.name)}</button>`
-          :`<span style="font-size:12px;color:var(--red)">⚠️ No car with ${r.combo}+ capacity available</span>`}
+        ${r.sd?`<button class="btn btn-primary btn-sm" onclick="openPoolingConfirm(${i})">Assign ${esc(r.sd.name)}</button>`
+              :`<span style="font-size:12px;color:var(--red)">⚠️ No car with ${r.combo}+ capacity</span>`}
         <button class="btn btn-secondary btn-sm" onclick="document.getElementById('pc-${i}').remove()">Dismiss</button>
       </div>
     </div>`).join('')}
@@ -639,8 +620,7 @@ document.getElementById('pooling-confirm-btn').addEventListener('click',async()=
 
 // ── Guest card ────────────────────────────────────────────────
 function renderCard(g){
-  const jt=journeyType(g);
-  const isDep=jt==='departure';
+  const jt=journeyType(g);const isDep=jt==='departure';
   const isAirport=g.pickup_location==='Airport';
   const pri=isPriority(g);
   const timeStr=g.arrival_date&&g.arrival_time?fmtDate(g.arrival_date)+' · '+fmtAmPm(g.arrival_time):'—';
@@ -648,14 +628,17 @@ function renderCard(g){
   const soonBadge=(()=>{
     if(!g.arrival_date||!g.arrival_time||!g.driver_name) return '';
     const mins=(new Date(g.arrival_date+'T'+g.arrival_time+':00').getTime()-Date.now())/60000;
-    return (mins>=0&&mins<=180)?'<span class="soon-badge">🕐 Arriving Soon</span>':'';
+    return mins>=0&&mins<=180?'<span class="soon-badge">🕐 Soon</span>':'';
   })();
   const jBadge=isDep
     ?'<span class="journey-badge-departure">🛫 Departure</span>'
     :'<span class="journey-badge-arrival">🛬 Arrival</span>';
 
-  // Departure cards show drop station label differently
-  const locLabel=isDep?'Drop: '+esc(g.pickup_location||'—'):'';
+  // Labels change by journey type
+  const stationLabel=isDep?'Drop Station':'Pickup Station';
+  const timeLabel=isDep?'Departure Time':'Arrival Time';
+  const dateLabel=isDep?'Departure Date':'Arrival Date';
+  const originLabel=isDep?'Departing From':'Coming From';
 
   return `<div class="guest-card${pri?' priority-high':''}" id="card-${g.group_id}" onclick="toggleCard('${g.group_id}')">
     <div class="card-strip ${stripClass(g)}"></div>
@@ -673,16 +656,22 @@ function renderCard(g){
     </div>
     <div class="card-expanded" id="exp-${g.group_id}">
       <div class="detail-grid">
-        <div class="detail-item"><div class="d-label">Transport</div><div class="d-value">${esc(g.transport_type||'—')} · ${esc(g.transport_name||'')} ${esc(g.transport_number||'')}</div></div>
+        <div class="detail-item"><div class="d-label">Transport</div>
+          <div class="d-value">${esc(g.transport_type||'—')} · ${esc(g.transport_name||'')} ${esc(g.transport_number||'')}</div></div>
         <div class="detail-item"><div class="d-label">PNR</div><div class="d-value">${esc(g.pnr||'—')}</div></div>
-        <div class="detail-item"><div class="d-label">Origin</div><div class="d-value">${esc(g.journey_origin||'—')}</div></div>
-        <div class="detail-item"><div class="d-label">${isDep?'Departure Time':'Arrival Time'}</div><div class="d-value">${g.arrival_date?fmtDate(g.arrival_date):''} ${g.arrival_time?fmtAmPm(g.arrival_time):''}</div></div>
-        <div class="detail-item"><div class="d-label">${isDep?'Drop Station':'Pickup Station'}</div><div class="d-value">${esc(g.pickup_location||'—')}</div></div>
-        <div class="detail-item"><div class="d-label">Car</div><div class="d-value">${esc(g.car_type||'—')} · Car No. <strong>${esc(g.car_no||'—')}</strong></div></div>
-        <div class="detail-item"><div class="d-label">Driver</div><div class="d-value">${esc(g.driver_name||'—')}<br>
+        <div class="detail-item"><div class="d-label">${originLabel}</div><div class="d-value">${esc(g.journey_origin||'—')}</div></div>
+        <div class="detail-item"><div class="d-label">${timeLabel}</div>
+          <div class="d-value">${g.arrival_date?fmtDate(g.arrival_date):''} ${g.arrival_time?fmtAmPm(g.arrival_time):''}</div></div>
+        <div class="detail-item"><div class="d-label">${stationLabel}</div><div class="d-value">${esc(g.pickup_location||'—')}</div></div>
+        <div class="detail-item"><div class="d-label">Car</div>
+          <div class="d-value">${esc(g.car_type||'—')} · Car No. <strong>${esc(g.car_no||'—')}</strong></div></div>
+        <div class="detail-item"><div class="d-label">Driver</div>
+          <div class="d-value">${esc(g.driver_name||'—')}<br>
           ${g.driver_phone?`<a href="tel:${g.driver_phone}" onclick="event.stopPropagation()">📞 ${esc(g.driver_phone)}</a>`:''}</div></div>
-        <div class="detail-item"><div class="d-label">Guest Phone</div><div class="d-value">${g.phone_primary?`<a href="tel:${g.phone_primary}" onclick="event.stopPropagation()">📞 ${esc(g.phone_primary)}</a>`:'—'}</div></div>
-        <div class="detail-item"><div class="d-label">Backup Phone</div><div class="d-value">${g.phone_backup?`<a href="tel:${g.phone_backup}" onclick="event.stopPropagation()">📞 ${esc(g.phone_backup)}</a>`:'—'}</div></div>
+        <div class="detail-item"><div class="d-label">Guest Phone</div>
+          <div class="d-value">${g.phone_primary?`<a href="tel:${g.phone_primary}" onclick="event.stopPropagation()">📞 ${esc(g.phone_primary)}</a>`:'—'}</div></div>
+        <div class="detail-item"><div class="d-label">Backup Phone</div>
+          <div class="d-value">${g.phone_backup?`<a href="tel:${g.phone_backup}" onclick="event.stopPropagation()">📞 ${esc(g.phone_backup)}</a>`:'—'}</div></div>
       </div>
       ${g.notes?`<div class="detail-item"><div class="d-label">Notes</div><div class="d-value" style="color:var(--text-2)">${esc(g.notes)}</div></div>`:''}
       <div class="live-status-box" id="ls-${g.group_id}">
@@ -703,30 +692,23 @@ function renderCard(g){
 
 function cardActions(g){
   const jt=journeyType(g);
-  if(g.status==='picked_up'||g.status==='car_returned'){
+  if(g.status==='picked_up'||g.status==='car_returned')
     return `<button class="btn btn-secondary btn-sm" onclick="markActive('${g.group_id}')">↩ Mark Active</button>`;
-  }
-  if(jt==='arrival'){
+  if(jt==='arrival')
     return `<button class="btn btn-secondary btn-sm" onclick="toggleField('${g.group_id}','dispatched','${g.dispatched||'no'}')">
         ${g.dispatched==='yes'?'🚗 Dispatched ✓':'🚗 Dispatch'}</button>
       <button class="btn btn-primary btn-sm" onclick="markFinal('${g.group_id}','arrival')">✅ Picked Up</button>`;
-  }
-  // Departure flow
-  if(g.car_returned==='yes'){
-    return `<button class="btn btn-secondary btn-sm" style="background:var(--gold-lt);border-color:var(--gold);color:var(--gold)" onclick="markFinal('${g.group_id}','departure')">🏁 Mark Complete</button>`;
-  }
-  if(g.dropped_off==='yes'){
-    return `<button class="btn btn-secondary btn-sm" onclick="toggleField('${g.group_id}','car_returned','no')">🔄 Car Back? Mark Complete</button>`;
-  }
+  // Departure
+  if(g.dropped_off==='yes')
+    return `<button class="btn btn-secondary btn-sm" onclick="markFinal('${g.group_id}','departure')">🔑 Car Returned — Complete</button>`;
   return `<button class="btn btn-secondary btn-sm" onclick="toggleField('${g.group_id}','dispatched','${g.dispatched||'no'}')">
       ${g.dispatched==='yes'?'🚗 Dispatched ✓':'🚗 Dispatch'}</button>
     <button class="btn btn-secondary btn-sm" onclick="toggleField('${g.group_id}','guest_in_car','${g.guest_in_car||'no'}')">
-      ${g.guest_in_car==='yes'?'👤 In Car ✓':'👤 Guest in Car'}</button>
+      ${g.guest_in_car==='yes'?'👤 In Car ✓':'👤 In Car'}</button>
     <button class="btn btn-primary btn-sm" onclick="toggleField('${g.group_id}','dropped_off','no')">🏁 Dropped Off</button>`;
 }
 
 function toggleCard(id){document.getElementById('exp-'+id)?.classList.toggle('open');}
-
 function stripClass(g){
   const t=(g.live_status_text||'').toLowerCase();
   if(!g.live_status_text) return 'strip-gray';
@@ -740,11 +722,9 @@ function statusLabel(g){
   const t=g.live_status_text.toLowerCase();
   if(t.includes('on time')) return 'On time';
   if(t.includes('arrived')||t.includes('landed')) return 'Arrived';
-  const m=g.live_status_text.match(/delay[^,\.]{0,25}/i);
-  return m?m[0].slice(0,25):'See details';
+  const m=g.live_status_text.match(/delay[^,\.]{0,25}/i);return m?m[0].slice(0,25):'See details';
 }
 function statusClass(g){const s=stripClass(g);return s==='strip-green'?'status-on-time':s==='strip-amber'?'status-delayed':s==='strip-red'?'status-late':'status-unknown';}
-function emptyState(msg){return`<div class="empty-state"><div class="e-icon">🎊</div><h3>${msg||'Nothing here yet'}</h3></div>`;}
 
 // ── Card actions ──────────────────────────────────────────────
 async function refreshStatus(id){
@@ -753,12 +733,10 @@ async function refreshStatus(id){
   if(box) box.innerHTML='<span class="ls-icon">⏳</span><div class="ls-text">Fetching live status…</div>';
   const isDep=journeyType(g)==='departure';
   const prompt=g.transport_type==='Flight'
-    ?(isDep
-      ?`Current status of flight ${g.transport_number} (${g.transport_name}) departing from Kolkata Airport today. On time or delayed, scheduled departure time. 2-3 sentences.`
-      :`Current status of flight ${g.transport_number} (${g.transport_name}) arriving Kolkata Airport. Gate status, delay, ETA. 2-3 sentences.`)
-    :(isDep
-      ?`Current running status of Indian Railways train ${g.transport_number} (${g.transport_name}) departing from Kolkata area today. On time or delayed by how many minutes. 2-3 sentences.`
-      :`Current running status of Indian Railways train ${g.transport_number} (${g.transport_name}), PNR ${g.pnr}. Current station, on time or delayed, ETA at ${g.pickup_location}. 2-3 sentences.`);
+    ?(isDep?`Current status of flight ${g.transport_number} (${g.transport_name}) departing Kolkata Airport today. On time or delayed, scheduled departure. 2-3 sentences.`
+           :`Current status of flight ${g.transport_number} (${g.transport_name}) arriving Kolkata Airport. Gate status, delay, ETA. 2-3 sentences.`)
+    :(isDep?`Current running status of train ${g.transport_number} (${g.transport_name}) departing Kolkata today. On time or delayed by how many minutes. 2-3 sentences.`
+           :`Current running status of Indian Railways train ${g.transport_number} (${g.transport_name}), PNR ${g.pnr}. Current station, on time or delayed, ETA at ${g.pickup_location}. 2-3 sentences.`);
   try{
     const result=await callGemini(prompt);
     await apiPost({action:'updateLiveStatus',group_id:id,live_status_text:result});
@@ -787,7 +765,6 @@ async function toggleField(id,field,current){
 }
 
 async function markFinal(id,type){
-  const field=type==='arrival'?'status':'status';
   const value=type==='arrival'?'picked_up':'car_returned';
   showLoading(true);
   await apiPost({action:'updateGuestStatus',group_id:id,field:'status',value});
@@ -818,23 +795,21 @@ function renderDrivers(){
     aSec.innerHTML='';return;
   }
   uSec.innerHTML=unassigned.length
-    ?`<div class="section-label">🔴 Unassigned Drivers (${unassigned.length})</div>
+    ?`<div class="section-label">🔴 Unassigned (${unassigned.length})</div>
        <div class="driver-cards-grid">${unassigned.map(d=>driverCard(d,[])).join('')}</div>`
-    :`<div class="section-label">Unassigned Drivers</div><p style="color:var(--text-2);font-size:13px;margin-bottom:24px">All drivers assigned ✓</p>`;
+    :`<div class="section-label">Unassigned Drivers</div><p style="color:var(--text-2);font-size:13px;margin-bottom:24px">All assigned ✓</p>`;
   if(assigned.length){
     const cards=assigned.map(d=>{
       const cn=d.car_no||d.car_token||'';
-      const groups=allGuests.filter(g=>(g.car_no===cn)&&g.status!=='picked_up'&&g.status!=='car_returned');
+      const groups=allGuests.filter(g=>g.car_no===cn&&g.status!=='picked_up'&&g.status!=='car_returned');
       return driverCard(d,groups);
     }).join('');
-    aSec.innerHTML=`<div class="section-label">✅ Assigned Drivers (${assigned.length})</div>
-      <div class="driver-cards-grid">${cards}</div>`;
+    aSec.innerHTML=`<div class="section-label">✅ Assigned (${assigned.length})</div><div class="driver-cards-grid">${cards}</div>`;
   } else { aSec.innerHTML=''; }
 }
 
 function parseDelayMins(text){
-  if(!text) return 0;
-  const t=text.toLowerCase();
+  if(!text) return 0;const t=text.toLowerCase();
   let m=t.match(/(\d+)\s*hour[s]?\s*(?:and\s*)?(\d+)?\s*min/);if(m) return parseInt(m[1])*60+(parseInt(m[2])||0);
   m=t.match(/(\d+)\s*hr[s]?\s*(?:and\s*)?(\d+)?\s*min/);if(m) return parseInt(m[1])*60+(parseInt(m[2])||0);
   m=t.match(/(\d+)\s*hour/);if(m) return parseInt(m[1])*60;
@@ -845,40 +820,29 @@ function fmtDelayBadge(d){if(!d||d<=0) return '';return d<60?'+'+d+'m':`+${Math.
 
 function driverCard(driver,groups){
   const isUnassigned=!groups||groups.length===0;
-  const now=new Date();
-  const cn=driver.car_no||driver.car_token||'—';
+  const now=new Date();const cn=driver.car_no||driver.car_token||'—';
 
   const assignmentHtml=isUnassigned
-    ?`<div class="driver-assignment" style="background:var(--amber-lt)">
-        <div class="da-label">Status</div>
-        <div class="da-group" style="color:var(--amber)">No assignment — available</div>
-      </div>`
+    ?`<div class="driver-assignment" style="background:var(--amber-lt)"><div class="da-label">Status</div>
+       <div class="da-group" style="color:var(--amber)">No assignment — available</div></div>`
     :groups.map(g=>{
-        const jt=journeyType(g);
-        const isDep=jt==='departure';
+        const jt=journeyType(g);const isDep=jt==='departure';
         const delayMins=parseDelayMins(g.live_status_text);
         const delayBadge=fmtDelayBadge(delayMins);
-        const lb=isDep?leaveByDeparture(g):leaveByArrival(g.arrival_date,g.arrival_time,delayMins);
+        const lb=isDep?leaveByDep(g):leaveByArr(g.arrival_date,g.arrival_time,delayMins);
         const lbDate=lb?new Date(lb):null;
         const urgent=lbDate&&(lbDate-now)<30*60*1000&&(lbDate-now)>0;
-        const transportLabel=g.transport_type==='Flight'?(isDep?'Flight Departs':'Flight Arrives'):(isDep?'Train Departs':'Train Arrives');
+        const tLabel=g.transport_type==='Flight'?(isDep?'Flight Departs':'Flight Arrives'):(isDep?'Train Departs':'Train Arrives');
         return `<div class="driver-assignment${isDep?' dep-assignment':''}">
-          <div class="da-label">
-            <span>${isDep?'🛫 Departure':'🛬 Arrival'}</span>
-          </div>
+          <div class="da-label">${isDep?'🛫 Departure':'🛬 Arrival'}</div>
           <div class="da-group">${esc(g.group_name)} · ${g.pax} pax</div>
-          <div class="da-detail">📍 ${isDep?'Drop':'Pickup'}: ${esc(g.pickup_location)} · ${fmtAmPm(g.arrival_time)||'—'} (${fmtDate(g.arrival_date)})<br>
-            🚦 ${g.live_status_text?esc(g.live_status_text.slice(0,65))+'…':'Status not refreshed'}</div>
+          <div class="da-detail">📍 ${isDep?'Drop':'Pickup'}: ${esc(g.pickup_location)} · ${fmtAmPm(g.arrival_time)} (${fmtDate(g.arrival_date)})<br>
+            🚦 ${g.live_status_text?esc(g.live_status_text.slice(0,65))+'…':'Not refreshed'}</div>
           <div class="driver-timing">
-            <div class="timing-box" style="position:relative">
-              ${delayBadge?`<span class="delay-badge">${delayBadge}</span>`:''}
-              <div class="tb-label">${transportLabel}</div>
-              <div class="tb-value">${g.arrival_time?fmtAmPm(g.arrival_time):'—'}</div>
-            </div>
+            <div class="timing-box">${delayBadge?`<span class="delay-badge">${delayBadge}</span>`:''}
+              <div class="tb-label">${tLabel}</div><div class="tb-value">${fmtAmPm(g.arrival_time)||'—'}</div></div>
             <div class="timing-box${urgent?' urgent':''}">
-              <div class="tb-label">Leave By</div>
-              <div class="tb-value">${lb?fmtAmPm(lb.slice(11,16)):'—'}</div>
-            </div>
+              <div class="tb-label">Leave By</div><div class="tb-value">${lb?fmtAmPm(lb.slice(11,16)):'—'}</div></div>
           </div>
         </div>
         <div class="driver-toggles">
@@ -886,16 +850,16 @@ function driverCard(driver,groups){
             <button class="toggle-btn${g.dispatched==='yes'?' active-green':''}" onclick="toggleDriverField('${g.group_id}','dispatched','${g.dispatched||'no'}')">
               ${g.dispatched==='yes'?'🚗 Dispatched ✓':'🚗 Dispatch'}</button>
             <button class="toggle-btn${g.guest_in_car==='yes'?' active-blue':''}" onclick="toggleDriverField('${g.group_id}','guest_in_car','${g.guest_in_car||'no'}')">
-              ${g.guest_in_car==='yes'?'👤 In Car ✓':'👤 Guest in Car'}</button>
+              ${g.guest_in_car==='yes'?'👤 In Car ✓':'👤 In Car'}</button>
             <button class="toggle-btn${g.dropped_off==='yes'?' active-purple':''}" onclick="toggleDriverField('${g.group_id}','dropped_off','${g.dropped_off||'no'}')">
-              ${g.dropped_off==='yes'?'🏁 Dropped Off ✓':'🏁 Dropped Off'}</button>
+              ${g.dropped_off==='yes'?'🏁 Dropped ✓':'🏁 Dropped Off'}</button>
             <button class="toggle-btn${g.car_returned==='yes'?' active-gold':''}" onclick="toggleDriverField('${g.group_id}','car_returned','${g.car_returned||'no'}')">
-              ${g.car_returned==='yes'?'🔑 Car Returned ✓':'🔑 Car Returned'}</button>
+              ${g.car_returned==='yes'?'🔑 Returned ✓':'🔑 Car Returned'}</button>
           `:`
             <button class="toggle-btn${g.driver_arrived==='yes'?' active-green':''}" onclick="toggleDriverField('${g.group_id}','driver_arrived','${g.driver_arrived||'no'}')">
               ${g.driver_arrived==='yes'?'📍 At Station ✓':'📍 At Station'}</button>
             <button class="toggle-btn${g.guest_in_car==='yes'?' active-blue':''}" onclick="toggleDriverField('${g.group_id}','guest_in_car','${g.guest_in_car||'no'}')">
-              ${g.guest_in_car==='yes'?'🚗 En Route ✓':'🚗 Guest in Car'}</button>
+              ${g.guest_in_car==='yes'?'🚗 En Route ✓':'🚗 In Car'}</button>
           `}
         </div>`;
       }).join('');
@@ -915,17 +879,16 @@ function driverCard(driver,groups){
   </div>`;
 }
 
-function leaveByArrival(date,time,delayMins){
+function leaveByArr(date,time,delayMins){
   if(!date||!time) return null;
   const dt=new Date(`${date}T${time}:00`);
   dt.setMinutes(dt.getMinutes()+(delayMins||0)-TRAVEL_MINS);
   return dt.toISOString();
 }
-function leaveByDeparture(g){
+function leaveByDep(g){
   if(!g.arrival_date||!g.arrival_time) return null;
-  const bufMins=departureBufMins(g.transport_type,g.pax);
   const dt=new Date(`${g.arrival_date}T${g.arrival_time}:00`);
-  dt.setMinutes(dt.getMinutes()-bufMins);
+  dt.setMinutes(dt.getMinutes()-departureBufMins(g.transport_type,g.pax));
   return dt.toISOString();
 }
 
@@ -963,29 +926,35 @@ function showGuestForm(id){
     document.getElementById('driver-detail-row').style.display='none';
     setJourneyType('arrival');
   }
+  // Reset file input
+  document.getElementById('ticket-file').value='';
 }
 function editGuest(id){showGuestForm(id);}
 
 function populateDriverDropdown(){
   const sel=document.getElementById('f-driver-select');
   sel.innerHTML='<option value="">— No driver assigned —</option>';
+  if(!allDrivers||!allDrivers.length) return;
   allDrivers.forEach(d=>{
     const cn=d.car_no||d.car_token||'';
     const opt=document.createElement('option');
-    opt.value=d.driver_id||d.driver_name;
-    opt.textContent=`${d.driver_name} (${cn}) · ${d.car_type} · Cap: ${d.capacity}`;
-    opt.dataset.name=d.driver_name;opt.dataset.phone=d.driver_phone||'';
-    opt.dataset.carType=d.car_type||'';opt.dataset.carNo=cn;opt.dataset.capacity=d.capacity||'0';
+    opt.value=d.driver_id||d.driver_name||cn;
+    opt.textContent=`${d.driver_name||'?'} (${cn}) · ${d.car_type||'?'} · Cap: ${d.capacity||'?'}`;
+    opt.dataset.name=d.driver_name||'';
+    opt.dataset.phone=d.driver_phone||'';
+    opt.dataset.carType=d.car_type||'';
+    opt.dataset.carNo=cn;
+    opt.dataset.capacity=d.capacity||'0';
     sel.appendChild(opt);
   });
 }
 
 function onDriverSelect(){
   const sel=document.getElementById('f-driver-select');
-  const opt=sel.options[sel.selectedIndex];
+  const opt=sel.selectedIndex>0?sel.options[sel.selectedIndex]:null;
   const row=document.getElementById('driver-detail-row');
-  if(!opt||!opt.dataset.name){
-    ['f-driver-name','f-driver-phone','f-car-type','f-car-no'].forEach(id=>document.getElementById(id).value='');
+  if(!opt||!opt.dataset||!opt.dataset.name){
+    ['f-driver-name','f-driver-phone','f-car-type','f-car-no'].forEach(id=>{ const el=document.getElementById(id);if(el) el.value=''; });
     row.style.display='none';return;
   }
   document.getElementById('f-driver-name').value=opt.dataset.name;
@@ -993,7 +962,7 @@ function onDriverSelect(){
   document.getElementById('f-car-type').value=opt.dataset.carType;
   document.getElementById('f-car-no').value=opt.dataset.carNo;
   row.style.display='block';
-  row.innerHTML=`<strong>${esc(opt.dataset.name)}</strong> · ${esc(opt.dataset.carType)} · Car No. ${esc(opt.dataset.carNo)} · Cap: ${opt.dataset.capacity} · 📞 ${esc(opt.dataset.phone)}`;
+  row.innerHTML=`<strong>${esc(opt.dataset.name)}</strong> · ${esc(opt.dataset.carType)} · Car No. <strong>${esc(opt.dataset.carNo)}</strong> · Cap: ${opt.dataset.capacity} · 📞 ${esc(opt.dataset.phone)}`;
 }
 
 function populateForm(g){
@@ -1008,10 +977,13 @@ function populateForm(g){
   document.getElementById('f-driver-phone').value=g.driver_phone||'';
   document.getElementById('f-car-type').value=g.car_type||'';
   document.getElementById('f-car-no').value=g.car_no||'';
+  // Match dropdown
   const sel=document.getElementById('f-driver-select');
-  for(let i=0;i<sel.options.length;i++){
-    if(sel.options[i].dataset.name===g.driver_name){sel.selectedIndex=i;break;}
+  let matched=false;
+  for(let i=1;i<sel.options.length;i++){
+    if(sel.options[i].dataset.name===g.driver_name){sel.selectedIndex=i;matched=true;break;}
   }
+  if(!matched) sel.selectedIndex=0;
   onDriverSelect();
 }
 
@@ -1043,11 +1015,7 @@ function checkConflict(data){
   });
   return conflicts.length?conflicts:null;
 }
-
-function hasLuggageNotes(notes){
-  if(!notes) return false;
-  return LUGGAGE_KW.some(k=>notes.toLowerCase().includes(k));
-}
+function hasLuggageNotes(n){return n&&LUGGAGE_KW.some(k=>n.toLowerCase().includes(k));}
 function checkCarOpt(data){
   if(!data.driver_name||!data.car_no||!data.pax) return null;
   if(hasLuggageNotes(data.notes)) return null;
@@ -1067,7 +1035,7 @@ async function submitGuestForm(e){
     pendingSubmitData=data;
     document.getElementById('conflict-detail').innerHTML=
       `<strong>${esc(data.driver_name)}</strong> is already assigned to:<br>`+
-      conflicts.map(c=>`• <strong>${esc(c.group_name)}</strong> at ${esc(c.pickup_location)} · ${fmtAmPm(c.arrival_time)} (${fmtDate(c.arrival_date)})`).join('<br>');
+      conflicts.map(c=>`• <strong>${esc(c.group_name)}</strong> · ${esc(c.pickup_location)} · ${fmtAmPm(c.arrival_time)} (${fmtDate(c.arrival_date)})`).join('<br>');
     document.getElementById('conflict-modal').classList.add('open');return;
   }
   const smallerDriver=checkCarOpt(data);
@@ -1077,7 +1045,7 @@ async function submitGuestForm(e){
     const cn=smallerDriver.car_no||smallerDriver.car_token||'';
     document.getElementById('car-opt-detail').innerHTML=
       `You assigned a <strong>${esc(data.car_type)}</strong> (Cap: ${ad?.capacity||'?'}) for ${data.pax} pax.<br>
-      A smaller <strong>${esc(smallerDriver.car_type)}</strong> (Cap: ${smallerDriver.capacity}, Car No. ${esc(cn)}, Driver: ${esc(smallerDriver.driver_name)}) is free and fits this group.`;
+      A smaller <strong>${esc(smallerDriver.car_type)}</strong> (Cap: ${smallerDriver.capacity}, Car No. ${esc(cn)}, Driver: ${esc(smallerDriver.driver_name)}) is free and fits.`;
     document.getElementById('car-opt-modal').classList.add('open');return;
   }
   await doSave(data);
@@ -1125,44 +1093,60 @@ async function doSave(data){
   showLoading(false);showDashboard();renderDashboard();
 }
 
-// ── File upload ───────────────────────────────────────────────
+// ── File upload + Gemini extraction ───────────────────────────
 async function handleFileUpload(event){
   const file=event.target.files[0];if(!file) return;
   showLoading(true);document.getElementById('extraction-result').classList.remove('show');
   try{
     const b64=await toBase64(file);const mime=file.type||'image/jpeg';
-    const prompt=`Extract travel ticket data. Return ONLY valid JSON, no markdown:
-{"transport_type":"Train or Flight","transport_name":"","transport_number":"","pnr":"","journey_origin":"city/station of departure","destination":"city/station of arrival","arrival_date":"YYYY-MM-DD","arrival_time":"HH:MM","individual_names":"comma separated","pax":0}`;
+    const prompt=`Extract travel ticket data. Return ONLY valid JSON, no markdown, no explanation:
+{"transport_type":"Train or Flight","transport_name":"","transport_number":"","pnr":"","journey_origin":"exact city or station name of departure","destination":"exact city or station name of arrival","arrival_date":"YYYY-MM-DD","arrival_time":"HH:MM 24hr","individual_names":"comma separated full names of all passengers","pax":0}`;
     const raw=await callGeminiFile(prompt,b64,mime);
-    let ex={};try{ex=JSON.parse(raw.replace(/```json|```/g,'').trim());}catch{}
+    let ex={};
+    try{ex=JSON.parse(raw.replace(/```json|```/g,'').trim());}catch{
+      // Try extracting JSON from within text
+      const match=raw.match(/\{[\s\S]*\}/);
+      if(match) try{ex=JSON.parse(match[0]);}catch{}
+    }
 
-    // Auto-detect journey type from origin/destination
+    // Auto-detect journey type
     const origin=(ex.journey_origin||'').toLowerCase();
     const dest=(ex.destination||'').toLowerCase();
-    const originIsKolkata=KOLKATA_ORIGINS.some(k=>origin.includes(k));
-    const destIsKolkata=KOLKATA_ORIGINS.some(k=>dest.includes(k));
+    const originKolkata=isKolkataStation(origin);
+    const destKolkata=isKolkataStation(dest);
     let detectedType='arrival';
-    if(originIsKolkata&&!destIsKolkata) detectedType='departure';
-    else if(destIsKolkata||(!originIsKolkata)) detectedType='arrival';
+    if(originKolkata&&!destKolkata) detectedType='departure';
+    else detectedType='arrival';
     setJourneyType(detectedType);
 
+    // Fill fields
     const fm={'f-transport-type':'transport_type','f-transport-name':'transport_name',
       'f-transport-number':'transport_number','f-pnr':'pnr','f-journey-origin':'journey_origin',
-      'f-arrival-date':'arrival_date','f-arrival-time':'arrival_time',
-      'f-individual-names':'individual_names','f-pax':'pax'};
-    Object.entries(fm).forEach(([el,k])=>{if(ex[k]) document.getElementById(el).value=ex[k];});
+      'f-arrival-date':'arrival_date','f-arrival-time':'arrival_time','f-pax':'pax'};
+    Object.entries(fm).forEach(([el,k])=>{if(ex[k]!==undefined&&ex[k]!=='') document.getElementById(el).value=ex[k];});
 
-    // Map station
+    // Individual names
+    if(ex.individual_names) document.getElementById('f-individual-names').value=ex.individual_names;
+
+    // Auto-fill merged group name from first passenger name
+    if(ex.individual_names){
+      const firstName=ex.individual_names.split(',')[0].trim();
+      if(firstName&&!document.getElementById('f-group-name').value){
+        document.getElementById('f-group-name').value=firstName;
+      }
+    }
+
+    // Map station based on journey type
     const stationSrc=detectedType==='departure'?origin:dest;
-    const locEl=document.getElementById('f-pickup-location');
-    if(stationSrc.includes('howrah')) locEl.value='Howrah';
-    else if(stationSrc.includes('sealdah')) locEl.value='Sealdah';
-    else if(stationSrc.includes('airport')||stationSrc.includes('nscbi')||stationSrc.includes('dumdum')) locEl.value='Airport';
-    else if(stationSrc.includes('kolkata')||stationSrc.includes('calcutta')) locEl.value='Kolkata Station';
+    const mapped=mapToStation(stationSrc);
+    if(mapped) document.getElementById('f-pickup-location').value=mapped;
 
     document.getElementById('extraction-result').classList.add('show');
-    showToast(`Extracted as ${detectedType}. Please verify.`,'success');
-  }catch(err){showToast('Extraction failed — please fill in manually','error');}
+    showToast(`Detected as ${detectedType}. Please verify.`,'success');
+  }catch(err){
+    console.error('Extraction error:',err);
+    showToast('Extraction failed — please fill in manually','error');
+  }
   showLoading(false);
 }
 function toBase64(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(file);});}
@@ -1192,17 +1176,17 @@ function openSummaryModal(){
   const today=new Date().toISOString().slice(0,10);
   const active=allGuests.filter(g=>g.status!=='picked_up'&&g.status!=='car_returned');
   const arrivals=active.filter(g=>journeyType(g)==='arrival');
-  const departures=active.filter(g=>journeyType(g)==='departure');
+  const deps=active.filter(g=>journeyType(g)==='departure');
   const done=allGuests.filter(g=>g.status==='picked_up'||g.status==='car_returned');
   const tiles=[
-    {label:"Today's Arrivals",   value:arrivals.filter(g=>g.arrival_date===today).length,  sub:'groups'},
-    {label:"Today's Departures", value:departures.filter(g=>g.arrival_date===today).length, sub:'groups'},
-    {label:'Pending Arrivals',   value:arrivals.length,                                      sub:'groups'},
-    {label:'Pending Departures', value:departures.length,                                    sub:'groups'},
-    {label:'Total Pending Pax',  value:active.reduce((s,g)=>s+(parseInt(g.pax)||0),0),      sub:'people'},
-    {label:'Completed',          value:done.length,                                          sub:'total'},
-    {label:'Dispatched',         value:active.filter(g=>g.dispatched==='yes').length,        sub:'drivers sent'},
-    {label:'Free Drivers',       value:allDrivers.filter(d=>d.assigned!=='yes').length,      sub:'available'},
+    {label:"Today's Arrivals",   value:arrivals.filter(g=>g.arrival_date===today).length, sub:'groups'},
+    {label:"Today's Departures", value:deps.filter(g=>g.arrival_date===today).length,     sub:'groups'},
+    {label:'Pending Arrivals',   value:arrivals.length,                                    sub:'groups'},
+    {label:'Pending Departures', value:deps.length,                                        sub:'groups'},
+    {label:'Total Pending Pax',  value:active.reduce((s,g)=>s+(parseInt(g.pax)||0),0),    sub:'people'},
+    {label:'Completed',          value:done.length,                                        sub:'total'},
+    {label:'Dispatched',         value:active.filter(g=>g.dispatched==='yes').length,      sub:'drivers sent'},
+    {label:'Free Drivers',       value:allDrivers.filter(d=>d.assigned!=='yes').length,    sub:'available'},
   ];
   document.getElementById('summary-grid').innerHTML=tiles.map(t=>
     `<div class="summary-tile"><div class="st-label">${t.label}</div><div class="st-value">${t.value}</div><div class="st-sub">${t.sub}</div></div>`
@@ -1230,24 +1214,119 @@ function saveSettings(){
 function toMins(date,time){return new Date(`${date}T${time}:00`).getTime()/60000;}
 function fmtDate(d){
   if(!d) return '';
-  const p=String(d).split('-');if(p.length!==3) return d;
+  // Handle ISO datetime strings — extract date part only
+  const dateStr=String(d).includes('T')?String(d).split('T')[0]:String(d);
+  const p=dateStr.split('-');if(p.length!==3) return d;
+  // Guard against 1899 epoch
+  if(parseInt(p[0])<1900) return '';
   const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   return parseInt(p[2])+' '+(months[parseInt(p[1])-1]||'');
 }
 function fmtAmPm(t){
   if(!t) return '';
-  const p=String(t).split(':');if(p.length<2) return t;
-  let h=parseInt(p[0]),m=p[1];const ap=h>=12?'PM':'AM';h=h%12||12;
+  // Handle ISO datetime — extract time part
+  let timeStr=String(t);
+  if(timeStr.includes('T')) timeStr=timeStr.split('T')[1].slice(0,5);
+  // Handle 1899 epoch time strings
+  if(timeStr.startsWith('1899')||timeStr.startsWith('190')) return '';
+  const p=timeStr.split(':');if(p.length<2) return t;
+  let h=parseInt(p[0]),m=String(p[1]).slice(0,2);
+  if(isNaN(h)) return t;
+  const ap=h>=12?'PM':'AM';h=h%12||12;
   return `${h}:${m} ${ap}`;
 }
 function fmtTs(ts){
-  try{const d=new Date(ts);return fmtAmPm(d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:false}));}catch{return ts;}
+  if(!ts) return '';
+  try{
+    // Handle "YYYY-MM-DD HH:MM" plain string from Apps Script
+    if(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(ts)){
+      const parts=ts.split(' ');return fmtAmPm(parts[1]);
+    }
+    return fmtAmPm(new Date(ts).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:false}));
+  }catch{return ts;}
 }
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 let _tt;
 function showToast(msg,type=''){
   const t=document.getElementById('toast');t.textContent=msg;t.className='show '+type;
   clearTimeout(_tt);_tt=setTimeout(()=>{t.className='';},3000);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TEST DATA — paste in browser console after typing "allow pasting"
+   then run: loadTestData()
+═══════════════════════════════════════════════════════════ */
+function loadTestData(){
+  allDrivers=[
+    {driver_id:'D001',driver_name:'Suresh Kumar', driver_phone:'9000000001',car_type:'Innova',        car_no:'WB02AB1042',capacity:'7', assigned:'yes'},
+    {driver_id:'D002',driver_name:'Ramesh Das',   driver_phone:'9000000002',car_type:'Ertiga',         car_no:'WB02CD2031',capacity:'6', assigned:'yes'},
+    {driver_id:'D003',driver_name:'Bikash Roy',   driver_phone:'9000000003',car_type:'Tempo Traveller',car_no:'WB02EF3099',capacity:'12',assigned:'yes'},
+    {driver_id:'D004',driver_name:'Manoj Singh',  driver_phone:'9000000004',car_type:'Scorpio',        car_no:'WB02GH4011',capacity:'7', assigned:'no'},
+  ];
+  const today=new Date().toISOString().slice(0,10);
+  const tom=new Date(Date.now()+86400000).toISOString().slice(0,10);
+  allGuests=[
+    // Arrival — no status (gray strip)
+    {group_id:'G001',group_name:'Sharma Family',  pax:'4',phone_primary:'9876543210',phone_backup:'9876543211',
+     pickup_location:'Howrah',    journey_origin:'New Delhi',  arrival_date:today,arrival_time:'14:30',
+     transport_type:'Train',transport_name:'Poorva Express',  transport_number:'12303',pnr:'1234567890',
+     car_type:'Innova',car_no:'WB02AB1042',driver_name:'Suresh Kumar',driver_phone:'9000000001',
+     notes:'',status:'active',journey_type:'arrival',dispatched:'no',driver_arrived:'no',guest_in_car:'no',dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:''},
+
+    // Arrival — pooling candidate (same station, 20 min gap, no driver)
+    {group_id:'G002',group_name:'Delhi Cousins',  pax:'3',phone_primary:'9876540001',phone_backup:'',
+     pickup_location:'Howrah',    journey_origin:'Agra',       arrival_date:today,arrival_time:'14:50',
+     transport_type:'Train',transport_name:'Rajdhani Express',transport_number:'12301',pnr:'9999999999',
+     car_type:'',car_no:'',driver_name:'',driver_phone:'',
+     notes:'',status:'active',journey_type:'arrival',dispatched:'no',driver_arrived:'no',guest_in_car:'no',dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:''},
+
+    // Arrival — delayed (amber strip)
+    {group_id:'G003',group_name:'Kolkata Mausi',  pax:'2',phone_primary:'9876540003',phone_backup:'',
+     pickup_location:'Airport',   journey_origin:'Mumbai',     arrival_date:today,arrival_time:'16:00',
+     transport_type:'Flight',transport_name:'IndiGo',          transport_number:'6E123',pnr:'ABC123',
+     car_type:'Ertiga',car_no:'WB02CD2031',driver_name:'Ramesh Das',driver_phone:'9000000002',
+     notes:'Wheelchair needed',status:'active',journey_type:'arrival',dispatched:'yes',driver_arrived:'yes',guest_in_car:'no',dropped_off:'no',car_returned:'no',
+     live_status_text:'Flight 6E123 is delayed by 45 minutes. New ETA 4:45 PM.',last_refreshed:'2025-01-01 14:00'},
+
+    // Arrival — on time (green strip)
+    {group_id:'G004',group_name:'Gupta Brothers', pax:'3',phone_primary:'9876540004',phone_backup:'9876540005',
+     pickup_location:'Kolkata Station',journey_origin:'Chennai',arrival_date:today,arrival_time:'18:00',
+     transport_type:'Train',transport_name:'Coromandel Express',transport_number:'12841',pnr:'2222222222',
+     car_type:'Tempo Traveller',car_no:'WB02EF3099',driver_name:'Bikash Roy',driver_phone:'9000000003',
+     notes:'6 large suitcases',status:'active',journey_type:'arrival',dispatched:'no',driver_arrived:'no',guest_in_car:'no',dropped_off:'no',car_returned:'no',
+     live_status_text:'Train 12841 is running on time. Currently at Kharagpur, expected at Kolkata Station at 6:05 PM.',last_refreshed:'2025-01-01 15:00'},
+
+    // Arrival — priority (no driver, arriving in <3 hrs from now)
+    {group_id:'G005',group_name:'Banerjee Uncle', pax:'2',phone_primary:'9876540006',phone_backup:'',
+     pickup_location:'Sealdah',   journey_origin:'Patna',      arrival_date:today,
+     arrival_time:(()=>{const d=new Date(Date.now()+90*60000);return d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0')})(),
+     transport_type:'Train',transport_name:'Jan Shatabdi',     transport_number:'12023',pnr:'1111111111',
+     car_type:'',car_no:'',driver_name:'',driver_phone:'',
+     notes:'',status:'active',journey_type:'arrival',dispatched:'no',driver_arrived:'no',guest_in_car:'no',dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:''},
+
+    // Departure — tomorrow
+    {group_id:'G006',group_name:'Pune Relatives', pax:'5',phone_primary:'9876540007',phone_backup:'',
+     pickup_location:'Howrah',    journey_origin:'Kolkata',    arrival_date:tom,arrival_time:'09:15',
+     transport_type:'Train',transport_name:'Azad Hind Express',transport_number:'12129',pnr:'3333333333',
+     car_type:'Tempo Traveller',car_no:'WB02EF3099',driver_name:'Bikash Roy',driver_phone:'9000000003',
+     notes:'',status:'active',journey_type:'departure',dispatched:'no',driver_arrived:'no',guest_in_car:'no',dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:''},
+
+    // Departure — flight today
+    {group_id:'G007',group_name:'Mumbai Chacha',  pax:'2',phone_primary:'9876540008',phone_backup:'',
+     pickup_location:'Airport',   journey_origin:'Kolkata',    arrival_date:today,arrival_time:'21:00',
+     transport_type:'Flight',transport_name:'Air India',       transport_number:'AI401',pnr:'XYZ999',
+     car_type:'Innova',car_no:'WB02AB1042',driver_name:'Suresh Kumar',driver_phone:'9000000001',
+     notes:'',status:'active',journey_type:'departure',dispatched:'no',driver_arrived:'no',guest_in_car:'no',dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:''},
+
+    // Completed arrival
+    {group_id:'G008',group_name:'Verma Family',   pax:'2',phone_primary:'9876540009',phone_backup:'',
+     pickup_location:'Sealdah',   journey_origin:'Kolkata',    arrival_date:today,arrival_time:'11:00',
+     transport_type:'Train',transport_name:'Local',            transport_number:'00001',pnr:'',
+     car_type:'Ertiga',car_no:'WB02CD2031',driver_name:'Ramesh Das',driver_phone:'9000000002',
+     notes:'',status:'picked_up',journey_type:'arrival',dispatched:'yes',driver_arrived:'yes',guest_in_car:'yes',dropped_off:'no',car_returned:'no',live_status_text:'Arrived',last_refreshed:''},
+  ];
+  renderDashboard();
+  console.log('✅ Test data loaded — '+allGuests.length+' guests, '+allDrivers.length+' drivers');
 }
 </script>
 </body>
