@@ -88,6 +88,7 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
 .pooling-card-detail{font-size:13px;color:var(--text-2);margin-bottom:10px;line-height:1.6}
 .pooling-card-actions{display:flex;gap:8px}
 
+/* Guest cards */
 .cards-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:24px}
 @media(max-width:640px){.cards-grid{grid-template-columns:1fr}}
 .guest-card{background:var(--white);border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow);overflow:hidden;transition:box-shadow .2s;cursor:pointer}
@@ -102,13 +103,18 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
 .card-name{font-family:var(--font-h);font-size:17px;color:var(--text);line-height:1.3}
 .card-pax{background:var(--gold-lt);color:var(--gold);font-size:12px;font-weight:600;padding:3px 9px;border-radius:20px;white-space:nowrap;flex-shrink:0}
 .card-badges{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px;min-height:4px}
-.card-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.card-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px}
+/* Driver info line on collapsed card */
+.card-driver-line{font-size:12px;color:var(--text-2);margin-top:4px;display:flex;align-items:center;gap:4px}
+.card-driver-line.has-driver{color:var(--green);font-weight:500}
+
 .location-badge{font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;text-transform:uppercase;letter-spacing:.4px}
 .loc-rail{background:var(--saffron-lt);color:var(--saffron)}.loc-airport{background:var(--blue-lt);color:var(--blue)}
 .journey-badge-arrival{background:var(--green-lt);color:var(--green);font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;text-transform:uppercase;letter-spacing:.4px}
 .journey-badge-departure{background:var(--purple-lt);color:var(--purple);font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;text-transform:uppercase;letter-spacing:.4px}
 .no-driver-badge{background:var(--red-lt);color:var(--red);font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;animation:pulse 2s ease infinite}
 .soon-badge{background:var(--amber-lt);color:var(--amber);font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px}
+
 .card-time{font-size:13px;color:var(--text-2)}
 .card-status-text{font-size:12px;font-weight:500;margin-left:auto}
 .status-on-time{color:var(--green)}.status-delayed{color:var(--amber)}.status-late{color:var(--red)}.status-unknown{color:var(--gray)}
@@ -134,6 +140,7 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
 .empty-state .e-icon{font-size:40px;margin-bottom:10px}
 .empty-state h3{font-family:var(--font-h);font-size:18px;color:var(--text);margin-bottom:4px}
 
+/* Driver analytics */
 #screen-drivers{display:none}
 .screen-header{display:flex;align-items:center;gap:14px;margin-bottom:28px}
 .screen-header h2{font-family:var(--font-h);font-size:24px;color:var(--text)}
@@ -169,6 +176,7 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
 .toggle-btn:hover:not(.active-green):not(.active-blue):not(.active-purple):not(.active-gold){background:var(--gray-lt)}
 .unassigned-badge{background:var(--amber);color:var(--white);font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px}
 
+/* Form */
 #screen-guest{display:none}
 .upload-zone{border:2px dashed var(--gold);border-radius:var(--radius);background:var(--gold-lt);padding:32px 24px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:24px;position:relative}
 .upload-zone:hover{background:#EDD9A3}
@@ -253,7 +261,6 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
         <button class="btn-icon" onclick="showDashboard()">←</button>
         <h2 id="guest-form-title">Add Guest Group</h2>
       </div>
-
       <div style="margin-bottom:20px">
         <label style="margin-bottom:8px">Journey Type</label>
         <div class="journey-toggle">
@@ -273,7 +280,6 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
 
       <form id="guest-form" onsubmit="submitGuestForm(event)">
         <input type="hidden" id="f-group-id"/>
-
         <div class="form-card">
           <h3>👨‍👩‍👧 Guest Group Details</h3>
           <div class="form-row">
@@ -406,7 +412,7 @@ const CONFLICT_MINS = 120;
 const LUGGAGE_KW    = ['luggage','bag','suitcase','baggage','wheelchair','equipment','heavy','lots','bulky','cargo'];
 const KOLKATA_STATIONS = ['howrah','sealdah','kolkata','kolkata station','nscbi','dumdum','netaji','calcutta'];
 
-function departureBufMins(type, pax){
+function departureBufMins(type,pax){
   const large=(parseInt(pax)||0)>3;
   return (type||'').toLowerCase()==='flight'?(large?255:240):(large?180:165);
 }
@@ -460,13 +466,8 @@ function screen(n){['dashboard','drivers','guest'].forEach(s=>{document.getEleme
 function showDashboard(){renderDashboard();}
 
 // ── Journey type helpers ──────────────────────────────────────
-function journeyType(g){return (g.journey_type||'arrival').toLowerCase()==='departure'?'departure':'arrival';}
-
-function isKolkataStation(str){
-  const s=(str||'').toLowerCase();
-  return KOLKATA_STATIONS.some(k=>s.includes(k));
-}
-
+function journeyType(g){return(g.journey_type||'arrival').toLowerCase()==='departure'?'departure':'arrival';}
+function isKolkataStation(str){const s=(str||'').toLowerCase();return KOLKATA_STATIONS.some(k=>s.includes(k));}
 function mapToStation(str){
   const s=(str||'').toLowerCase();
   if(s.includes('howrah')) return 'Howrah';
@@ -474,6 +475,32 @@ function mapToStation(str){
   if(s.includes('airport')||s.includes('nscbi')||s.includes('dumdum')||s.includes('netaji')) return 'Airport';
   if(s.includes('kolkata')||s.includes('calcutta')) return 'Kolkata Station';
   return '';
+}
+
+// ── Time helpers — NO Date object for IST-safe calculations ──
+// Parse "HH:MM" string into total minutes since midnight
+function parseTimeMins(timeStr){
+  if(!timeStr) return 0;
+  const clean=String(timeStr).split('T').pop().slice(0,5);
+  const p=clean.split(':');
+  return parseInt(p[0]||0)*60+parseInt(p[1]||0);
+}
+// Add/subtract minutes from "HH:MM" string, returns "HH:MM"
+function addMinsToTime(timeStr,deltaMins){
+  let total=parseTimeMins(timeStr)+deltaMins;
+  // Clamp within day range for display (wrap around midnight)
+  total=((total%1440)+1440)%1440;
+  const h=Math.floor(total/60),m=total%60;
+  return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');
+}
+// Leave By for arrival: arrival_time - delay_already_included - TRAVEL_MINS
+function calcLeaveByArrival(timeStr,delayMins){
+  // arrival_time is scheduled. Add delay to get real arrival, then subtract TRAVEL_MINS
+  return addMinsToTime(timeStr,(delayMins||0)-TRAVEL_MINS);
+}
+// Leave By for departure: departure_time - buffer
+function calcLeaveByDeparture(timeStr,transportType,pax){
+  return addMinsToTime(timeStr,-departureBufMins(transportType,pax));
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -492,7 +519,7 @@ function renderDashboard(){
   const sortSec=list=>list.sort((a,b)=>{
     const ap=isPriority(a)?0:1,bp=isPriority(b)?0:1;
     if(ap!==bp) return ap-bp;
-    return ((a.arrival_date||'')+(a.arrival_time||'')).localeCompare((b.arrival_date||'')+(b.arrival_time||''));
+    return((a.arrival_date||'')+(a.arrival_time||'')).localeCompare((b.arrival_date||'')+(b.arrival_time||''));
   });
 
   const todayHasArrivals=arrivals.some(g=>g.arrival_date===today);
@@ -558,7 +585,7 @@ function buildPooling(){
       if(!a.arrival_date||!a.arrival_time||!b.arrival_date||!b.arrival_time) continue;
       if(a.pickup_location!==b.pickup_location) continue;
       if(a.driver_name&&b.driver_name&&a.driver_name===b.driver_name) continue;
-      const diff=Math.abs(toMins(a.arrival_date,a.arrival_time)-toMins(b.arrival_date,b.arrival_time));
+      const diff=Math.abs(parseTimeMins(a.arrival_time)-parseTimeMins(b.arrival_time));
       if(diff>30) continue;
       const combo=(parseInt(a.pax)||0)+(parseInt(b.pax)||0);
       let sd=null;
@@ -624,20 +651,25 @@ function renderCard(g){
   const isAirport=g.pickup_location==='Airport';
   const pri=isPriority(g);
   const timeStr=g.arrival_date&&g.arrival_time?fmtDate(g.arrival_date)+' · '+fmtAmPm(g.arrival_time):'—';
+
+  // Badges
+  const jBadge=isDep?'<span class="journey-badge-departure">🛫 Departure</span>':'<span class="journey-badge-arrival">🛬 Arrival</span>';
   const noDriverBadge=pri?'<span class="no-driver-badge">⚠️ No Driver</span>':'';
   const soonBadge=(()=>{
     if(!g.arrival_date||!g.arrival_time||!g.driver_name) return '';
-    const mins=(new Date(g.arrival_date+'T'+g.arrival_time+':00').getTime()-Date.now())/60000;
+    const ms=new Date(g.arrival_date+'T'+g.arrival_time+':00').getTime();
+    const mins=(ms-Date.now())/60000;
     return mins>=0&&mins<=180?'<span class="soon-badge">🕐 Soon</span>':'';
   })();
-  const jBadge=isDep
-    ?'<span class="journey-badge-departure">🛫 Departure</span>'
-    :'<span class="journey-badge-arrival">🛬 Arrival</span>';
 
-  // Labels change by journey type
+  // Driver line on collapsed card
+  const driverLine=g.driver_name
+    ?`<div class="card-driver-line has-driver">🚗 ${esc(g.driver_name)} · ${esc(g.car_no||'—')}</div>`
+    :'';
+
+  // Labels by journey type
   const stationLabel=isDep?'Drop Station':'Pickup Station';
   const timeLabel=isDep?'Departure Time':'Arrival Time';
-  const dateLabel=isDep?'Departure Date':'Arrival Date';
   const originLabel=isDep?'Departing From':'Coming From';
 
   return `<div class="guest-card${pri?' priority-high':''}" id="card-${g.group_id}" onclick="toggleCard('${g.group_id}')">
@@ -653,6 +685,7 @@ function renderCard(g){
         <span class="card-time">🕐 ${timeStr}</span>
         <span class="card-status-text ${statusClass(g)}">${statusLabel(g)}</span>
       </div>
+      ${driverLine}
     </div>
     <div class="card-expanded" id="exp-${g.group_id}">
       <div class="detail-grid">
@@ -698,14 +731,15 @@ function cardActions(g){
     return `<button class="btn btn-secondary btn-sm" onclick="toggleField('${g.group_id}','dispatched','${g.dispatched||'no'}')">
         ${g.dispatched==='yes'?'🚗 Dispatched ✓':'🚗 Dispatch'}</button>
       <button class="btn btn-primary btn-sm" onclick="markFinal('${g.group_id}','arrival')">✅ Picked Up</button>`;
-  // Departure
+  // Departure — after dropped off, show car returned button
   if(g.dropped_off==='yes')
-    return `<button class="btn btn-secondary btn-sm" onclick="markFinal('${g.group_id}','departure')">🔑 Car Returned — Complete</button>`;
+    return `<span style="font-size:12px;color:var(--purple);font-weight:500">🏁 Dropped Off</span>
+      <button class="btn btn-primary btn-sm" onclick="markFinal('${g.group_id}','departure')">🔑 Car Returned → Complete</button>`;
   return `<button class="btn btn-secondary btn-sm" onclick="toggleField('${g.group_id}','dispatched','${g.dispatched||'no'}')">
       ${g.dispatched==='yes'?'🚗 Dispatched ✓':'🚗 Dispatch'}</button>
     <button class="btn btn-secondary btn-sm" onclick="toggleField('${g.group_id}','guest_in_car','${g.guest_in_car||'no'}')">
       ${g.guest_in_car==='yes'?'👤 In Car ✓':'👤 In Car'}</button>
-    <button class="btn btn-primary btn-sm" onclick="toggleField('${g.group_id}','dropped_off','no')">🏁 Dropped Off</button>`;
+    <button class="btn btn-primary btn-sm" onclick="toggleField('${g.group_id}','dropped_off','${g.dropped_off||'no'}')">🏁 Dropped Off</button>`;
 }
 
 function toggleCard(id){document.getElementById('exp-'+id)?.classList.toggle('open');}
@@ -733,10 +767,12 @@ async function refreshStatus(id){
   if(box) box.innerHTML='<span class="ls-icon">⏳</span><div class="ls-text">Fetching live status…</div>';
   const isDep=journeyType(g)==='departure';
   const prompt=g.transport_type==='Flight'
-    ?(isDep?`Current status of flight ${g.transport_number} (${g.transport_name}) departing Kolkata Airport today. On time or delayed, scheduled departure. 2-3 sentences.`
-           :`Current status of flight ${g.transport_number} (${g.transport_name}) arriving Kolkata Airport. Gate status, delay, ETA. 2-3 sentences.`)
-    :(isDep?`Current running status of train ${g.transport_number} (${g.transport_name}) departing Kolkata today. On time or delayed by how many minutes. 2-3 sentences.`
-           :`Current running status of Indian Railways train ${g.transport_number} (${g.transport_name}), PNR ${g.pnr}. Current station, on time or delayed, ETA at ${g.pickup_location}. 2-3 sentences.`);
+    ?(isDep
+      ?`What is the current status of flight ${g.transport_number} (${g.transport_name}) scheduled to depart from Kolkata airport today? Is it on time or delayed? What is the current scheduled departure time? Please give a concise 2-3 sentence answer.`
+      :`What is the current status of flight ${g.transport_number} (${g.transport_name}) arriving at Kolkata airport today? Is it on time or delayed? What is the estimated arrival time? Please give a concise 2-3 sentence answer.`)
+    :(isDep
+      ?`What is the current running status of Indian Railways train number ${g.transport_number} named ${g.transport_name} today? Is it on time or delayed from its Kolkata departure? Give a concise 2-3 sentence answer with delay info if any.`
+      :`What is the current running status of Indian Railways train number ${g.transport_number} named ${g.transport_name} with PNR ${g.pnr}? Which station is it currently at and is it running on time or delayed? What is the expected arrival time at ${g.pickup_location} station in Kolkata? Give a concise 2-3 sentence answer.`);
   try{
     const result=await callGemini(prompt);
     await apiPost({action:'updateLiveStatus',group_id:id,live_status_text:result});
@@ -752,13 +788,15 @@ async function refreshStatus(id){
     }
     showToast('Status updated','success');
   }catch(e){
+    console.error('Refresh error:',e);
     if(box) box.innerHTML='<span class="ls-icon">⚠️</span><div class="ls-text">Status unavailable — tap Refresh to retry</div>';
     showToast('Could not fetch status','error');
   }
 }
 
 async function toggleField(id,field,current){
-  const newVal=current==='yes'?'no':'yes';showLoading(true);
+  const newVal=current==='yes'?'no':'yes';
+  showLoading(true);
   await apiPost({action:'updateGuestStatus',group_id:id,field,value:newVal});
   const idx=allGuests.findIndex(x=>x.group_id===id);if(idx>=0) allGuests[idx][field]=newVal;
   showLoading(false);renderDashboard();
@@ -770,7 +808,7 @@ async function markFinal(id,type){
   await apiPost({action:'updateGuestStatus',group_id:id,field:'status',value});
   const idx=allGuests.findIndex(x=>x.group_id===id);if(idx>=0) allGuests[idx].status=value;
   showLoading(false);renderDashboard();
-  showToast(type==='arrival'?'Picked up 🎉':'Completed ✓','success');
+  showToast(type==='arrival'?'Picked up 🎉':'Trip completed ✓','success');
 }
 
 async function markActive(id){
@@ -829,9 +867,13 @@ function driverCard(driver,groups){
         const jt=journeyType(g);const isDep=jt==='departure';
         const delayMins=parseDelayMins(g.live_status_text);
         const delayBadge=fmtDelayBadge(delayMins);
-        const lb=isDep?leaveByDep(g):leaveByArr(g.arrival_date,g.arrival_time,delayMins);
-        const lbDate=lb?new Date(lb):null;
-        const urgent=lbDate&&(lbDate-now)<30*60*1000&&(lbDate-now)>0;
+        // Use string-based time math to avoid timezone issues
+        const leaveByTime=isDep
+          ?calcLeaveByDeparture(g.arrival_time,g.transport_type,g.pax)
+          :calcLeaveByArrival(g.arrival_time,delayMins);
+        const leaveMins=parseTimeMins(leaveByTime);
+        const nowMins=new Date().getHours()*60+new Date().getMinutes();
+        const urgent=(leaveMins-nowMins)>0&&(leaveMins-nowMins)<30;
         const tLabel=g.transport_type==='Flight'?(isDep?'Flight Departs':'Flight Arrives'):(isDep?'Train Departs':'Train Arrives');
         return `<div class="driver-assignment${isDep?' dep-assignment':''}">
           <div class="da-label">${isDep?'🛫 Departure':'🛬 Arrival'}</div>
@@ -842,7 +884,7 @@ function driverCard(driver,groups){
             <div class="timing-box">${delayBadge?`<span class="delay-badge">${delayBadge}</span>`:''}
               <div class="tb-label">${tLabel}</div><div class="tb-value">${fmtAmPm(g.arrival_time)||'—'}</div></div>
             <div class="timing-box${urgent?' urgent':''}">
-              <div class="tb-label">Leave By</div><div class="tb-value">${lb?fmtAmPm(lb.slice(11,16)):'—'}</div></div>
+              <div class="tb-label">Leave By</div><div class="tb-value">${fmtAmPm(leaveByTime)||'—'}</div></div>
           </div>
         </div>
         <div class="driver-toggles">
@@ -853,7 +895,7 @@ function driverCard(driver,groups){
               ${g.guest_in_car==='yes'?'👤 In Car ✓':'👤 In Car'}</button>
             <button class="toggle-btn${g.dropped_off==='yes'?' active-purple':''}" onclick="toggleDriverField('${g.group_id}','dropped_off','${g.dropped_off||'no'}')">
               ${g.dropped_off==='yes'?'🏁 Dropped ✓':'🏁 Dropped Off'}</button>
-            <button class="toggle-btn${g.car_returned==='yes'?' active-gold':''}" onclick="toggleDriverField('${g.group_id}','car_returned','${g.car_returned||'no'}')">
+            <button class="toggle-btn${g.car_returned==='yes'?' active-gold':''}" onclick="driverMarkComplete('${g.group_id}')">
               ${g.car_returned==='yes'?'🔑 Returned ✓':'🔑 Car Returned'}</button>
           `:`
             <button class="toggle-btn${g.driver_arrived==='yes'?' active-green':''}" onclick="toggleDriverField('${g.group_id}','driver_arrived','${g.driver_arrived||'no'}')">
@@ -879,17 +921,15 @@ function driverCard(driver,groups){
   </div>`;
 }
 
-function leaveByArr(date,time,delayMins){
-  if(!date||!time) return null;
-  const dt=new Date(`${date}T${time}:00`);
-  dt.setMinutes(dt.getMinutes()+(delayMins||0)-TRAVEL_MINS);
-  return dt.toISOString();
-}
-function leaveByDep(g){
-  if(!g.arrival_date||!g.arrival_time) return null;
-  const dt=new Date(`${g.arrival_date}T${g.arrival_time}:00`);
-  dt.setMinutes(dt.getMinutes()-departureBufMins(g.transport_type,g.pax));
-  return dt.toISOString();
+async function driverMarkComplete(groupId){
+  // Mark car_returned AND status=car_returned so card moves to completed
+  showLoading(true);
+  await apiPost({action:'updateGuestStatus',group_id:groupId,field:'car_returned',value:'yes'});
+  await apiPost({action:'updateGuestStatus',group_id:groupId,field:'status',value:'car_returned'});
+  const idx=allGuests.findIndex(g=>g.group_id===groupId);
+  if(idx>=0){allGuests[idx].car_returned='yes';allGuests[idx].status='car_returned';}
+  showLoading(false);renderDrivers();renderDashboard();
+  showToast('Trip completed ✓','success');
 }
 
 async function toggleDriverField(groupId,field,current){
@@ -926,7 +966,6 @@ function showGuestForm(id){
     document.getElementById('driver-detail-row').style.display='none';
     setJourneyType('arrival');
   }
-  // Reset file input
   document.getElementById('ticket-file').value='';
 }
 function editGuest(id){showGuestForm(id);}
@@ -954,7 +993,7 @@ function onDriverSelect(){
   const opt=sel.selectedIndex>0?sel.options[sel.selectedIndex]:null;
   const row=document.getElementById('driver-detail-row');
   if(!opt||!opt.dataset||!opt.dataset.name){
-    ['f-driver-name','f-driver-phone','f-car-type','f-car-no'].forEach(id=>{ const el=document.getElementById(id);if(el) el.value=''; });
+    ['f-driver-name','f-driver-phone','f-car-type','f-car-no'].forEach(id=>{const el=document.getElementById(id);if(el) el.value='';});
     row.style.display='none';return;
   }
   document.getElementById('f-driver-name').value=opt.dataset.name;
@@ -977,7 +1016,6 @@ function populateForm(g){
   document.getElementById('f-driver-phone').value=g.driver_phone||'';
   document.getElementById('f-car-type').value=g.car_type||'';
   document.getElementById('f-car-no').value=g.car_no||'';
-  // Match dropdown
   const sel=document.getElementById('f-driver-select');
   let matched=false;
   for(let i=1;i<sel.options.length;i++){
@@ -1005,13 +1043,13 @@ function v(id){return document.getElementById(id)?.value||'';}
 // ── Conflict & car optimisation ───────────────────────────────
 function checkConflict(data){
   if(!data.driver_name||!data.arrival_date||!data.arrival_time) return null;
-  const nm=toMins(data.arrival_date,data.arrival_time);
+  const nm=parseTimeMins(data.arrival_time);
   const conflicts=allGuests.filter(g=>{
     if(g.group_id===data.group_id) return false;
     if(g.status==='picked_up'||g.status==='car_returned') return false;
     if(g.driver_name!==data.driver_name) return false;
     if(!g.arrival_date||!g.arrival_time) return false;
-    return Math.abs(toMins(g.arrival_date,g.arrival_time)-nm)<CONFLICT_MINS;
+    return Math.abs(parseTimeMins(g.arrival_time)-nm)<CONFLICT_MINS;
   });
   return conflicts.length?conflicts:null;
 }
@@ -1093,25 +1131,41 @@ async function doSave(data){
   showLoading(false);showDashboard();renderDashboard();
 }
 
-// ── File upload + Gemini extraction ───────────────────────────
+// ── File upload ───────────────────────────────────────────────
 async function handleFileUpload(event){
   const file=event.target.files[0];if(!file) return;
   showLoading(true);document.getElementById('extraction-result').classList.remove('show');
   try{
     const b64=await toBase64(file);const mime=file.type||'image/jpeg';
-    const prompt=`Extract travel ticket data. Return ONLY valid JSON, no markdown, no explanation:
-{"transport_type":"Train or Flight","transport_name":"","transport_number":"","pnr":"","journey_origin":"exact city or station name of departure","destination":"exact city or station name of arrival","arrival_date":"YYYY-MM-DD","arrival_time":"HH:MM 24hr","individual_names":"comma separated full names of all passengers","pax":0}`;
+    // Ask Gemini to extract BOTH departure and arrival times separately
+    const prompt=`You are extracting data from a travel ticket (train or flight). Return ONLY a valid JSON object with NO markdown, NO explanation, NO code blocks — just the raw JSON.
+
+Extract these exact fields:
+{
+  "transport_type": "Train or Flight",
+  "transport_name": "name of train or flight",
+  "transport_number": "train number or flight number",
+  "pnr": "PNR or booking reference number",
+  "journey_origin": "exact name of departure city or station",
+  "journey_destination": "exact name of arrival city or station",
+  "depart_date": "YYYY-MM-DD format — the date the train/flight DEPARTS from origin",
+  "depart_time": "HH:MM in 24-hour format — the time the train/flight DEPARTS from origin",
+  "arrive_date": "YYYY-MM-DD format — the date the train/flight ARRIVES at destination",
+  "arrive_time": "HH:MM in 24-hour format — the time the train/flight ARRIVES at destination",
+  "individual_names": "comma separated list of all passenger names exactly as printed",
+  "pax": number of passengers as integer
+}`;
     const raw=await callGeminiFile(prompt,b64,mime);
     let ex={};
     try{ex=JSON.parse(raw.replace(/```json|```/g,'').trim());}catch{
-      // Try extracting JSON from within text
       const match=raw.match(/\{[\s\S]*\}/);
       if(match) try{ex=JSON.parse(match[0]);}catch{}
     }
+    console.log('Gemini extraction result:',ex);
 
-    // Auto-detect journey type
+    // Auto-detect journey type from origin/destination
     const origin=(ex.journey_origin||'').toLowerCase();
-    const dest=(ex.destination||'').toLowerCase();
+    const dest=(ex.journey_destination||'').toLowerCase();
     const originKolkata=isKolkataStation(origin);
     const destKolkata=isKolkataStation(dest);
     let detectedType='arrival';
@@ -1119,30 +1173,42 @@ async function handleFileUpload(event){
     else detectedType='arrival';
     setJourneyType(detectedType);
 
-    // Fill fields
-    const fm={'f-transport-type':'transport_type','f-transport-name':'transport_name',
-      'f-transport-number':'transport_number','f-pnr':'pnr','f-journey-origin':'journey_origin',
-      'f-arrival-date':'arrival_date','f-arrival-time':'arrival_time','f-pax':'pax'};
-    Object.entries(fm).forEach(([el,k])=>{if(ex[k]!==undefined&&ex[k]!=='') document.getElementById(el).value=ex[k];});
-
-    // Individual names
+    // Fill transport fields
+    if(ex.transport_type) document.getElementById('f-transport-type').value=ex.transport_type;
+    if(ex.transport_name) document.getElementById('f-transport-name').value=ex.transport_name;
+    if(ex.transport_number) document.getElementById('f-transport-number').value=ex.transport_number;
+    if(ex.pnr) document.getElementById('f-pnr').value=ex.pnr;
+    if(ex.journey_origin) document.getElementById('f-journey-origin').value=ex.journey_origin;
+    if(ex.pax) document.getElementById('f-pax').value=ex.pax;
     if(ex.individual_names) document.getElementById('f-individual-names').value=ex.individual_names;
 
-    // Auto-fill merged group name from first passenger name
-    if(ex.individual_names){
+    // Auto-fill group name from first passenger
+    if(ex.individual_names&&!document.getElementById('f-group-name').value){
       const firstName=ex.individual_names.split(',')[0].trim();
-      if(firstName&&!document.getElementById('f-group-name').value){
-        document.getElementById('f-group-name').value=firstName;
-      }
+      if(firstName) document.getElementById('f-group-name').value=firstName;
     }
 
-    // Map station based on journey type
+    // Pick correct date and time based on journey type
+    if(detectedType==='departure'){
+      // Departure: use the time the train/flight STARTS from origin
+      if(ex.depart_date) document.getElementById('f-arrival-date').value=ex.depart_date;
+      if(ex.depart_time) document.getElementById('f-arrival-time').value=ex.depart_time;
+    } else {
+      // Arrival: use the time the train/flight REACHES Kolkata
+      if(ex.arrive_date) document.getElementById('f-arrival-date').value=ex.arrive_date;
+      if(ex.arrive_time) document.getElementById('f-arrival-time').value=ex.arrive_time;
+      // Fallback to depart if arrive not available
+      if(!ex.arrive_date&&ex.depart_date) document.getElementById('f-arrival-date').value=ex.depart_date;
+      if(!ex.arrive_time&&ex.depart_time) document.getElementById('f-arrival-time').value=ex.depart_time;
+    }
+
+    // Map station
     const stationSrc=detectedType==='departure'?origin:dest;
     const mapped=mapToStation(stationSrc);
     if(mapped) document.getElementById('f-pickup-location').value=mapped;
 
     document.getElementById('extraction-result').classList.add('show');
-    showToast(`Detected as ${detectedType}. Please verify.`,'success');
+    showToast(`Detected as ${detectedType} — please verify all fields`,'success');
   }catch(err){
     console.error('Extraction error:',err);
     showToast('Extraction failed — please fill in manually','error');
@@ -1151,23 +1217,42 @@ async function handleFileUpload(event){
 }
 function toBase64(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(file);});}
 
-// ── Gemini ────────────────────────────────────────────────────
+// ── Gemini API ────────────────────────────────────────────────
 async function callGemini(prompt){
-  const r=await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${GEMINI_KEY}`,
-    {method:'POST',headers:{'Content-Type':'application/json'},
-     body:JSON.stringify({contents:[{parts:[{text:prompt}]}],tools:[{google_search:{}}]})}
-  );
-  const d=await r.json();if(d.error) throw new Error(d.error.message);
-  return d.candidates?.[0]?.content?.parts?.[0]?.text||'No response';
+  // Try with google_search grounding first
+  try{
+    const r=await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${GEMINI_KEY}`,
+      {method:'POST',headers:{'Content-Type':'application/json'},
+       body:JSON.stringify({contents:[{parts:[{text:prompt}]}],tools:[{google_search:{}}]})}
+    );
+    const d=await r.json();
+    if(d.error) throw new Error(d.error.message);
+    const text=d.candidates?.[0]?.content?.parts?.[0]?.text||'';
+    if(text) return text;
+    throw new Error('Empty response');
+  }catch(e1){
+    console.warn('Gemini with search failed, retrying without search:',e1.message);
+    // Fallback: no search tool
+    const r=await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${GEMINI_KEY}`,
+      {method:'POST',headers:{'Content-Type':'application/json'},
+       body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})}
+    );
+    const d=await r.json();
+    if(d.error) throw new Error(d.error.message);
+    return d.candidates?.[0]?.content?.parts?.[0]?.text||'No response';
+  }
 }
+
 async function callGeminiFile(prompt,b64,mime){
   const r=await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${GEMINI_KEY}`,
     {method:'POST',headers:{'Content-Type':'application/json'},
      body:JSON.stringify({contents:[{parts:[{inline_data:{mime_type:mime,data:b64}},{text:prompt}]}]})}
   );
-  const d=await r.json();if(d.error) throw new Error(d.error.message);
+  const d=await r.json();
+  if(d.error) throw new Error(d.error.message);
   return d.candidates?.[0]?.content?.parts?.[0]?.text||'{}';
 }
 
@@ -1211,24 +1296,19 @@ function saveSettings(){
 }
 
 // ── Helpers ───────────────────────────────────────────────────
-function toMins(date,time){return new Date(`${date}T${time}:00`).getTime()/60000;}
 function fmtDate(d){
   if(!d) return '';
-  // Handle ISO datetime strings — extract date part only
   const dateStr=String(d).includes('T')?String(d).split('T')[0]:String(d);
   const p=dateStr.split('-');if(p.length!==3) return d;
-  // Guard against 1899 epoch
   if(parseInt(p[0])<1900) return '';
   const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   return parseInt(p[2])+' '+(months[parseInt(p[1])-1]||'');
 }
 function fmtAmPm(t){
   if(!t) return '';
-  // Handle ISO datetime — extract time part
   let timeStr=String(t);
   if(timeStr.includes('T')) timeStr=timeStr.split('T')[1].slice(0,5);
-  // Handle 1899 epoch time strings
-  if(timeStr.startsWith('1899')||timeStr.startsWith('190')) return '';
+  if(timeStr.startsWith('1899')) return '';
   const p=timeStr.split(':');if(p.length<2) return t;
   let h=parseInt(p[0]),m=String(p[1]).slice(0,2);
   if(isNaN(h)) return t;
@@ -1238,10 +1318,7 @@ function fmtAmPm(t){
 function fmtTs(ts){
   if(!ts) return '';
   try{
-    // Handle "YYYY-MM-DD HH:MM" plain string from Apps Script
-    if(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(ts)){
-      const parts=ts.split(' ');return fmtAmPm(parts[1]);
-    }
+    if(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(ts)){const parts=ts.split(' ');return fmtAmPm(parts[1]);}
     return fmtAmPm(new Date(ts).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:false}));
   }catch{return ts;}
 }
@@ -1252,10 +1329,11 @@ function showToast(msg,type=''){
   clearTimeout(_tt);_tt=setTimeout(()=>{t.className='';},3000);
 }
 
-/* ═══════════════════════════════════════════════════════════
-   TEST DATA — paste in browser console after typing "allow pasting"
-   then run: loadTestData()
-═══════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════
+   TEST DATA
+   In browser console: type "allow pasting" → Enter, then paste:
+   loadTestData()
+══════════════════════════════════════════════════════════════ */
 function loadTestData(){
   allDrivers=[
     {driver_id:'D001',driver_name:'Suresh Kumar', driver_phone:'9000000001',car_type:'Innova',        car_no:'WB02AB1042',capacity:'7', assigned:'yes'},
@@ -1265,68 +1343,71 @@ function loadTestData(){
   ];
   const today=new Date().toISOString().slice(0,10);
   const tom=new Date(Date.now()+86400000).toISOString().slice(0,10);
+  // Arrival 90 mins from now (for priority test)
+  const soon=new Date(Date.now()+90*60000);
+  const soonTime=soon.getHours().toString().padStart(2,'0')+':'+soon.getMinutes().toString().padStart(2,'0');
+
   allGuests=[
-    // Arrival — no status (gray strip)
     {group_id:'G001',group_name:'Sharma Family',  pax:'4',phone_primary:'9876543210',phone_backup:'9876543211',
-     pickup_location:'Howrah',    journey_origin:'New Delhi',  arrival_date:today,arrival_time:'14:30',
-     transport_type:'Train',transport_name:'Poorva Express',  transport_number:'12303',pnr:'1234567890',
+     pickup_location:'Howrah',journey_origin:'New Delhi',arrival_date:today,arrival_time:'14:30',
+     transport_type:'Train',transport_name:'Poorva Express',transport_number:'12303',pnr:'1234567890',
      car_type:'Innova',car_no:'WB02AB1042',driver_name:'Suresh Kumar',driver_phone:'9000000001',
      notes:'',status:'active',journey_type:'arrival',dispatched:'no',driver_arrived:'no',guest_in_car:'no',dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:''},
 
-    // Arrival — pooling candidate (same station, 20 min gap, no driver)
+    // Pooling candidate — same station, 20 min gap, no driver
     {group_id:'G002',group_name:'Delhi Cousins',  pax:'3',phone_primary:'9876540001',phone_backup:'',
-     pickup_location:'Howrah',    journey_origin:'Agra',       arrival_date:today,arrival_time:'14:50',
+     pickup_location:'Howrah',journey_origin:'Agra',arrival_date:today,arrival_time:'14:50',
      transport_type:'Train',transport_name:'Rajdhani Express',transport_number:'12301',pnr:'9999999999',
      car_type:'',car_no:'',driver_name:'',driver_phone:'',
      notes:'',status:'active',journey_type:'arrival',dispatched:'no',driver_arrived:'no',guest_in_car:'no',dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:''},
 
-    // Arrival — delayed (amber strip)
+    // Delayed flight — amber strip, driver assigned
     {group_id:'G003',group_name:'Kolkata Mausi',  pax:'2',phone_primary:'9876540003',phone_backup:'',
-     pickup_location:'Airport',   journey_origin:'Mumbai',     arrival_date:today,arrival_time:'16:00',
-     transport_type:'Flight',transport_name:'IndiGo',          transport_number:'6E123',pnr:'ABC123',
+     pickup_location:'Airport',journey_origin:'Mumbai',arrival_date:today,arrival_time:'16:00',
+     transport_type:'Flight',transport_name:'IndiGo',transport_number:'6E123',pnr:'ABC123',
      car_type:'Ertiga',car_no:'WB02CD2031',driver_name:'Ramesh Das',driver_phone:'9000000002',
      notes:'Wheelchair needed',status:'active',journey_type:'arrival',dispatched:'yes',driver_arrived:'yes',guest_in_car:'no',dropped_off:'no',car_returned:'no',
-     live_status_text:'Flight 6E123 is delayed by 45 minutes. New ETA 4:45 PM.',last_refreshed:'2025-01-01 14:00'},
+     live_status_text:'Flight 6E123 is delayed by 45 minutes. New ETA is 4:45 PM.',last_refreshed:'2025-01-01 14:00'},
 
-    // Arrival — on time (green strip)
+    // On time — green strip
     {group_id:'G004',group_name:'Gupta Brothers', pax:'3',phone_primary:'9876540004',phone_backup:'9876540005',
      pickup_location:'Kolkata Station',journey_origin:'Chennai',arrival_date:today,arrival_time:'18:00',
      transport_type:'Train',transport_name:'Coromandel Express',transport_number:'12841',pnr:'2222222222',
      car_type:'Tempo Traveller',car_no:'WB02EF3099',driver_name:'Bikash Roy',driver_phone:'9000000003',
      notes:'6 large suitcases',status:'active',journey_type:'arrival',dispatched:'no',driver_arrived:'no',guest_in_car:'no',dropped_off:'no',car_returned:'no',
-     live_status_text:'Train 12841 is running on time. Currently at Kharagpur, expected at Kolkata Station at 6:05 PM.',last_refreshed:'2025-01-01 15:00'},
+     live_status_text:'Train 12841 is running on time. Currently at Kharagpur, ETA Kolkata Station 6:05 PM.',last_refreshed:'2025-01-01 15:00'},
 
-    // Arrival — priority (no driver, arriving in <3 hrs from now)
+    // Priority — no driver, arriving in 90 min
     {group_id:'G005',group_name:'Banerjee Uncle', pax:'2',phone_primary:'9876540006',phone_backup:'',
-     pickup_location:'Sealdah',   journey_origin:'Patna',      arrival_date:today,
-     arrival_time:(()=>{const d=new Date(Date.now()+90*60000);return d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0')})(),
-     transport_type:'Train',transport_name:'Jan Shatabdi',     transport_number:'12023',pnr:'1111111111',
+     pickup_location:'Sealdah',journey_origin:'Patna',arrival_date:today,arrival_time:soonTime,
+     transport_type:'Train',transport_name:'Jan Shatabdi',transport_number:'12023',pnr:'1111111111',
      car_type:'',car_no:'',driver_name:'',driver_phone:'',
      notes:'',status:'active',journey_type:'arrival',dispatched:'no',driver_arrived:'no',guest_in_car:'no',dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:''},
 
-    // Departure — tomorrow
+    // Departure tomorrow
     {group_id:'G006',group_name:'Pune Relatives', pax:'5',phone_primary:'9876540007',phone_backup:'',
-     pickup_location:'Howrah',    journey_origin:'Kolkata',    arrival_date:tom,arrival_time:'09:15',
+     pickup_location:'Howrah',journey_origin:'Kolkata',arrival_date:tom,arrival_time:'09:15',
      transport_type:'Train',transport_name:'Azad Hind Express',transport_number:'12129',pnr:'3333333333',
      car_type:'Tempo Traveller',car_no:'WB02EF3099',driver_name:'Bikash Roy',driver_phone:'9000000003',
      notes:'',status:'active',journey_type:'departure',dispatched:'no',driver_arrived:'no',guest_in_car:'no',dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:''},
 
-    // Departure — flight today
+    // Departure today — flight
     {group_id:'G007',group_name:'Mumbai Chacha',  pax:'2',phone_primary:'9876540008',phone_backup:'',
-     pickup_location:'Airport',   journey_origin:'Kolkata',    arrival_date:today,arrival_time:'21:00',
-     transport_type:'Flight',transport_name:'Air India',       transport_number:'AI401',pnr:'XYZ999',
+     pickup_location:'Airport',journey_origin:'Kolkata',arrival_date:today,arrival_time:'21:00',
+     transport_type:'Flight',transport_name:'Air India',transport_number:'AI401',pnr:'XYZ999',
      car_type:'Innova',car_no:'WB02AB1042',driver_name:'Suresh Kumar',driver_phone:'9000000001',
      notes:'',status:'active',journey_type:'departure',dispatched:'no',driver_arrived:'no',guest_in_car:'no',dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:''},
 
     // Completed arrival
     {group_id:'G008',group_name:'Verma Family',   pax:'2',phone_primary:'9876540009',phone_backup:'',
-     pickup_location:'Sealdah',   journey_origin:'Kolkata',    arrival_date:today,arrival_time:'11:00',
-     transport_type:'Train',transport_name:'Local',            transport_number:'00001',pnr:'',
+     pickup_location:'Sealdah',journey_origin:'Bhubaneswar',arrival_date:today,arrival_time:'11:00',
+     transport_type:'Train',transport_name:'Coromandel',transport_number:'12841',pnr:'',
      car_type:'Ertiga',car_no:'WB02CD2031',driver_name:'Ramesh Das',driver_phone:'9000000002',
      notes:'',status:'picked_up',journey_type:'arrival',dispatched:'yes',driver_arrived:'yes',guest_in_car:'yes',dropped_off:'no',car_returned:'no',live_status_text:'Arrived',last_refreshed:''},
   ];
   renderDashboard();
   console.log('✅ Test data loaded — '+allGuests.length+' guests, '+allDrivers.length+' drivers');
+  console.log('Tip: open Driver Analytics to test Leave By timing');
 }
 </script>
 </body>
