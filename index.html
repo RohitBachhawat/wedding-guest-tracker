@@ -493,11 +493,38 @@ async function initAndLoad(){
   try{
     await apiPost({action:'initSheet'});
     const [g,d]=await Promise.all([apiGet('getGuests'),apiGet('getDrivers')]);
-    allGuests=(g.guests||[]).filter(x=>x.deleted!=='yes');
+    allGuests=(g.guests||[]).filter(x=>x.deleted!=='yes').map(sanitizeGuest);
     allDrivers=d.drivers||[];
     renderDashboard();
   }catch(e){showToast('Cannot connect to Google Sheet. Check your Apps Script URL.','error');}
   showLoading(false);
+}
+
+// Guarantee arrival_date is YYYY-MM-DD and arrival_time is HH:MM
+// so date/time inputs always get the correct raw value
+function sanitizeGuest(g){
+  // arrival_date: extract YYYY-MM-DD from any format
+  if(g.arrival_date){
+    const s=String(g.arrival_date);
+    const isoMatch=s.match(/^(\d{4}-\d{2}-\d{2})/);
+    if(isoMatch) g.arrival_date=isoMatch[1];
+    else if(s.includes('T')) g.arrival_date=s.split('T')[0];
+    // If year < 1900 (1899 epoch), clear it
+    if(g.arrival_date&&parseInt(g.arrival_date.slice(0,4))<1900) g.arrival_date='';
+  }
+  // arrival_time: extract HH:MM from any format
+  if(g.arrival_time){
+    const s=String(g.arrival_time);
+    // Handle "HH:MM:SS" or ISO datetime — take first 5 chars of time part
+    let t=s;
+    if(s.includes('T')) t=s.split('T')[1];
+    const timeMatch=t.match(/^(\d{2}:\d{2})/);
+    if(timeMatch) g.arrival_time=timeMatch[1];
+    else g.arrival_time='';
+    // Guard 1899 epoch time values
+    if(g.arrival_time&&g.arrival_time.startsWith('18')) g.arrival_time='';
+  }
+  return g;
 }
 
 // ── Screen router ─────────────────────────────────────────────
@@ -1011,13 +1038,17 @@ function onDriverSelect(){
 }
 
 function populateForm(g){
+  // Sanitize before populating to ensure date/time inputs get correct format
+  const sg=sanitizeGuest({...g});
   const m={'f-group-id':'group_id','f-group-name':'group_name','f-individual-names':'individual_names',
     'f-pax':'pax','f-phone-primary':'phone_primary','f-phone-backup':'phone_backup',
     'f-pickup-location':'pickup_location','f-journey-origin':'journey_origin',
-    'f-arrival-date':'arrival_date','f-arrival-time':'arrival_time',
     'f-transport-type':'transport_type','f-transport-name':'transport_name',
     'f-transport-number':'transport_number','f-pnr':'pnr','f-notes':'notes'};
-  Object.entries(m).forEach(([el,k])=>{const e=document.getElementById(el);if(e) e.value=g[k]||'';});
+  Object.entries(m).forEach(([el,k])=>{const e=document.getElementById(el);if(e) e.value=sg[k]||'';});
+  // Set date and time inputs explicitly from sanitized values
+  document.getElementById('f-arrival-date').value=sg.arrival_date||'';
+  document.getElementById('f-arrival-time').value=sg.arrival_time||'';
   document.getElementById('f-driver-name').value=g.driver_name||'';
   document.getElementById('f-driver-phone').value=g.driver_phone||'';
   document.getElementById('f-car-type').value=g.car_type||'';
