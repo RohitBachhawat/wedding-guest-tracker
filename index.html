@@ -90,22 +90,28 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
 .pooling-card-detail{font-size:13px;color:var(--text-2);margin-bottom:10px;line-height:1.6}
 .pooling-card-actions{display:flex;gap:8px}
 
-.cards-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:24px}
-@media(max-width:640px){.cards-grid{grid-template-columns:1fr}}
+.cards-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px}
+@media(max-width:900px){.cards-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.cards-grid{grid-template-columns:1fr}}
 .guest-card{background:var(--white);border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow);overflow:hidden;transition:box-shadow .2s;cursor:pointer}
 .guest-card:hover{box-shadow:var(--shadow-lg)}
 .guest-card.priority-high{border:2px solid var(--red)}
 
 .card-strip{height:5px;width:100%}
 .strip-green{background:var(--green)}.strip-amber{background:var(--amber)}.strip-red{background:var(--red)}.strip-gray{background:var(--gray)}
-.card-body{padding:16px 18px}
+.card-body{padding:14px 16px}
 .card-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px;gap:8px}
-.card-name{font-family:var(--font-h);font-size:17px;color:var(--text);line-height:1.3}
-.card-pax{background:var(--gold-lt);color:var(--gold);font-size:12px;font-weight:600;padding:3px 9px;border-radius:20px;white-space:nowrap;flex-shrink:0}
-.card-badges{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px;min-height:4px}
-.card-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px}
-.card-driver-line{font-size:12px;color:var(--text-2);margin-top:4px;display:flex;align-items:center;gap:4px}
+.card-name{font-family:var(--font-h);font-size:16px;color:var(--text);line-height:1.3;flex:1}
+.card-time-block{display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;text-align:right;gap:1px}
+.card-time-block .ct-time{font-size:17px;font-weight:700;color:var(--text);line-height:1.1}
+.card-time-block .ct-date{font-size:11px;color:var(--text-2)}
+.card-pax{background:var(--gold-lt);color:var(--gold);font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;white-space:nowrap}
+.card-badges{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-bottom:5px;min-height:4px}
+.card-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px}
+.card-train-line{font-size:11px;color:var(--text-2);margin-top:2px}
+.card-driver-line{font-size:12px;color:var(--text-2);margin-top:2px;display:flex;align-items:center;gap:4px}
 .card-driver-line.has-driver{color:var(--green);font-weight:500}
+@media(min-width:601px){.card-train-mobile{display:none}}
 
 .location-badge{font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;text-transform:uppercase;letter-spacing:.4px}
 .loc-rail{background:var(--saffron-lt);color:var(--saffron)}.loc-airport{background:var(--blue-lt);color:var(--blue)}
@@ -113,6 +119,7 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
 .journey-badge-departure{background:var(--purple-lt);color:var(--purple);font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;text-transform:uppercase}
 .no-driver-badge{background:var(--red-lt);color:var(--red);font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;animation:pulse 2s ease infinite}
 .soon-badge{background:var(--amber-lt);color:var(--amber);font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px}
+.same-train-badge{background:var(--blue-lt);color:var(--blue);font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px}
 
 .card-time{font-size:13px;color:var(--text-2)}
 .card-status-text{font-size:12px;font-weight:500;margin-left:auto}
@@ -234,9 +241,9 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
     <!-- DASHBOARD -->
     <div id="screen-dashboard">
       <div class="date-tabs" id="date-tabs"></div>
+      <div id="multi-train-section"></div>
       <div id="pooling-section"></div>
-      <div id="arrivals-section"></div>
-      <div id="departures-section"></div>
+      <div id="active-cards-container"></div>
       <button class="completed-toggle" id="completed-toggle" onclick="toggleCompleted()">
         <span>✅</span><span id="completed-label">Show Completed</span>
       </button>
@@ -559,48 +566,82 @@ function calcLeaveByDeparture(t,type,pax){return addMinsToTime(t,-departureBufMi
 // ══════════════════════════════════════════════════════════════
 // DASHBOARD
 // ══════════════════════════════════════════════════════════════
+// Dismissed multi-train banner trains (session only)
+const dismissedMultiTrain=new Set();
+
 function renderDashboard(){
   screen('dashboard');
-  buildDateTabs();buildPooling();
-  const today=new Date().toISOString().slice(0,10);
-  const active=filteredGuests();
-  const arrivals=active.filter(g=>journeyType(g)==='arrival');
-  const departures=active.filter(g=>journeyType(g)==='departure');
-  const done=allGuests.filter(g=>g.status==='picked_up'||g.status==='car_returned');
+  buildDateTabs();
+  buildMultiTrainBanner();
+  buildPooling();
 
-  const sortSec=list=>list.sort((a,b)=>{
+  const active=filteredGuests();
+  // Sort all active by date+time ascending, priority (no driver+soon) first within same time
+  active.sort((a,b)=>{
     const ap=isPriority(a)?0:1,bp=isPriority(b)?0:1;
     if(ap!==bp) return ap-bp;
-    return((a.arrival_date||'')+(a.arrival_time||'')).localeCompare((b.arrival_date||'')+(b.arrival_time||''));
+    const da=(a.arrival_date||'9999')+(a.arrival_time||'99:99');
+    const db=(b.arrival_date||'9999')+(b.arrival_time||'99:99');
+    return da.localeCompare(db);
   });
 
-  const todayHasArrivals=arrivals.some(g=>g.arrival_date===today);
-  const arrHtml=buildSection(sortSec(arrivals),'arrival');
-  const depHtml=buildSection(sortSec(departures),'departure');
+  // Group by date for dividers
+  const today=new Date().toISOString().slice(0,10);
+  let html='';let lastDate='';
+  active.forEach(g=>{
+    const d=g.arrival_date||'';
+    if(d!==lastDate){
+      const label=d===today?'Today — '+fmtDate(d):d?fmtDate(d):'No Date';
+      html+=`<div class="date-divider">📅 ${label}</div><div class="cards-grid" id="date-grid-${d||'none'}">`;
+      lastDate=d;
+    }
+    html+=renderCard(g);
+  });
+  if(active.length) html+='</div>';
+  document.getElementById('active-cards-container').innerHTML=
+    active.length?html:`<div class="empty-state"><div class="e-icon">🎊</div><h3>No upcoming guests</h3><p>Tap <strong>+ Add Guest</strong> to get started</p></div>`;
 
-  if(todayHasArrivals||!departures.some(g=>g.arrival_date===today)){
-    document.getElementById('arrivals-section').innerHTML=arrHtml;
-    document.getElementById('departures-section').innerHTML=depHtml;
-  } else {
-    document.getElementById('arrivals-section').innerHTML=depHtml;
-    document.getElementById('departures-section').innerHTML=arrHtml;
-  }
-
-  document.getElementById('completed-cards').innerHTML=done.map(renderCard).join('');
+  const done=allGuests.filter(g=>g.status==='picked_up'||g.status==='car_returned');
+  document.getElementById('completed-cards').innerHTML=done.map(g=>renderCard(g,true)).join('');
   document.getElementById('completed-label').textContent=(completedOpen?'Hide':'Show')+' Completed ('+done.length+')';
   document.getElementById('completed-cards').classList.toggle('open',completedOpen);
 }
 
-function buildSection(list,type){
-  if(!list.length) return '';
-  return `<div class="section-block">
-    <div class="section-label">${type==='arrival'?'🛬 Arrivals':'🛫 Departures'} (${list.length})</div>
-    <div class="cards-grid">${list.map(renderCard).join('')}</div>
+function buildMultiTrainBanner(){
+  const active=filteredGuests();
+  // Group by transport_number+transport_type, only where count > 1
+  const groups={};
+  active.forEach(g=>{
+    if(!g.transport_number) return;
+    const key=(g.transport_type||'')+'|'+(g.transport_number||'');
+    if(!groups[key]) groups[key]={num:g.transport_number,type:g.transport_type,name:g.transport_name,guests:[],totalPax:0};
+    groups[key].guests.push(g);
+    groups[key].totalPax+=(parseInt(g.pax)||0);
+  });
+  const multi=Object.values(groups).filter(gr=>gr.guests.length>1&&!dismissedMultiTrain.has(gr.num));
+  const sec=document.getElementById('multi-train-section');
+  if(!multi.length){sec.innerHTML='';return;}
+  const items=multi.map(gr=>
+    `<strong>${gr.name||gr.num}</strong> ${gr.num} — ${gr.guests.length} groups, ${gr.totalPax} pax`
+  ).join(' &nbsp;·&nbsp; ');
+  sec.innerHTML=`<div class="multi-train-banner">
+    <span class="mt-icon">ℹ️</span>
+    <div class="mt-body">Multiple families on same transport: ${items}</div>
+    <button class="mt-dismiss" onclick="dismissMultiTrain()" title="Dismiss">✕</button>
   </div>`;
 }
 
+function dismissMultiTrain(){
+  // Dismiss all currently shown
+  const active=filteredGuests();
+  const groups={};
+  active.forEach(g=>{if(g.transport_number) groups[g.transport_number]=true;});
+  Object.keys(groups).forEach(k=>dismissedMultiTrain.add(k));
+  document.getElementById('multi-train-section').innerHTML='';
+}
+
 function filteredGuests(){
-  let list=allGuests.filter(g=>g.status!=='picked_up'&&g.status!=='car_returned');
+  let list=allGuests.filter(g=>g.status!=='picked_up'&&g.status!=='car_returned'&&g.deleted!=='yes');
   if(activeTab!=='all') list=list.filter(g=>g.arrival_date===activeTab);
   return list;
 }
@@ -614,7 +655,7 @@ function isPriority(g){
 }
 
 function buildDateTabs(){
-  const dates=[...new Set(allGuests.filter(g=>g.status!=='picked_up'&&g.status!=='car_returned').map(g=>g.arrival_date).filter(Boolean))].sort();
+  const dates=[...new Set(allGuests.filter(g=>g.status!=='picked_up'&&g.status!=='car_returned'&&g.deleted!=='yes').map(g=>g.arrival_date).filter(Boolean))].sort();
   const today=new Date().toISOString().slice(0,10);
   const tabs=[{val:'all',label:'All Days'},...dates.map(d=>({val:d,label:d===today?'Today':fmtDate(d)}))];
   document.getElementById('date-tabs').innerHTML=tabs.map(t=>
@@ -707,12 +748,19 @@ document.getElementById('pooling-confirm-btn').addEventListener('click',async()=
 });
 
 // ── Guest card ────────────────────────────────────────────────
-function renderCard(g){
+function renderCard(g, isCompleted){
   const jt=journeyType(g);const isDep=jt==='departure';
   const isAirport=g.pickup_location==='Airport';
   const pri=isPriority(g);
-  const timeStr=g.arrival_date&&g.arrival_time?fmtDate(g.arrival_date)+' · '+fmtAmPm(g.arrival_time):'—';
-  const jBadge=isDep?'<span class="journey-badge-departure">🛫 Departure</span>':'<span class="journey-badge-arrival">🛬 Arrival</span>';
+
+  // Same-train badge: count how many active guests share this train number
+  const sameTrainCount=g.transport_number
+    ?allGuests.filter(x=>x.transport_number===g.transport_number&&x.group_id!==g.group_id&&x.status!=='picked_up'&&x.status!=='car_returned').length
+    :0;
+  const sameTrainBadge=sameTrainCount>0
+    ?`<span class="same-train-badge">🚂 ${sameTrainCount+1} groups on ${esc(g.transport_number)}</span>`:'';
+
+  const jBadge=isDep?'<span class="journey-badge-departure">🛫 Dep</span>':'<span class="journey-badge-arrival">🛬 Arr</span>';
   const noDriverBadge=pri?'<span class="no-driver-badge">⚠️ No Driver</span>':'';
   const soonBadge=(()=>{
     if(!g.arrival_date||!g.arrival_time||!g.driver_name) return '';
@@ -723,6 +771,10 @@ function renderCard(g){
   const driverLine=g.driver_name
     ?`<div class="card-driver-line has-driver">🚗 ${esc(g.driver_name)} · ${esc(g.car_no||'—')}</div>`
     :'';
+  // Train line: always shown on mobile, hidden on desktop (via CSS)
+  const trainLine=g.transport_number
+    ?`<div class="card-train-line card-train-mobile">🚂 ${esc(g.transport_name||'')} ${esc(g.transport_number)}</div>`:'';
+
   const stationLabel=isDep?'Drop Station':'Pickup Station';
   const timeLabel=isDep?'Departure Time':'Arrival Time';
   const originLabel=isDep?'Departing From':'Coming From';
@@ -732,15 +784,22 @@ function renderCard(g){
     <div class="card-body">
       <div class="card-header">
         <div class="card-name">${esc(g.group_name)}</div>
-        <div class="card-pax">👥 ${g.pax||0}</div>
+        <div class="card-time-block">
+          <div class="ct-time">${g.arrival_time?fmtAmPm(g.arrival_time):'—'}</div>
+          <div class="ct-date">${g.arrival_date?fmtDate(g.arrival_date):'—'}</div>
+        </div>
       </div>
-      <div class="card-badges">${jBadge}${noDriverBadge}${soonBadge}</div>
+      <div class="card-badges">
+        ${jBadge}
+        <span class="card-pax">👥 ${g.pax||0}</span>
+        ${noDriverBadge}${soonBadge}${sameTrainBadge}
+      </div>
       <div class="card-meta">
         <span class="location-badge ${isAirport?'loc-airport':'loc-rail'}">${isDep?'Drop: ':''}${esc(g.pickup_location||'—')}</span>
-        <span class="card-time">🕐 ${timeStr}</span>
         <span class="card-status-text ${statusClass(g)}">${statusLabel(g)}</span>
       </div>
       ${driverLine}
+      ${trainLine}
     </div>
     <div class="card-expanded" id="exp-${g.group_id}">
       <div class="detail-grid">
@@ -854,6 +913,7 @@ async function toggleField(id,field,current){
   showLoading(false);renderDashboard();
 }
 async function markFinal(id,type){
+  // Both picked_up and car_returned go to completed section
   const value=type==='arrival'?'picked_up':'car_returned';
   showLoading(true);
   await apiPost({action:'updateGuestStatus',group_id:id,field:'status',value});
@@ -1130,20 +1190,19 @@ function v(id){return document.getElementById(id)?.value||'';}
 
 // ── Duplicate check ────────────────────────────────────────────
 function checkDuplicate(data){
-  if(!data.pnr&&!data.transport_number) return null;
+  // Only match on PNR — train numbers repeat daily, only PNR is unique per booking
+  if(!data.pnr) return null;
   return allGuests.find(g=>{
     if(g.group_id===data.group_id) return false;
-    const pnrMatch=data.pnr&&g.pnr&&data.pnr.toUpperCase()===g.pnr.toUpperCase();
-    const numMatch=data.transport_number&&g.transport_number&&
-      data.transport_number.replace(/\s/g,'').toUpperCase()===g.transport_number.replace(/\s/g,'').toUpperCase();
-    return pnrMatch||numMatch;
+    if(!g.pnr) return false;
+    return data.pnr.trim().toUpperCase()===g.pnr.trim().toUpperCase();
   })||null;
 }
 
 function openDupModal(data,existing){
   dupPendingData=data;dupExistingId=existing.group_id;
   document.getElementById('dup-detail').innerHTML=
-    `A entry with ${data.pnr?'PNR <strong>'+esc(data.pnr)+'</strong>':''} ${data.transport_number?'/ Flight/Train <strong>'+esc(data.transport_number)+'</strong>':''} already exists: <strong>${esc(existing.group_name)}</strong> · ${fmtDate(existing.arrival_date)} ${fmtAmPm(existing.arrival_time)}.`;
+    `An entry with PNR <strong>${esc(data.pnr)}</strong> already exists: <strong>${esc(existing.group_name)}</strong> · ${fmtDate(existing.arrival_date)} ${fmtAmPm(existing.arrival_time)}.`;
   document.getElementById('dup-modal').classList.add('open');
 }
 function closeDupModal(){document.getElementById('dup-modal').classList.remove('open');dupPendingData=null;dupExistingId=null;}
@@ -1438,15 +1497,16 @@ function openSummaryModal(){
   const arrivals=active.filter(g=>journeyType(g)==='arrival');
   const deps=active.filter(g=>journeyType(g)==='departure');
   const done=allGuests.filter(g=>g.status==='picked_up'||g.status==='car_returned');
+  const todayAll=active.filter(g=>g.arrival_date===today);
   const tiles=[
-    {label:"Today's Arrivals",   value:arrivals.filter(g=>g.arrival_date===today).length, sub:'groups'},
-    {label:"Today's Departures", value:deps.filter(g=>g.arrival_date===today).length,     sub:'groups'},
-    {label:'Pending Arrivals',   value:arrivals.length,                                    sub:'groups'},
-    {label:'Pending Departures', value:deps.length,                                        sub:'groups'},
-    {label:'Total Pending Pax',  value:active.reduce((s,g)=>s+(parseInt(g.pax)||0),0),    sub:'people'},
-    {label:'Completed',          value:done.length,                                        sub:'total'},
-    {label:'Dispatched',         value:active.filter(g=>g.dispatched==='yes').length,      sub:'drivers sent'},
-    {label:'Free Drivers',       value:allDrivers.filter(d=>d.assigned!=='yes').length,    sub:'available'},
+    {label:"Today's Guests",     value:todayAll.length,                                    sub:'groups'},
+    {label:"Today's Pax",        value:todayAll.reduce((s,g)=>s+(parseInt(g.pax)||0),0),   sub:'people'},
+    {label:"Today's Arrivals",   value:arrivals.filter(g=>g.arrival_date===today).length,  sub:'groups'},
+    {label:"Today's Departures", value:deps.filter(g=>g.arrival_date===today).length,      sub:'groups'},
+    {label:'Total Pending Pax',  value:active.reduce((s,g)=>s+(parseInt(g.pax)||0),0),     sub:'people'},
+    {label:'Completed',          value:done.length,                                         sub:'total'},
+    {label:'Dispatched',         value:active.filter(g=>g.dispatched==='yes').length,       sub:'drivers sent'},
+    {label:'Free Drivers',       value:allDrivers.filter(d=>d.assigned!=='yes').length,     sub:'available'},
   ];
   document.getElementById('summary-grid').innerHTML=tiles.map(t=>
     `<div class="summary-tile"><div class="st-label">${t.label}</div><div class="st-value">${t.value}</div><div class="st-sub">${t.sub}</div></div>`
