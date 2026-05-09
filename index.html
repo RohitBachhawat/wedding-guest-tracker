@@ -1517,48 +1517,62 @@ function loadTestData(){
   const soon=new Date(Date.now()+90*60000);
   const soonTime=soon.getHours().toString().padStart(2,'0')+':'+soon.getMinutes().toString().padStart(2,'0');
   allGuests=[
+    // 12303 Poorva Express — today DEPARTURE (Kolkata → New Delhi)
     {group_id:'G001',group_name:'Sharma Family',pax:'4',phone_primary:'9876543210',phone_backup:'9876543211',
-     pickup_location:'Howrah',journey_origin:'New Delhi',arrival_date:today,arrival_time:'14:30',
+     pickup_location:'Howrah',journey_origin:'Kolkata',arrival_date:today,arrival_time:'14:00',
      transport_type:'Train',transport_name:'Poorva Express',transport_number:'12303',pnr:'1234567890',
      car_type:'Innova',car_no:'WB02AB1042',driver_name:'Suresh Kumar',driver_phone:'9000000001',
-     notes:'',status:'active',journey_type:'arrival',dispatched:'no',driver_arrived:'no',guest_in_car:'no',dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:'',deleted:'no'},
-    {group_id:'G002',group_name:'Delhi Cousins',pax:'3',phone_primary:'9876540001',phone_backup:'',
-     pickup_location:'Howrah',journey_origin:'Agra',arrival_date:today,arrival_time:'14:50',
-     transport_type:'Train',transport_name:'Rajdhani Express',transport_number:'12301',pnr:'9999999999',
-     car_type:'',car_no:'',driver_name:'',driver_phone:'',
-     notes:'',status:'active',journey_type:'arrival',dispatched:'no',driver_arrived:'no',guest_in_car:'no',dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:'',deleted:'no'},
-    {group_id:'G003',group_name:'Kolkata Mausi',pax:'2',phone_primary:'9876540003',phone_backup:'',
-     pickup_location:'Airport',journey_origin:'Mumbai',arrival_date:today,arrival_time:'16:00',
-     transport_type:'Flight',transport_name:'IndiGo',transport_number:'6E123',pnr:'ABC123',
+     notes:'',status:'active',journey_type:'departure',dispatched:'no',driver_arrived:'no',guest_in_car:'no',dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:'',deleted:'no'},
+
+    // 13051 Tebhaga Express — today ARRIVAL (Jalpaiguri → Sealdah)
+    {group_id:'G002',group_name:'Roy Family',pax:'3',phone_primary:'9876540001',phone_backup:'',
+     pickup_location:'Sealdah',journey_origin:'Jalpaiguri',arrival_date:today,arrival_time:'07:15',
+     transport_type:'Train',transport_name:'Tebhaga Express',transport_number:'13051',pnr:'2345678901',
      car_type:'Ertiga',car_no:'WB02CD2031',driver_name:'Ramesh Das',driver_phone:'9000000002',
-     notes:'Wheelchair needed',status:'active',journey_type:'arrival',dispatched:'yes',driver_arrived:'yes',guest_in_car:'no',dropped_off:'no',car_returned:'no',
-     live_status_text:'Flight 6E123 is delayed by 45 minutes. New ETA 4:45 PM.',last_refreshed:'2025-01-01 14:00',deleted:'no'},
-    {group_id:'G004',group_name:'Gupta Brothers',pax:'3',phone_primary:'9876540004',phone_backup:'',
-     pickup_location:'Kolkata Station',journey_origin:'Chennai',arrival_date:today,arrival_time:'18:00',
-     transport_type:'Train',transport_name:'Coromandel Express',transport_number:'12841',pnr:'2222222222',
+     notes:'',status:'active',journey_type:'arrival',dispatched:'no',driver_arrived:'no',guest_in_car:'no',dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:'',deleted:'no'},
+
+    // 12274 Duronto Express — today ARRIVAL (New Delhi → Howrah)
+    {group_id:'G003',group_name:'Kapoor Siblings',pax:'2',phone_primary:'9876540002',phone_backup:'9876540003',
+     pickup_location:'Howrah',journey_origin:'New Delhi',arrival_date:today,arrival_time:'16:30',
+     transport_type:'Train',transport_name:'Duronto Express',transport_number:'12274',pnr:'3456789012',
+     car_type:'Ertiga',car_no:'WB02CD2031',driver_name:'Ramesh Das',driver_phone:'9000000002',
+     notes:'',status:'active',journey_type:'arrival',dispatched:'no',driver_arrived:'no',guest_in_car:'no',dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:'',deleted:'no'},
+
+    // 12304 Poorva Express — today ARRIVAL (New Delhi → Howrah)
+    {group_id:'G004',group_name:'Mehta Family',pax:'5',phone_primary:'9876540004',phone_backup:'',
+     pickup_location:'Howrah',journey_origin:'New Delhi',arrival_date:today,arrival_time:'09:45',
+     transport_type:'Train',transport_name:'Poorva Express',transport_number:'12304',pnr:'4567890123',
      car_type:'Tempo Traveller',car_no:'WB02EF3099',driver_name:'Bikash Roy',driver_phone:'9000000003',
-     notes:'6 large suitcases',status:'active',journey_type:'arrival',dispatched:'no',driver_arrived:'no',guest_in_car:'no',dropped_off:'no',car_returned:'no',
-     live_status_text:'Train 12841 is on time. Currently at Kharagpur. ETA Kolkata Station 6:05 PM.',last_refreshed:'2025-01-01 15:00',deleted:'no'},
-    {group_id:'G005',group_name:'Banerjee Uncle',pax:'2',phone_primary:'9876540006',phone_backup:'',
-     pickup_location:'Sealdah',journey_origin:'Patna',arrival_date:today,arrival_time:soonTime,
-     transport_type:'Train',transport_name:'Jan Shatabdi',transport_number:'12023',pnr:'1111111111',
+     notes:'Elderly couple, needs assistance',status:'active',journey_type:'arrival',dispatched:'no',driver_arrived:'no',guest_in_car:'no',dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:'',deleted:'no'},
+
+    // 12304 Poorva Express — TOMORROW ARRIVAL (New Delhi → Howrah)
+    {group_id:'G005',group_name:'Joshi Brothers',pax:'3',phone_primary:'9876540005',phone_backup:'',
+     pickup_location:'Howrah',journey_origin:'New Delhi',arrival_date:tom,arrival_time:'09:45',
+     transport_type:'Train',transport_name:'Poorva Express',transport_number:'12304',pnr:'5678901234',
      car_type:'',car_no:'',driver_name:'',driver_phone:'',
      notes:'',status:'active',journey_type:'arrival',dispatched:'no',driver_arrived:'no',guest_in_car:'no',dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:'',deleted:'no'},
-    {group_id:'G006',group_name:'Rishab Bachhawat',pax:'1',phone_primary:'9876540007',phone_backup:'',
-     pickup_location:'Airport',journey_origin:'New Delhi',arrival_date:'2026-03-31',arrival_time:'01:15',
-     transport_type:'Flight',transport_name:'SpiceJet',transport_number:'SG-759',pnr:'SJ3Q3H',
-     car_type:'Ertiga',car_no:'WB02CD2031',driver_name:'Ramesh Das',driver_phone:'9000000002',
-     notes:'',status:'active',journey_type:'arrival',dispatched:'no',driver_arrived:'no',guest_in_car:'no',dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:'',deleted:'no'},
-    {group_id:'G007',group_name:'Rishab Bachhawat',pax:'1',phone_primary:'9876540007',phone_backup:'',
-     pickup_location:'Airport',journey_origin:'Kolkata',arrival_date:'2026-03-25',arrival_time:'06:05',
-     transport_type:'Flight',transport_name:'SpiceJet',transport_number:'SG-130',pnr:'A8BVYY',
+
+    // 18029 Shalimar Express — today ARRIVAL (Okha → Howrah)
+    {group_id:'G006',group_name:'Patel Group',pax:'6',phone_primary:'9876540006',phone_backup:'9876540007',
+     pickup_location:'Howrah',journey_origin:'Okha',arrival_date:today,arrival_time:'11:30',
+     transport_type:'Train',transport_name:'Shalimar Express',transport_number:'18029',pnr:'6789012345',
+     car_type:'Tempo Traveller',car_no:'WB02EF3099',driver_name:'Bikash Roy',driver_phone:'9000000003',
+     notes:'6 large bags',status:'active',journey_type:'arrival',dispatched:'yes',driver_arrived:'no',guest_in_car:'no',dropped_off:'no',car_returned:'no',
+     live_status_text:'Train 18029 is running on time. Currently at Santragachi. ETA Howrah 11:35 AM.',last_refreshed:'2025-01-01 10:00',deleted:'no'},
+
+    // 12859 Gitanjali Express — today DEPARTURE (Howrah → Mumbai CST)
+    {group_id:'G007',group_name:'Banerjee Uncle',pax:'2',phone_primary:'9876540008',phone_backup:'',
+     pickup_location:'Howrah',journey_origin:'Kolkata',arrival_date:today,arrival_time:'14:05',
+     transport_type:'Train',transport_name:'Gitanjali Express',transport_number:'12859',pnr:'7890123456',
      car_type:'Innova',car_no:'WB02AB1042',driver_name:'Suresh Kumar',driver_phone:'9000000001',
      notes:'',status:'active',journey_type:'departure',dispatched:'no',driver_arrived:'no',guest_in_car:'no',dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:'',deleted:'no'},
+
+    // Completed — picked up
     {group_id:'G008',group_name:'Verma Family',pax:'2',phone_primary:'9876540009',phone_backup:'',
-     pickup_location:'Sealdah',journey_origin:'Bhubaneswar',arrival_date:today,arrival_time:'11:00',
-     transport_type:'Train',transport_name:'Coromandel',transport_number:'12841',pnr:'',
+     pickup_location:'Sealdah',journey_origin:'Bhubaneswar',arrival_date:today,arrival_time:'08:00',
+     transport_type:'Train',transport_name:'Coromandel Express',transport_number:'12841',pnr:'8901234567',
      car_type:'Ertiga',car_no:'WB02CD2031',driver_name:'Ramesh Das',driver_phone:'9000000002',
-     notes:'',status:'picked_up',journey_type:'arrival',dispatched:'yes',driver_arrived:'yes',guest_in_car:'yes',dropped_off:'no',car_returned:'no',live_status_text:'Arrived',last_refreshed:'',deleted:'no'},
+     notes:'',status:'picked_up',journey_type:'arrival',dispatched:'yes',driver_arrived:'yes',guest_in_car:'yes',dropped_off:'no',car_returned:'no',live_status_text:'Arrived on time.',last_refreshed:'',deleted:'no'},
   ];
   renderDashboard();
   console.log('✅ Test data loaded — '+allGuests.length+' guests, '+allDrivers.length+' drivers');
