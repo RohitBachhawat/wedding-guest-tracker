@@ -287,7 +287,7 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
           <h3>👨‍👩‍👧 Guest Group Details</h3>
           <div class="form-row">
             <div class="form-group"><label>Merged Group Name *</label><input type="text" id="f-group-name" placeholder="e.g. Sharma Family" required/></div>
-            <div class="form-group"><label>Total Pax *</label><input type="number" id="f-pax" min="1" max="30" placeholder="1" required/></div>
+            <div class="form-group"><label>Total Pax *</label><input type="number" id="f-pax" min="1" max="30" placeholder="1" required oninput="onDriverSelect()"/></div>
           </div>
           <div class="form-group"><label>Individual Names (for records)</label><input type="text" id="f-individual-names" placeholder="Rishab Bachhawat"/></div>
           <div class="form-row">
@@ -673,10 +673,30 @@ function openPoolingConfirm(i){
     <span style="color:var(--text-2);font-size:12px">Combined ${r.combo} pax · ${r.type==='departure'?'Departing from':'Arriving at'}: ${esc(r.a.pickup_location)}</span>`;
   document.getElementById('pooling-modal').classList.add('open');
 }
-function closePoolingModal(){document.getElementById('pooling-modal').classList.remove('open');pendingPooling=null;}
+function closePoolingModal(){
+  document.getElementById('pooling-modal').classList.remove('open');
+  pendingPooling=null;
+  document.getElementById('pooling-confirm-btn').classList.remove('hidden');
+}
 document.getElementById('pooling-confirm-btn').addEventListener('click',async()=>{
   if(pendingPooling===null) return;
   const r=currentRecs[pendingPooling];const tgt=r.sd.target;const sd=r.sd;
+
+  // Hard block: recheck capacity at point of confirm
+  const assignedDriver=allDrivers.find(d=>(d.car_no||d.car_token)===sd.car_no);
+  const carCap=parseInt(assignedDriver?.capacity||0);
+  if(carCap>0&&r.combo>carCap){
+    // Find a free car that fits
+    const betterCar=allDrivers.find(d=>d.assigned!=='yes'&&parseInt(d.capacity||0)>=r.combo);
+    const suggestion=betterCar
+      ?`<br><br>💡 <strong>${betterCar.driver_name}</strong> (${betterCar.car_type}, Cap: ${betterCar.capacity}, Car No. ${betterCar.car_no||betterCar.car_token}) is free and fits all ${r.combo} passengers.`
+      :'<br><br>No free car with enough capacity found. Please assign a larger car manually.';
+    document.getElementById('pooling-modal-text').innerHTML=
+      `⚠️ Cannot merge — combined <strong>${r.combo} pax</strong> exceeds <strong>${esc(sd.name)}'s</strong> car capacity of <strong>${carCap}</strong>.${suggestion}`;
+    document.getElementById('pooling-confirm-btn').classList.add('hidden');
+    return;
+  }
+
   showLoading(true);
   const updated={...tgt,driver_name:sd.name,car_no:sd.car_no,car_type:sd.car,driver_phone:sd.phone||''};
   await apiPost({action:'updateGuest',data:updated});
@@ -1033,8 +1053,14 @@ function onDriverSelect(){
   document.getElementById('f-driver-phone').value=opt.dataset.phone;
   document.getElementById('f-car-type').value=opt.dataset.carType;
   document.getElementById('f-car-no').value=opt.dataset.carNo;
+
+  const pax=parseInt(document.getElementById('f-pax').value)||0;
+  const cap=parseInt(opt.dataset.capacity)||0;
+  const overCapacity=pax>0&&cap>0&&pax>cap;
+
   row.style.display='block';
-  row.innerHTML=`<strong>${esc(opt.dataset.name)}</strong> · ${esc(opt.dataset.carType)} · Car No. <strong>${esc(opt.dataset.carNo)}</strong> · Cap: ${opt.dataset.capacity} · 📞 ${esc(opt.dataset.phone)}`;
+  row.innerHTML=`<strong>${esc(opt.dataset.name)}</strong> · ${esc(opt.dataset.carType)} · Car No. <strong>${esc(opt.dataset.carNo)}</strong> · Cap: ${opt.dataset.capacity} · 📞 ${esc(opt.dataset.phone)}`+
+    (overCapacity?`<br><span style="color:var(--amber);font-weight:600">⚠️ Car capacity (${cap}) is less than group size (${pax}). You can still save.</span>`:'');
 }
 
 function populateForm(g){
