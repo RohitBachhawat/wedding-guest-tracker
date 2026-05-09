@@ -90,10 +90,10 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
 .pooling-card-detail{font-size:13px;color:var(--text-2);margin-bottom:10px;line-height:1.6}
 .pooling-card-actions{display:flex;gap:8px}
 
-.cards-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px}
+.cards-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px;align-items:start}
 @media(max-width:900px){.cards-grid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:600px){.cards-grid{grid-template-columns:1fr}}
-.guest-card{background:var(--white);border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow);overflow:hidden;transition:box-shadow .2s;cursor:pointer}
+.guest-card{background:var(--white);border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow);overflow:hidden;transition:box-shadow .2s;cursor:pointer;align-self:start}
 .guest-card:hover{box-shadow:var(--shadow-lg)}
 .guest-card.priority-high{border:2px solid var(--red)}
 
@@ -202,6 +202,9 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
 .conflict-detail{background:var(--red-lt);border:1px solid #f5c6c2;border-radius:8px;padding:12px 14px;font-size:13px;color:var(--red);line-height:1.7;margin-bottom:4px}
 .car-opt-detail{background:var(--green-lt);border:1px solid #a8d5c2;border-radius:8px;padding:12px 14px;font-size:13px;color:var(--green);line-height:1.7;margin-bottom:4px}
 .dup-detail{background:var(--amber-lt);border:1px solid #f6c752;border-radius:8px;padding:12px 14px;font-size:13px;color:var(--amber);line-height:1.7;margin-bottom:4px}
+.date-group{width:100%;margin-bottom:8px}
+.date-divider{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-2);padding:6px 0 10px;display:flex;align-items:center;gap:10px;width:100%}
+.date-divider::after{content:'';flex:1;height:1px;background:var(--border)}
 </style>
 </head>
 <body>
@@ -585,19 +588,24 @@ function renderDashboard(){
     return da.localeCompare(db);
   });
 
-  // Group by date for dividers
+  // Group by date for dividers — each date gets its own full-width label + fresh grid
   const today=new Date().toISOString().slice(0,10);
-  let html='';let lastDate='';
+  // Build date → guests map preserving sort order
+  const dateMap=new Map();
   active.forEach(g=>{
-    const d=g.arrival_date||'';
-    if(d!==lastDate){
-      const label=d===today?'Today — '+fmtDate(d):d?fmtDate(d):'No Date';
-      html+=`<div class="date-divider">📅 ${label}</div><div class="cards-grid" id="date-grid-${d||'none'}">`;
-      lastDate=d;
-    }
-    html+=renderCard(g);
+    const d=g.arrival_date||'none';
+    if(!dateMap.has(d)) dateMap.set(d,[]);
+    dateMap.get(d).push(g);
   });
-  if(active.length) html+='</div>';
+  let html='';
+  dateMap.forEach((guests,d)=>{
+    const label=d===today?'Today — '+fmtDate(d):d&&d!=='none'?fmtDate(d):'No Date';
+    html+=`<div class="date-group">`;
+    html+=`<div class="date-divider">📅 ${label}</div>`;
+    html+=`<div class="cards-grid">`;
+    guests.forEach(g=>{ html+=renderCard(g); });
+    html+=`</div></div>`;
+  });
   document.getElementById('active-cards-container').innerHTML=
     active.length?html:`<div class="empty-state"><div class="e-icon">🎊</div><h3>No upcoming guests</h3><p>Tap <strong>+ Add Guest</strong> to get started</p></div>`;
 
@@ -870,7 +878,7 @@ function statusLabel(g){
   const t=g.live_status_text.toLowerCase();
   if(t.includes('on time')) return 'On time';
   if(t.includes('arrived')||t.includes('landed')) return 'Arrived';
-  const m=g.live_status_text.match(/delay[^,\.]{0,25}/i);return m?m[0].slice(0,25):'See details';
+  const m=g.live_status_text.match(/delay[^,\.]{0,25}/i);return m?m[0].slice(0,25):'';
 }
 function statusClass(g){const s=stripClass(g);return s==='strip-green'?'status-on-time':s==='strip-amber'?'status-delayed':s==='strip-red'?'status-late':'status-unknown';}
 
