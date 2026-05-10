@@ -532,7 +532,8 @@ function sanitizeGuest(g){
     if(timeMatch) g.arrival_time=timeMatch[1];
     else g.arrival_time='';
     // Guard 1899 epoch time values
-    if(g.arrival_time&&g.arrival_time.startsWith('18')) g.arrival_time='';
+    // If time is longer than HH:MM (e.g. HH:MM:SS), strip to HH:MM
+    if(g.arrival_time&&g.arrival_time.length>5) g.arrival_time=g.arrival_time.slice(0,5);
   }
   return g;
 }
@@ -542,7 +543,19 @@ function screen(n){['dashboard','drivers','guest'].forEach(s=>{document.getEleme
 function showDashboard(){renderDashboard();}
 
 // ── Journey helpers ───────────────────────────────────────────
-function journeyType(g){return(g.journey_type||'arrival').toLowerCase()==='departure'?'departure':'arrival';}
+function journeyType(g){
+  const jt=(g.journey_type||'').toLowerCase().trim();
+  if(jt==='departure') return 'departure';
+  if(jt==='arrival') return 'arrival';
+  // Fallback 1: infer from origin — if origin is a Kolkata station, it's a departure
+  if(g.journey_origin&&isKolkataStation(g.journey_origin.toLowerCase())) return 'departure';
+  // Fallback 2: if destination (pickup_location) is one of our 4 stations AND
+  // origin is NOT a Kolkata station → it's an arrival
+  // If pickup_location is one of our 4 AND origin IS Kolkata → departure (already caught above)
+  // Additional signal: if live_status_text mentions 'depart' → departure
+  if(g.live_status_text&&g.live_status_text.toLowerCase().includes('depart')) return 'departure';
+  return 'arrival';
+}
 function isKolkataStation(str){const s=(str||'').toLowerCase();return KOLKATA_STATIONS.some(k=>s.includes(k));}
 function mapToStation(str){
   const s=(str||'').toLowerCase();
@@ -1548,15 +1561,27 @@ function fmtDate(d){
 }
 function fmtAmPm(t){
   if(!t) return '';
-  let s=String(t);
-  if(s.includes('T')) s=s.split('T')[1];
+  let s=String(t).trim();
+  // Handle ISO datetime: "2026-03-25T06:05:00.000Z" → take time part
+  if(s.includes('T')){
+    const tPart=s.split('T')[1];
+    // Only use if it looks like a valid time, not 1899
+    if(s.startsWith('1899')) return '';
+    s=tPart;
+  }
+  // Handle "YYYY-MM-DD HH:MM" plain string from Apps Script
+  if(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(s)) s=s.split(' ')[1];
+  // Now s should be "HH:MM" or "HH:MM:SS"
   s=s.slice(0,5);
-  if(s.startsWith('1899')||s.length<4) return '';
-  const p=s.split(':');if(p.length<2) return t;
-  let h=parseInt(p[0]),m=String(p[1]).slice(0,2);
-  if(isNaN(h)) return t;
-  const ap=h>=12?'PM':'AM';h=h%12||12;
-  return `${h}:${m} ${ap}`;
+  if(!s||s.length<4) return '';
+  const p=s.split(':');
+  if(p.length<2) return '';
+  const h=parseInt(p[0]);
+  const m=String(p[1]).padStart(2,'0');
+  if(isNaN(h)||h<0||h>23) return '';
+  const ap=h>=12?'PM':'AM';
+  const h12=h%12||12;
+  return `${h12}:${m} ${ap}`;
 }
 function fmtTs(ts){
   if(!ts) return '';
