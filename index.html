@@ -513,6 +513,16 @@ async function initAndLoad(){
 // Guarantee arrival_date is YYYY-MM-DD and arrival_time is HH:MM
 // so date/time inputs always get the correct raw value
 function sanitizeGuest(g){
+  // Detect swapped date/time columns from sheet
+  // If arrival_date looks like HH:MM and arrival_time looks like YYYY-MM-DD, swap them
+  const dStr=String(g.arrival_date||'');
+  const tStr=String(g.arrival_time||'');
+  const dateIsTime=/^\d{1,2}:\d{2}/.test(dStr);
+  const timeIsDate=/^\d{4}-\d{2}-\d{2}/.test(tStr);
+  if(dateIsTime||timeIsDate){
+    const tmp=g.arrival_date;g.arrival_date=g.arrival_time;g.arrival_time=tmp;
+    addDebug('SWAPPED: '+g.group_name+' date='+dStr+' time='+tStr);
+  }
   // arrival_date: extract YYYY-MM-DD from any format
   if(g.arrival_date){
     const s=String(g.arrival_date);
@@ -535,7 +545,7 @@ function sanitizeGuest(g){
     // If time is longer than HH:MM (e.g. HH:MM:SS), strip to HH:MM
     if(g.arrival_time&&g.arrival_time.length>5) g.arrival_time=g.arrival_time.slice(0,5);
   }
-  addDebug('OUT: '+JSON.stringify(g.arrival_time)+' → '+fmtAmPm(g.arrival_time));
+  addDebug('OUT: date='+JSON.stringify(g.arrival_date)+' time='+JSON.stringify(g.arrival_time)+' → '+fmtAmPm(g.arrival_time));
   return g;
 }
 
