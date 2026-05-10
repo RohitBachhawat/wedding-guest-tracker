@@ -521,8 +521,7 @@ function sanitizeGuest(g){
   const timeIsDate=/^\d{4}-\d{2}-\d{2}/.test(tStr);
   if(dateIsTime||timeIsDate){
     const tmp=g.arrival_date;g.arrival_date=g.arrival_time;g.arrival_time=tmp;
-    addDebug('SWAPPED: '+g.group_name+' date='+dStr+' time='+tStr);
-  }
+    }
   // arrival_date: extract YYYY-MM-DD from any format
   if(g.arrival_date){
     const s=String(g.arrival_date);
@@ -538,14 +537,16 @@ function sanitizeGuest(g){
     // Handle "HH:MM:SS" or ISO datetime — take first 5 chars of time part
     let t=s;
     if(s.includes('T')) t=s.split('T')[1];
-    const timeMatch=t.match(/^(\d{2}:\d{2})/);
-    if(timeMatch) g.arrival_time=timeMatch[1];
-    else g.arrival_time='';
+    const timeMatch=t.match(/^(\d{1,2}:\d{2})/);
+    if(timeMatch){
+      // Pad single-digit hour with leading zero so input[type=time] works
+      const parts=timeMatch[1].split(':');
+      g.arrival_time=parts[0].padStart(2,'0')+':'+parts[1];
+    } else g.arrival_time='';
     // Guard 1899 epoch time values
     // If time is longer than HH:MM (e.g. HH:MM:SS), strip to HH:MM
     if(g.arrival_time&&g.arrival_time.length>5) g.arrival_time=g.arrival_time.slice(0,5);
   }
-  addDebug('OUT: date='+JSON.stringify(g.arrival_date)+' time='+JSON.stringify(g.arrival_time)+' → '+fmtAmPm(g.arrival_time));
   return g;
 }
 
@@ -1602,12 +1603,6 @@ function fmtTs(ts){
   }catch{return ts;}
 }
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-let _debugLines=[];
-function addDebug(msg){
-  _debugLines.push(msg);
-  const p=document.getElementById('debug-panel');
-  if(p) p.innerHTML=_debugLines.slice(-20).map(l=>'<div>'+l+'</div>').join('');
-}
 let _tt;
 function showToast(msg,type=''){
   const t=document.getElementById('toast');t.textContent=msg;t.className='show '+type;
@@ -1690,7 +1685,6 @@ function loadTestData(){
   console.log('Try: duplicate detection by uploading the Cleartrip PDF again');
 }
 </script>
-<div id="debug-panel" style="position:fixed;bottom:0;left:0;right:0;background:#1e1e2e;color:#a8ff78;font-size:11px;padding:8px;max-height:200px;overflow-y:auto;z-index:99999;font-family:monospace;display:none"></div>
-<button onclick="document.getElementById('debug-panel').style.display=document.getElementById('debug-panel').style.display==='none'?'block':'none'" style="position:fixed;bottom:4px;right:4px;z-index:99999;background:#C8922A;color:white;border:none;border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer">DEBUG</button>
+
 </body>
 </html>
