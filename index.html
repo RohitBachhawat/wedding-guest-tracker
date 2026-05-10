@@ -494,9 +494,49 @@ async function launchApp(){
 }
 
 // ── API ───────────────────────────────────────────────────────
-function showLoading(v){document.getElementById('loading-overlay').classList.toggle('hidden',!v)}
-async function apiGet(a){const r=await fetch(`${SCRIPT_URL}?action=${a}`);return r.json();}
-async function apiPost(p){const r=await fetch(SCRIPT_URL,{method:'POST',body:JSON.stringify(p)});return r.json();}
+// ── Loading with auto force-clear after 15s ─────────────────
+let _loadingTimer=null;
+function showLoading(v){
+  document.getElementById('loading-overlay').classList.toggle('hidden',!v);
+  if(v){
+    clearTimeout(_loadingTimer);
+    _loadingTimer=setTimeout(()=>{
+      document.getElementById('loading-overlay').classList.add('hidden');
+      showToast('Request timed out. Please try again.','error');
+    },15000);
+  } else {
+    clearTimeout(_loadingTimer);
+  }
+}
+
+// ── Fetch with timeout + response validation ─────────────────
+async function fetchWithTimeout(url,options={},timeoutMs=12000){
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),timeoutMs);
+  try{
+    const r=await fetch(url,{...options,signal:controller.signal});
+    clearTimeout(timer);
+    if(!r.ok) throw new Error('Server error '+r.status+': '+r.statusText);
+    return r;
+  }catch(e){
+    clearTimeout(timer);
+    if(e.name==='AbortError') throw new Error('Request timed out. Check your connection.');
+    throw e;
+  }
+}
+
+async function apiGet(a){
+  const r=await fetchWithTimeout(SCRIPT_URL+'?action='+a);
+  const data=await r.json();
+  if(data&&data.error) throw new Error('Sheet error: '+data.error);
+  return data;
+}
+async function apiPost(p){
+  const r=await fetchWithTimeout(SCRIPT_URL,{method:'POST',body:JSON.stringify(p)});
+  const data=await r.json();
+  if(data&&data.error) throw new Error('Sheet error: '+data.error);
+  return data;
+}
 
 async function initAndLoad(){
   showLoading(true);
@@ -506,7 +546,10 @@ async function initAndLoad(){
     allGuests=(g.guests||[]).filter(x=>x.deleted!=='yes').map(sanitizeGuest);
     allDrivers=d.drivers||[];
     renderDashboard();
-  }catch(e){showToast('Cannot connect to Google Sheet. Check your Apps Script URL.','error');}
+  }catch(e){
+    console.error('initAndLoad error:',e);
+    showToast(e.message||'Cannot connect. Check your Apps Script URL.','error');
+  }
   showLoading(false);
 }
 
@@ -772,12 +815,15 @@ document.getElementById('pooling-confirm-btn').addEventListener('click',async()=
   }
 
   showLoading(true);
-  const updated={...tgt,driver_name:sd.name,car_no:sd.car_no,car_type:sd.car,driver_phone:sd.phone||''};
-  await apiPost({action:'updateGuest',data:updated});
-  const idx=allGuests.findIndex(g=>g.group_id===tgt.group_id);
-  if(idx>=0) allGuests[idx]={...allGuests[idx],...updated};
-  closePoolingModal();showLoading(false);renderDashboard();
-  showToast('Driver assigned to '+tgt.group_name+' ✓','success');
+  try{
+    const updated={...tgt,driver_name:sd.name,car_no:sd.car_no,car_type:sd.car,driver_phone:sd.phone||''};
+    await apiPost({action:'updateGuest',data:updated});
+    const idx=allGuests.findIndex(g=>g.group_id===tgt.group_id);
+    if(idx>=0) allGuests[idx]={...allGuests[idx],...updated};
+    closePoolingModal();renderDashboard();
+    showToast('Driver assigned to '+tgt.group_name+' ✓','success');
+  }catch(e){showToast(e.message||'Save failed. Please retry.','error');}
+  showLoading(false);
 });
 
 // ── Guest card ────────────────────────────────────────────────
@@ -941,23 +987,31 @@ async function refreshStatus(id){
 
 async function toggleField(id,field,current){
   const newVal=current==='yes'?'no':'yes';showLoading(true);
-  await apiPost({action:'updateGuestStatus',group_id:id,field,value:newVal});
-  const idx=allGuests.findIndex(x=>x.group_id===id);if(idx>=0) allGuests[idx][field]=newVal;
-  showLoading(false);renderDashboard();
+  try{
+    await apiPost({action:'updateGuestStatus',group_id:id,field,value:newVal});
+    const idx=allGuests.findIndex(x=>x.group_id===id);if(idx>=0) allGuests[idx][field]=newVal;
+    renderDashboard();
+  }catch(e){showToast(e.message||'Save failed. Please retry.','error');}
+  showLoading(false);
 }
 async function markFinal(id,type){
-  // Both picked_up and car_returned go to completed section
   const value=type==='arrival'?'picked_up':'car_returned';
   showLoading(true);
-  await apiPost({action:'updateGuestStatus',group_id:id,field:'status',value});
-  const idx=allGuests.findIndex(x=>x.group_id===id);if(idx>=0) allGuests[idx].status=value;
-  showLoading(false);renderDashboard();showToast(type==='arrival'?'Picked up 🎉':'Trip completed ✓','success');
+  try{
+    await apiPost({action:'updateGuestStatus',group_id:id,field:'status',value});
+    const idx=allGuests.findIndex(x=>x.group_id===id);if(idx>=0) allGuests[idx].status=value;
+    renderDashboard();showToast(type==='arrival'?'Picked up 🎉':'Trip completed ✓','success');
+  }catch(e){showToast(e.message||'Save failed. Please retry.','error');}
+  showLoading(false);
 }
 async function markActive(id){
   showLoading(true);
-  await apiPost({action:'updateGuestStatus',group_id:id,field:'status',value:'active'});
-  const idx=allGuests.findIndex(x=>x.group_id===id);if(idx>=0) allGuests[idx].status='active';
-  showLoading(false);renderDashboard();showToast('Moved back to active','success');
+  try{
+    await apiPost({action:'updateGuestStatus',group_id:id,field:'status',value:'active'});
+    const idx=allGuests.findIndex(x=>x.group_id===id);if(idx>=0) allGuests[idx].status='active';
+    renderDashboard();showToast('Moved back to active','success');
+  }catch(e){showToast(e.message||'Save failed. Please retry.','error');}
+  showLoading(false);
 }
 
 // ── Delete ────────────────────────────────────────────────────
@@ -970,10 +1024,12 @@ function closeDeleteModal(){document.getElementById('delete-modal').classList.re
 document.getElementById('delete-confirm-btn').addEventListener('click',async()=>{
   if(!deletePendingId) return;
   showLoading(true);
-  await apiPost({action:'deleteGuest',group_id:deletePendingId});
-  allGuests=allGuests.filter(g=>g.group_id!==deletePendingId);
-  closeDeleteModal();showLoading(false);renderDashboard();
-  showToast('Entry deleted','success');
+  try{
+    await apiPost({action:'deleteGuest',group_id:deletePendingId});
+    allGuests=allGuests.filter(g=>g.group_id!==deletePendingId);
+    closeDeleteModal();renderDashboard();showToast('Entry deleted','success');
+  }catch(e){showToast(e.message||'Delete failed. Please retry.','error');}
+  showLoading(false);
 });
 
 // ══════════════════════════════════════════════════════════════
@@ -1073,17 +1129,25 @@ function driverCard(driver,groups){
 
 async function driverMarkComplete(groupId){
   showLoading(true);
-  await apiPost({action:'updateGuestStatus',group_id:groupId,field:'car_returned',value:'yes'});
-  await apiPost({action:'updateGuestStatus',group_id:groupId,field:'status',value:'car_returned'});
-  const idx=allGuests.findIndex(g=>g.group_id===groupId);
-  if(idx>=0){allGuests[idx].car_returned='yes';allGuests[idx].status='car_returned';}
-  showLoading(false);renderDrivers();renderDashboard();showToast('Trip completed ✓','success');
+  try{
+    await Promise.all([
+      apiPost({action:'updateGuestStatus',group_id:groupId,field:'car_returned',value:'yes'}),
+      apiPost({action:'updateGuestStatus',group_id:groupId,field:'status',value:'car_returned'})
+    ]);
+    const idx=allGuests.findIndex(g=>g.group_id===groupId);
+    if(idx>=0){allGuests[idx].car_returned='yes';allGuests[idx].status='car_returned';}
+    renderDrivers();renderDashboard();showToast('Trip completed ✓','success');
+  }catch(e){showToast(e.message||'Save failed. Please retry.','error');}
+  showLoading(false);
 }
 async function toggleDriverField(groupId,field,current){
   const v=current==='yes'?'no':'yes';showLoading(true);
-  await apiPost({action:'updateGuestStatus',group_id:groupId,field,value:v});
-  const idx=allGuests.findIndex(g=>g.group_id===groupId);if(idx>=0) allGuests[idx][field]=v;
-  showLoading(false);renderDrivers();showToast('Updated ✓','success');
+  try{
+    await apiPost({action:'updateGuestStatus',group_id:groupId,field,value:v});
+    const idx=allGuests.findIndex(g=>g.group_id===groupId);if(idx>=0) allGuests[idx][field]=v;
+    renderDrivers();showToast('Updated ✓','success');
+  }catch(e){showToast(e.message||'Save failed. Please retry.','error');}
+  showLoading(false);
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1260,6 +1324,7 @@ function checkConflict(data){
     if(g.status==='picked_up'||g.status==='car_returned') return false;
     if(g.driver_name!==data.driver_name) return false;
     if(!g.arrival_date||!g.arrival_time) return false;
+    if(g.arrival_date!==data.arrival_date) return false;
     return Math.abs(parseTimeMins(g.arrival_time)-nm)<CONFLICT_MINS;
   });
   return conflicts.length?conflicts:null;
@@ -1365,6 +1430,11 @@ async function proceedSave(data){
     document.getElementById('roundtrip-banner').classList.add('hidden');
     showDashboard();renderDashboard();
   }
+  }catch(e){
+    console.error('proceedSave error:',e);
+    showToast(e.message||'Save failed. Please retry.','error');
+    showLoading(false);
+  }
 }
 
 // ── File upload + Gemini extraction ───────────────────────────
@@ -1374,7 +1444,8 @@ async function handleFileUpload(event){
   document.getElementById('extraction-result').classList.remove('show');
   document.getElementById('roundtrip-banner').classList.add('hidden');
   try{
-    const b64=await toBase64(file);const mime=file.type||'image/jpeg';
+    const {b64,mime}=await compressIfNeeded(file);
+    if(file.type!=='application/pdf'&&file.size>800*1024) showToast('Image compressed for faster upload','success');
     const prompt=`You are extracting travel ticket data. This ticket may be a single journey or a round trip with multiple legs.
 
 Read the ENTIRE ticket carefully and extract ALL legs/flights/trains found.
@@ -1489,6 +1560,46 @@ IMPORTANT:
   showLoading(false);
 }
 function toBase64(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(file);});}
+
+// Compress image to max 800KB before sending to Gemini
+// PDFs are passed through unchanged
+async function compressIfNeeded(file){
+  const MAX_BYTES=800*1024;
+  // Skip compression for PDFs
+  if(file.type==='application/pdf') return {b64:await toBase64(file),mime:'application/pdf'};
+  // If already small enough, skip compression
+  if(file.size<=MAX_BYTES) return {b64:await toBase64(file),mime:file.type||'image/jpeg'};
+  return new Promise((res,rej)=>{
+    const img=new Image();
+    const url=URL.createObjectURL(file);
+    img.onload=()=>{
+      URL.revokeObjectURL(url);
+      const canvas=document.createElement('canvas');
+      // Scale down proportionally — start at full size, reduce until under limit
+      let w=img.width,h=img.height,quality=0.85;
+      // Max dimension 1600px
+      if(w>1600||h>1600){
+        const scale=Math.min(1600/w,1600/h);
+        w=Math.round(w*scale);h=Math.round(h*scale);
+      }
+      canvas.width=w;canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      // Try reducing quality until under 800KB
+      const tryExport=(q)=>{
+        const dataUrl=canvas.toDataURL('image/jpeg',q);
+        const bytes=(dataUrl.length-'data:image/jpeg;base64,'.length)*0.75;
+        if(bytes<=MAX_BYTES||q<=0.4){
+          res({b64:dataUrl.split(',')[1],mime:'image/jpeg'});
+        } else {
+          tryExport(Math.max(q-0.1,0.4));
+        }
+      };
+      tryExport(quality);
+    };
+    img.onerror=rej;
+    img.src=url;
+  });
+}
 
 // ── Gemini ────────────────────────────────────────────────────
 async function callGemini(prompt){
