@@ -1508,14 +1508,33 @@ async function submitGuestForm(e){
   const ori = (data.journey_origin||'').toLowerCase();
   const des = (data.journey_destination||'').toLowerCase();
   const wc = WEDDING_CITY.toLowerCase();
+  const pl = (data.pickup_location||'').toLowerCase();
   
-  // If set as arrival but origin is wedding city or a local hub → should be departure
-  if (data.journey_type === 'arrival' && ori && wc && ((ori.includes(wc)||wc.includes(ori)) || isLocalHub(data.journey_origin))) {
-    showJTMismatchModal(data, 'departure'); return;
+  // Helper: does this string match the wedding city or any local hub?
+  function matchesLocal(str){
+    if(!str) return false;
+    const s=str.toLowerCase();
+    return (wc && (s.includes(wc)||wc.includes(s))) || isLocalHub(str);
   }
-  // If set as departure but destination is wedding city or a local hub → should be arrival
-  if (data.journey_type === 'departure' && des && wc && ((des.includes(wc)||wc.includes(des)) || isLocalHub(data.journey_destination))) {
-    showJTMismatchModal(data, 'arrival'); return;
+  
+  const oriIsLocal = matchesLocal(data.journey_origin);
+  const desIsLocal = matchesLocal(data.journey_destination);
+  // Also check if pickup location matches origin (origin = local hub = departure)
+  const plMatchesOri = ori && pl && (ori.includes(pl)||pl.includes(ori));
+  
+  if (data.journey_type === 'arrival') {
+    // Origin is local → should be departure (they're leaving FROM the wedding city)
+    if (oriIsLocal && !desIsLocal) { showJTMismatchModal(data, 'departure'); return; }
+    // Pickup station matches origin → user is picking up from where they depart = likely departure
+    if (plMatchesOri && !desIsLocal) { showJTMismatchModal(data, 'departure'); return; }
+  }
+  if (data.journey_type === 'departure') {
+    // Destination is local → should be arrival (they're coming TO the wedding city)
+    if (desIsLocal && !oriIsLocal) { showJTMismatchModal(data, 'arrival'); return; }
+    // Origin is NOT local but set as departure → they're leaving from an outside city, should be arrival
+    if (!oriIsLocal && !desIsLocal && ori && des) {
+      // Neither matches — can't determine, skip
+    } else if (!oriIsLocal && desIsLocal) { showJTMismatchModal(data, 'arrival'); return; }
   }
 
   const smallerDriver=checkCarOpt(data);
