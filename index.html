@@ -1487,13 +1487,14 @@ async function submitGuestForm(e){
   }
 
   // ── Journey Type Mismatch Check (Final Safety) ────────────────
-  const originLocal = isLocalHub(data.journey_origin);
-  const destLocal = isLocalHub(data.journey_destination);
+  const pl = (data.pickup_location||'').toLowerCase();
+  const ori = (data.journey_origin||'').toLowerCase();
+  const des = (data.journey_destination||'').toLowerCase();
   
-  if (data.journey_type === 'arrival' && originLocal && !destLocal) {
+  if (data.journey_type === 'arrival' && (ori.includes(pl) || pl.includes(ori))) {
     showJTMismatchModal(data, 'departure'); return;
   }
-  if (data.journey_type === 'departure' && destLocal && !originLocal) {
+  if (data.journey_type === 'departure' && (des.includes(pl) || pl.includes(des))) {
     showJTMismatchModal(data, 'arrival'); return;
   }
 
