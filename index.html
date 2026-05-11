@@ -493,7 +493,7 @@ let pendingSubmitData=null,pendingPooling=null,currentRecs=[];
 let carOptPendingData=null,carOptSmallerDriver=null;
 let dupPendingData=null,dupExistingId=null;
 let deletePendingId=null;
-let jtMismatchPendingLeg=null;
+let jtMismatchPendingData=null;
 // Round trip queue: array of extracted leg objects waiting to be filled
 let rtQueue=[], rtQueueIdx=0;
 // Personal details carried over between round trip legs
@@ -1481,6 +1481,18 @@ async function submitGuestForm(e){
       conflicts.map(c=>`• <strong>${esc(c.group_name)}</strong> · ${esc(c.pickup_location)} · ${fmtAmPm(c.arrival_time)} (${fmtDate(c.arrival_date)})`).join('<br>');
     document.getElementById('conflict-modal').classList.add('open');return;
   }
+
+  // ── Journey Type Mismatch Check (Final Safety) ────────────────
+  const originLocal = isLocalHub(data.journey_origin);
+  const destLocal = isLocalHub(data.journey_destination);
+  
+  if (data.journey_type === 'arrival' && originLocal && !destLocal) {
+    showJTMismatchModal(data, 'departure'); return;
+  }
+  if (data.journey_type === 'departure' && destLocal && !originLocal) {
+    showJTMismatchModal(data, 'arrival'); return;
+  }
+
   const smallerDriver=checkCarOpt(data);
   if(smallerDriver){
     carOptPendingData=data;carOptSmallerDriver=smallerDriver;
@@ -1653,8 +1665,7 @@ async function handleFileUpload(event){
       document.getElementById('f-group-id').value='';
       document.getElementById('driver-detail-row').style.display='none';
       document.getElementById('f-driver-select').selectedIndex=0;
-      document.getElementById('f-driver-select').selectedIndex=0;
-      checkAndPopulate(leg);
+      populateFormFromLeg(leg);
       const er=document.getElementById('extraction-result');
       er.textContent=`✅ ${leg.journey_type==='departure'?'Departure':'Arrival'} extracted: ${leg.transport_type} ${leg.transport_number} · ${fmtDate(leg.arrival_date)} ${fmtAmPm(leg.arrival_time)} · Please verify all fields.`;
       er.classList.add('show');
@@ -1668,8 +1679,7 @@ async function handleFileUpload(event){
       document.getElementById('f-group-id').value='';
       document.getElementById('driver-detail-row').style.display='none';
       document.getElementById('f-driver-select').selectedIndex=0;
-      document.getElementById('f-driver-select').selectedIndex=0;
-      checkAndPopulate(leg1);
+      populateFormFromLeg(leg1);
 
       const banner=document.getElementById('roundtrip-banner');
       banner.innerHTML=`🔄 <span>Round trip with <strong>${processedLegs.length} legs</strong> detected. You are on <strong>Leg 1 of ${processedLegs.length}</strong> — ${leg1.journey_type==='departure'?'Departure':'Arrival'}. Fill in driver details and save. The next leg will open automatically.</span>`;
@@ -1728,36 +1738,38 @@ async function compressIfNeeded(file){
   });
 }
 
-function checkAndPopulate(leg){
-  const current = document.getElementById('f-journey-type').value;
-  if(leg.journey_type && leg.journey_type !== current){
-    jtMismatchPendingLeg = leg;
-    const extractedLabel = leg.journey_type === 'arrival' ? '🛬 Arrival' : '🛫 Departure';
-    const currentLabel = current === 'arrival' ? '🛬 Arrival' : '🛫 Departure';
-    document.getElementById('jt-mismatch-text').innerHTML = 
-      `The AI identified this as a <strong>${extractedLabel}</strong> ticket, but the form is currently set to <strong>${currentLabel}</strong>.<br><br>Would you like to switch the journey type or continue with your current selection?`;
-    document.getElementById('jt-mismatch-modal').classList.add('open');
-  } else {
-    populateFormFromLeg(leg);
-  }
+function showJTMismatchModal(data, suggested){
+  jtMismatchPendingData = data;
+  const suggestedLabel = suggested === 'arrival' ? '🛬 Arrival' : '🛫 Departure';
+  const currentLabel = data.journey_type === 'arrival' ? '🛬 Arrival' : '🛫 Departure';
+  
+  document.getElementById('jt-mismatch-text').innerHTML = 
+    `This journey appears to be a <strong>${suggestedLabel}</strong> (based on the locations), but is being saved as an <strong>${currentLabel}</strong>.<br><br>Would you like to switch to ${suggestedLabel} or continue saving as ${currentLabel}?`;
+  
+  // Update button actions for this specific data
+  const switchBtn = document.getElementById('jt-mismatch-switch');
+  switchBtn.textContent = `Switch to ${suggestedLabel} & Save`;
+  switchBtn.onclick = async () => {
+    const d = {...jtMismatchPendingData, journey_type: suggested};
+    closeJTMismatchModal();
+    await proceedSave(d);
+  };
+  
+  const keepBtn = document.getElementById('jt-mismatch-keep');
+  keepBtn.textContent = `Keep as ${currentLabel} & Save`;
+  keepBtn.onclick = async () => {
+    const d = jtMismatchPendingData;
+    closeJTMismatchModal();
+    await proceedSave(d);
+  };
+
+  document.getElementById('jt-mismatch-modal').classList.add('open');
 }
+
 function closeJTMismatchModal(){
   document.getElementById('jt-mismatch-modal').classList.remove('open');
-  jtMismatchPendingLeg = null;
+  jtMismatchPendingData = null;
 }
-document.getElementById('jt-mismatch-switch').addEventListener('click', ()=>{
-  if(jtMismatchPendingLeg){
-    setJourneyType(jtMismatchPendingLeg.journey_type);
-    populateFormFromLeg(jtMismatchPendingLeg);
-  }
-  closeJTMismatchModal();
-});
-document.getElementById('jt-mismatch-keep').addEventListener('click', ()=>{
-  if(jtMismatchPendingLeg){
-    populateFormFromLeg(jtMismatchPendingLeg);
-  }
-  closeJTMismatchModal();
-});
 
 // ── Gemini ────────────────────────────────────────────────────
 async function callGemini(prompt){
