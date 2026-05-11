@@ -685,7 +685,13 @@ function journeyType(g){
   if(g.live_status_text&&g.live_status_text.toLowerCase().includes('depart')) return 'departure';
   return 'arrival';
 }
-function isKolkataStation(str){const s=(str||'').toLowerCase();return KOLKATA_STATIONS.some(k=>s.includes(k));}
+function isLocalHub(str){
+  const s=(str||'').toLowerCase();
+  return HUBS.some(k=> {
+    const h = k.toLowerCase();
+    return s.includes(h) || h.includes(s);
+  });
+}
 function mapToStation(str, type){
   const s=(str||'').toLowerCase();
   const isFlight = (type||'').toLowerCase() === 'flight';
@@ -1554,36 +1560,33 @@ async function handleFileUpload(event){
   try{
     const {b64,mime}=await compressIfNeeded(file);
     if(file.type!=='application/pdf'&&file.size>800*1024) showToast('Image compressed for faster upload','success');
-    const prompt=`You are extracting travel ticket data. This ticket may be a single journey or a round trip with multiple legs.
+    const prompt=`You are extracting travel ticket data for a wedding in ${WEDDING_CITY}.
+    
+    The wedding hubs are: ${HUBS.join(', ')}.
 
-Read the ENTIRE ticket carefully and extract ALL legs/flights/trains found.
+    Read the ENTIRE ticket carefully and extract ALL legs.
 
-Return ONLY a valid JSON object with NO markdown, NO explanation:
-{
-  "legs": [
+    Return ONLY a valid JSON object with NO markdown:
     {
-      "transport_type": "Train or Flight",
-      "transport_name": "airline/train name e.g. SpiceJet or Poorva Express",
-      "transport_number": "flight/train number e.g. SG-759 or 12303",
-      "pnr": "PNR or booking reference for this specific leg",
-      "journey_origin": "exact departure city or airport code",
-      "journey_destination": "exact arrival city or airport code",
-      "depart_date": "YYYY-MM-DD — date this leg DEPARTS from origin",
-      "depart_time": "HH:MM 24hr — time this leg DEPARTS from origin",
-      "arrive_date": "YYYY-MM-DD — date this leg ARRIVES at destination (may be next day for overnight)",
-      "arrive_time": "HH:MM 24hr — time this leg ARRIVES at destination",
-      "individual_names": "comma separated full names of all passengers",
-      "pax": 1
-    }
-  ]
-}
-
-IMPORTANT:
-- For each leg, depart_date/depart_time is when it LEAVES the origin city
-- For each leg, arrive_date/arrive_time is when it REACHES the destination city
-- If overnight flight (arrives next day), arrive_date must be the NEXT day
-- Extract every leg separately even if same passengers
-- PNR may differ per leg for flights`;
+      "legs": [
+        {
+          "journey_type": "arrival or departure - arrival means coming TO the wedding city, departure means leaving FROM it",
+          "matched_hub": "The EXACT hub name from the list [${HUBS.join(', ')}] that the guest is using for this leg. If none match, pick the most likely or leave empty.",
+          "transport_type": "Train or Flight",
+          "transport_name": "airline/train name",
+          "transport_number": "flight/train number",
+          "pnr": "PNR for this leg",
+          "journey_origin": "departure city",
+          "journey_destination": "arrival city",
+          "depart_date": "YYYY-MM-DD",
+          "depart_time": "HH:MM 24hr",
+          "arrive_date": "YYYY-MM-DD",
+          "arrive_time": "HH:MM 24hr",
+          "individual_names": "comma separated names",
+          "pax": 1
+        }
+      ]
+    }`;
 
     const raw=await callGeminiFile(prompt,b64,mime);
     let parsed={legs:[]};
@@ -1600,22 +1603,23 @@ IMPORTANT:
       showLoading(false);return;
     }
 
-    // Determine journey type for each leg based on origin/destination
+    // Determine journey type and data for each leg
     const processedLegs=parsed.legs.map(leg=>{
-      const origin=(leg.journey_origin||'').toLowerCase();
-      const dest=(leg.journey_destination||'').toLowerCase();
-      const originKolkata=isKolkataStation(origin);
-      const destKolkata=isKolkataStation(dest);
-      const jt=originKolkata&&!destKolkata?'departure':'arrival';
+      const jt = leg.journey_type === 'departure' ? 'departure' : 'arrival';
 
       // Pick correct date/time based on journey type
+      // For Arrival: we care about when they REACH the hub
+      // For Departure: we care about when they LEAVE the hub
       const date=jt==='departure'?leg.depart_date:leg.arrive_date;
       const time=jt==='departure'?leg.depart_time:leg.arrive_time;
 
-      // Map Kolkata station
-      const stationSrc=jt==='departure'?origin:dest;
-      const station=mapToStation(stationSrc, leg.transport_type)||'Airport';
-
+      // Use AI matched hub if valid, else fallback to mapping logic
+      let station = HUBS.find(h => h === leg.matched_hub);
+      if(!station) {
+        const stationSrc=jt==='departure'?leg.journey_origin:leg.journey_destination;
+        station = mapToStation(stationSrc, leg.transport_type);
+      }
+      
       // Auto group name from first passenger
       const firstName=(leg.individual_names||'').split(',')[0].trim();
 
@@ -1624,7 +1628,8 @@ IMPORTANT:
         transport_name:leg.transport_name||'',transport_number:leg.transport_number||'',
         pnr:leg.pnr||'',journey_origin:leg.journey_origin||'',
         arrival_date:date||'',arrival_time:time||'',
-        pickup_location:station,individual_names:leg.individual_names||'',
+        pickup_location:station || (HUBS[0] || ''),
+        individual_names:leg.individual_names||'',
         pax:leg.pax||1,group_name:firstName||''
       };
     });
