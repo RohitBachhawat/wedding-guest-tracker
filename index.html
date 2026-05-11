@@ -314,9 +314,8 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
             <div class="form-group"><label>Journey Destination *</label><input type="text" id="f-journey-destination" placeholder="e.g. Kolkata" required/></div>
           </div>
           <div class="form-row">
-            <div class="form-group"><label>Transport Type *</label>
-              <select id="f-transport-type" required><option value="">Select…</option><option value="Train">Train</option><option value="Flight">Flight</option></select>
-            </div>
+            <div class="form-group"><label id="location-label">Pickup Station *</label><select id="f-pickup-location" required></select></div>
+            <div class="form-group"><label>Transport Type *</label><select id="f-transport-type" required><option value="Train">Train</option><option value="Flight">Flight</option></select></div>
           </div>
           <div class="form-row">
             <div class="form-group"><label>Train / Flight Name</label><input type="text" id="f-transport-name" placeholder="e.g. SpiceJet SG-759"/></div>
@@ -324,15 +323,9 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
           </div>
           <div class="form-row">
             <div class="form-group"><label>PNR / Airline PNR</label><input type="text" id="f-pnr" placeholder="e.g. SJ3Q3H"/></div>
-            <div class="form-group">
-              <label id="location-label">Pickup Station *</label>
-              <select id="f-pickup-location" required>
-                <option value="">Select station…</option>
-              </select>
-            </div>
+            <div class="form-group"><label id="date-label">Arrival Date *</label><input type="date" id="f-arrival-date" required/></div>
           </div>
           <div class="form-row">
-            <div class="form-group"><label id="date-label">Arrival Date *</label><input type="date" id="f-arrival-date" required/></div>
             <div class="form-group"><label id="time-label">Arrival Time *</label><input type="time" id="f-arrival-time" required/></div>
           </div>
         </div>
@@ -470,6 +463,45 @@ const TRAVEL_MINS   = 90;
 const CONFLICT_MINS = 120;
 const LUGGAGE_KW    = ['luggage','bag','suitcase','baggage','wheelchair','equipment','heavy','lots','bulky','cargo'];
 
+// ── Offline write queue ──────────────────────────────────────
+const SYNC_QUEUE_KEY = 'wgt_sync_queue';
+let syncQueue = JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY)||'[]');
+let syncInProgress = false;
+function enqueueSyncAction(payload){
+  syncQueue.push({payload, ts:Date.now()});
+  localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(syncQueue));
+  updateSyncBadge();
+}
+function updateSyncBadge(){
+  let badge=document.getElementById('sync-badge');
+  if(!badge){badge=document.createElement('div');badge.id='sync-badge';
+    badge.style.cssText='position:fixed;bottom:70px;right:16px;background:var(--amber);color:#000;padding:6px 14px;border-radius:20px;font-size:13px;font-weight:600;z-index:999;cursor:pointer;display:none;box-shadow:0 2px 8px rgba(0,0,0,.3)';
+    badge.onclick=()=>flushSyncQueue();
+    document.body.appendChild(badge);}
+  if(syncQueue.length){badge.textContent='🔄 '+syncQueue.length+' pending';badge.style.display='block';}
+  else{badge.style.display='none';}
+}
+async function flushSyncQueue(){
+  if(syncInProgress||!syncQueue.length||!SCRIPT_URL) return;
+  syncInProgress=true;updateSyncBadge();
+  const remaining=[];
+  for(const item of syncQueue){
+    try{await apiPostRaw(item.payload);}catch(e){remaining.push(item);}
+  }
+  syncQueue=remaining;
+  localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(syncQueue));
+  syncInProgress=false;updateSyncBadge();
+  if(!remaining.length) showToast('All changes synced ✓','success');
+}
+window.addEventListener('online',()=>{setTimeout(flushSyncQueue,2000);});
+setInterval(()=>{if(navigator.onLine) flushSyncQueue();},60000);
+
+// ── Absolute time helpers ────────────────────────────────────
+function toAbsoluteMs(date,time){
+  if(!date||!time) return NaN;
+  return new Date(date+'T'+time+':00').getTime();
+}
+
 
 function departureBufMins(type,pax){
   const large=(parseInt(pax)||0)>3;
@@ -486,6 +518,18 @@ function saveToCache() {
     localStorage.setItem(CACHE_KEY_DRIVERS, JSON.stringify(allDrivers));
     localStorage.setItem(CACHE_KEY_TS, Date.now().toString());
   } catch(e) { console.warn('Failed to save to cache:', e); }
+}
+
+// Derive driver assignment status from the active guest list (source of truth)
+function syncDriverAssignment(){
+  const activeDriverNames = new Set(
+    allGuests
+      .filter(g => g.status!=='picked_up' && g.status!=='car_returned' && g.deleted!=='yes' && g.driver_name)
+      .map(g => g.driver_name)
+  );
+  allDrivers.forEach(d => {
+    d.assigned = activeDriverNames.has(d.driver_name) ? 'yes' : 'no';
+  });
 }
 
 // ── State ─────────────────────────────────────────────────────
@@ -563,33 +607,38 @@ async function launchApp(){
 // ── API ───────────────────────────────────────────────────────
 // ── Loading with auto force-clear after 15s ─────────────────
 let _loadingTimer=null;
+let _loadingStage=null;
 function showLoading(v){
-  document.getElementById('loading-overlay').classList.toggle('hidden',!v);
+  const overlay=document.getElementById('loading-overlay');
+  overlay.classList.toggle('hidden',!v);
   if(v){
-    clearTimeout(_loadingTimer);
+    clearTimeout(_loadingTimer);clearTimeout(_loadingStage);
+    // Progressive messaging for GAS cold starts
+    _loadingStage=setTimeout(()=>{
+      const msg=overlay.querySelector('.loading-msg');
+      if(msg) msg.textContent='Waking up server…';
+    },10000);
     _loadingTimer=setTimeout(()=>{
-      document.getElementById('loading-overlay').classList.add('hidden');
-      showToast('Request timed out. Please try again.','error');
-    },20000);
+      overlay.classList.add('hidden');
+      showToast('Request timed out (40s). Please retry.','error');
+    },40000);
   } else {
-    clearTimeout(_loadingTimer);
+    clearTimeout(_loadingTimer);clearTimeout(_loadingStage);
+    const msg=document.querySelector('.loading-msg');
+    if(msg) msg.textContent='Loading…';
   }
 }
 
-// ── Fetch with timeout + response validation ─────────────────
-async function fetchWithTimeout(url,options={},timeoutMs=12000){
+// ── Fetch with timeout + CORS-safe for GAS ───────────────────
+async function fetchWithTimeout(url,options={},timeoutMs=35000){
   let timer;
   const timeoutPromise = new Promise((_, reject) => {
     timer = setTimeout(() => reject(new Error('Request timed out')), timeoutMs);
   });
-  
   try {
-    const r = await Promise.race([
-      fetch(url, options),
-      timeoutPromise
-    ]);
+    const r = await Promise.race([fetch(url, options), timeoutPromise]);
     clearTimeout(timer);
-    if(!r.ok) throw new Error('Server error '+r.status+': '+r.statusText);
+    // GAS redirects return 200 after redirect — don't check r.ok for redirects
     return r;
   } catch(e) {
     clearTimeout(timer);
@@ -597,20 +646,39 @@ async function fetchWithTimeout(url,options={},timeoutMs=12000){
   }
 }
 
+// CORS-safe POST: use text/plain to avoid OPTIONS preflight on GAS
+async function apiPostRaw(p){
+  if(!SCRIPT_URL) return {};
+  const r=await fetchWithTimeout(SCRIPT_URL,{
+    method:'POST',
+    headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body:JSON.stringify(p)
+  });
+  const data=await r.json();
+  if(data&&data.error) throw new Error('Sheet error: '+data.error);
+  return data;
+}
+
 async function apiGet(a){
+  if(!SCRIPT_URL) return {};
   const r=await fetchWithTimeout(SCRIPT_URL+'?action='+a);
   const data=await r.json();
   if(data&&data.error) throw new Error('Sheet error: '+data.error);
   return data;
 }
 async function apiPost(p){
-  const r=await fetchWithTimeout(SCRIPT_URL,{method:'POST',body:JSON.stringify(p)});
-  const data=await r.json();
-  if(data&&data.error) throw new Error('Sheet error: '+data.error);
-  return data;
+  if(!SCRIPT_URL) return {};
+  try{
+    return await apiPostRaw(p);
+  }catch(e){
+    // Queue for retry if offline or timeout
+    enqueueSyncAction(p);
+    throw e;
+  }
 }
 
 async function initAndLoad(){
+  if(!SCRIPT_URL) return;
   // 1. Load from cache for instant display
   try {
     const cachedG = localStorage.getItem(CACHE_KEY_GUESTS);
@@ -618,6 +686,7 @@ async function initAndLoad(){
     if(cachedG && cachedD) {
       allGuests = JSON.parse(cachedG).map(sanitizeGuest);
       allDrivers = JSON.parse(cachedD);
+      syncDriverAssignment();
       renderDashboard();
     }
   } catch(e) { console.warn('Cache load failed:', e); }
@@ -626,11 +695,15 @@ async function initAndLoad(){
   try{
     await apiPost({action:'initSheet'});
     const [g,d]=await Promise.all([apiGet('getGuests'),apiGet('getDrivers')]);
-    allGuests=(g.guests||[]).filter(x=>x.deleted!=='yes').map(sanitizeGuest);
-    allDrivers=d.drivers||[];
+    if(g && g.guests && g.guests.length) allGuests=g.guests.filter(x=>x.deleted!=='yes').map(sanitizeGuest);
+    if(d && d.drivers && d.drivers.length) allDrivers=d.drivers;
     
+    syncDriverAssignment();
     saveToCache();
     renderDashboard();
+    
+    // Data integrity pass — surface bad records
+    runDataIntegrityCheck();
   }catch(e){
     console.error('initAndLoad error:',e);
     if(allGuests.length) {
@@ -640,45 +713,63 @@ async function initAndLoad(){
     }
   }
   showLoading(false);
+  
+  // Flush any pending offline writes
+  updateSyncBadge();
+  if(navigator.onLine) setTimeout(flushSyncQueue, 3000);
 }
 
-// Guarantee arrival_date is YYYY-MM-DD and arrival_time is HH:MM
-// so date/time inputs always get the correct raw value
+function runDataIntegrityCheck(){
+  const issues = allGuests.filter(g => g._data_warning && g.status==='active');
+  if(!issues.length) return;
+  console.warn('Data integrity issues found:', issues.map(g => g.group_name + ': ' + g._data_warning));
+  showToast('⚠️ '+issues.length+' entries have data issues — check console or edit them', 'error');
+}
+
+// Format-only sanitizer: normalises date/time strings, flags issues instead of silent swaps
 function sanitizeGuest(g){
-  // Detect swapped date/time columns from sheet
-  // If arrival_date looks like HH:MM and arrival_time looks like YYYY-MM-DD, swap them
   const dStr=String(g.arrival_date||'');
   const tStr=String(g.arrival_time||'');
-  const dateIsTime=/^\d{1,2}:\d{2}/.test(dStr);
+  const dateIsTime=/^\d{1,2}:\d{2}/.test(dStr) && !/^\d{4}/.test(dStr);
   const timeIsDate=/^\d{4}-\d{2}-\d{2}/.test(tStr);
-  if(dateIsTime||timeIsDate){
-    const tmp=g.arrival_date;g.arrival_date=g.arrival_time;g.arrival_time=tmp;
-    }
-  // arrival_date: extract YYYY-MM-DD from any format
+  
+  // Flag potential swap instead of silently mutating
+  if(dateIsTime && timeIsDate){
+    g._data_warning = 'Date and Time appear swapped in the spreadsheet';
+    console.warn('Data swap detected for', g.group_id||g.group_name, '— date:', dStr, 'time:', tStr);
+    // Only swap if BOTH are clearly wrong (high confidence)
+    const tmp=g.arrival_date; g.arrival_date=g.arrival_time; g.arrival_time=tmp;
+  } else if(dateIsTime || timeIsDate){
+    // Only ONE field is wrong — don't swap, just flag
+    g._data_warning = dateIsTime ? 'Date field contains a time value' : 'Time field contains a date value';
+    console.warn('Data issue for', g.group_id||g.group_name, ':', g._data_warning);
+  }
+  
+  // arrival_date: extract YYYY-MM-DD
   if(g.arrival_date){
     const s=String(g.arrival_date);
     const isoMatch=s.match(/^(\d{4}-\d{2}-\d{2})/);
     if(isoMatch) g.arrival_date=isoMatch[1];
     else if(s.includes('T')) g.arrival_date=s.split('T')[0];
-    // If year < 1900 (1899 epoch), clear it
     if(g.arrival_date&&parseInt(g.arrival_date.slice(0,4))<1900) g.arrival_date='';
   }
-  // arrival_time: extract HH:MM from any format
+  // arrival_time: extract HH:MM
   if(g.arrival_time){
     const s=String(g.arrival_time);
-    // Handle "HH:MM:SS" or ISO datetime — take first 5 chars of time part
-    let t=s;
-    if(s.includes('T')) t=s.split('T')[1];
+    let t=s; if(s.includes('T')) t=s.split('T')[1];
     const timeMatch=t.match(/^(\d{1,2}:\d{2})/);
     if(timeMatch){
-      // Pad single-digit hour with leading zero so input[type=time] works
       const parts=timeMatch[1].split(':');
       g.arrival_time=parts[0].padStart(2,'0')+':'+parts[1];
-    } else g.arrival_time='';
-    // Guard 1899 epoch time values
-    // If time is longer than HH:MM (e.g. HH:MM:SS), strip to HH:MM
+    } else {
+      g._data_warning = g._data_warning || ('Malformed time: "'+s+'"');
+      g.arrival_time='';
+    }
     if(g.arrival_time&&g.arrival_time.length>5) g.arrival_time=g.arrival_time.slice(0,5);
   }
+  // Flag missing critical fields
+  if(!g.arrival_date && g.status==='active') g._data_warning = g._data_warning || 'Missing arrival date';
+  if(!g.arrival_time && g.status==='active') g._data_warning = g._data_warning || 'Missing arrival time';
   return g;
 }
 
@@ -733,6 +824,13 @@ function hubMatch(str){
 }
 function isLocalHub(str){
   return !!hubMatch(str);
+}
+// Helper: does this string match the wedding city or any local hub?
+function matchesLocal(str){
+  if(!str) return false;
+  const wc = (WEDDING_CITY||'').toLowerCase();
+  const s=str.toLowerCase();
+  return (wc && (s.includes(wc)||wc.includes(s))) || isLocalHub(str);
 }
 function mapToStation(str, type){
   const isFlight = (type||'').toLowerCase() === 'flight';
@@ -1401,8 +1499,14 @@ function populateForm(g){
   document.getElementById('f-car-no').value=g.car_no||'';
   const sel=document.getElementById('f-driver-select');
   let matched=false;
-  for(let i=1;i<sel.options.length;i++){if(sel.options[i].dataset.name===g.driver_name){sel.selectedIndex=i;matched=true;break;}}
+  const targetName = g.driver_name || '';
+  for(let i=1;i<sel.options.length;i++){
+    if(sel.options[i].dataset.name === targetName){
+      sel.selectedIndex=i; matched=true; break;
+    }
+  }
   if(!matched) sel.selectedIndex=0;
+  // Crucial: ensure hidden fields are filled from the selected option
   onDriverSelect();
 }
 
@@ -1485,21 +1589,32 @@ document.getElementById('dup-save-anyway').addEventListener('click',async()=>{
 // ── Conflict & car opt ─────────────────────────────────────────
 function checkConflict(data){
   if(!data.driver_name||!data.arrival_date||!data.arrival_time) return null;
-  const nm=parseTimeMins(data.arrival_time);
+  const dataMs=toAbsoluteMs(data.arrival_date,data.arrival_time);
+  if(isNaN(dataMs)) return null;
   const conflicts=allGuests.filter(g=>{
     if(g.group_id===data.group_id) return false;
     if(g.status==='picked_up'||g.status==='car_returned') return false;
     if(g.driver_name!==data.driver_name) return false;
     if(!g.arrival_date||!g.arrival_time) return false;
-    if(g.arrival_date!==data.arrival_date) return false;
-    return Math.abs(parseTimeMins(g.arrival_time)-nm)<CONFLICT_MINS;
+    
+    // Use absolute timestamps — catches cross-midnight conflicts
+    const gMs=toAbsoluteMs(g.arrival_date,g.arrival_time);
+    if(isNaN(gMs)) return false;
+    const diffMins=Math.abs(gMs-dataMs)/60000;
+    if(diffMins >= CONFLICT_MINS) return false;
+    
+    // If different stations, it's definitely a conflict
+    if(g.pickup_location !== data.pickup_location) return true;
+    
+    // If SAME station: arrival+departure back-to-back is OK
+    if(g.journey_type !== data.journey_type) return false;
+    
+    return true;
   });
   return conflicts.length?conflicts:null;
 }
 function hasLuggageNotes(n){return n&&LUGGAGE_KW.some(k=>n.toLowerCase().includes(k));}
 function checkCarOpt(data){
-  if(!data.driver_name||!data.car_no||!data.pax) return null;
-  if(hasLuggageNotes(data.notes)) return null;
   const ad=allDrivers.find(d=>(d.car_no||d.car_token)===data.car_no);if(!ad) return null;
   const ac=parseInt(ad.capacity||0);const pax=parseInt(data.pax)||0;
   const smaller=allDrivers.filter(d=>{if(d.assigned==='yes') return false;const c=parseInt(d.capacity||0);return c>=pax&&c<ac;}).sort((a,b)=>parseInt(a.capacity)-parseInt(b.capacity));
@@ -1524,15 +1639,7 @@ async function submitGuestForm(e){
   // ── Journey Type Mismatch Check (Final Safety) ────────────────
   const ori = (data.journey_origin||'').toLowerCase();
   const des = (data.journey_destination||'').toLowerCase();
-  const wc = WEDDING_CITY.toLowerCase();
   const pl = (data.pickup_location||'').toLowerCase();
-  
-  // Helper: does this string match the wedding city or any local hub?
-  function matchesLocal(str){
-    if(!str) return false;
-    const s=str.toLowerCase();
-    return (wc && (s.includes(wc)||wc.includes(s))) || isLocalHub(str);
-  }
   
   const oriIsLocal = matchesLocal(data.journey_origin);
   const desIsLocal = matchesLocal(data.journey_destination);
@@ -1599,7 +1706,7 @@ async function proceedSave(data){
       await apiPost({action:'updateGuest',data});
       const idx=allGuests.findIndex(g=>g.group_id===editingId);
       if(idx>=0) allGuests[idx]={...allGuests[idx],...data};
-      saveToCache();
+      syncDriverAssignment(); saveToCache();
       showToast('Guest updated ✓','success');
       showLoading(false);showDashboard();renderDashboard();
     } else {
@@ -1609,7 +1716,7 @@ async function proceedSave(data){
       data.dropped_off='no';data.car_returned='no';data.deleted='no';
       data.live_status_text='';data.last_refreshed='';
       allGuests.push(data);
-      saveToCache();
+      syncDriverAssignment(); saveToCache();
       showToast('Guest added 🎉','success');
       showLoading(false);
       if(rtQueue.length>0&&rtQueueIdx<rtQueue.length){
@@ -1850,7 +1957,7 @@ function closeJTMismatchModal(){
 async function callGemini(prompt){
   try{
     const r=await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${GEMINI_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
       {method:'POST',headers:{'Content-Type':'application/json'},
        body:JSON.stringify({contents:[{parts:[{text:prompt}]}],tools:[{google_search:{}}]})}
     );
@@ -1861,7 +1968,7 @@ async function callGemini(prompt){
   }catch(e1){
     console.warn('Gemini search fallback:',e1.message);
     const r=await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${GEMINI_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
       {method:'POST',headers:{'Content-Type':'application/json'},
        body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})}
     );
@@ -1870,33 +1977,40 @@ async function callGemini(prompt){
   }
 }
 async function callGeminiFile(prompt,b64,mime){
+  const body=JSON.stringify({contents:[{parts:[{inline_data:{mime_type:mime,data:b64}},{text:prompt}]}]});
+  // First attempt: primary model
   try{
     const r=await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${GEMINI_KEY}`,
-      {method:'POST',headers:{'Content-Type':'application/json'},
-       body:JSON.stringify({contents:[{parts:[{inline_data:{mime_type:mime,data:b64}},{text:prompt}]}]})}
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
+      {method:'POST',headers:{'Content-Type':'application/json'},body}
     );
-    const d=await r.json();if(d.error) throw new Error(d.error.message);
+    const d=await r.json();
+    if(d.error) throw new Error(d.error.message);
     return d.candidates?.[0]?.content?.parts?.[0]?.text||'{}';
   }catch(e1){
-    console.warn('callGeminiFile first attempt failed, retrying without inline_data hint:',e1.message);
-    const r=await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${GEMINI_KEY}`,
-      {method:'POST',headers:{'Content-Type':'application/json'},
-       body:JSON.stringify({contents:[{parts:[{inline_data:{mime_type:mime,data:b64}},{text:prompt}]}]})}
-    );
-    const d=await r.json();if(d.error) throw new Error(d.error.message);
-    return d.candidates?.[0]?.content?.parts?.[0]?.text||'{}';
+    // Fallback: secondary model
+    console.warn('callGeminiFile primary failed, trying fallback model:',e1.message);
+    try{
+      const r=await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`,
+        {method:'POST',headers:{'Content-Type':'application/json'},body}
+      );
+      const d=await r.json();
+      if(d.error) throw new Error(d.error.message);
+      return d.candidates?.[0]?.content?.parts?.[0]?.text||'{}';
+    }catch(e2){
+      throw new Error('Extraction failed on all models: '+e2.message);
+    }
   }
 }
 
 // ── Summary ───────────────────────────────────────────────────
 function openSummaryModal(){
   const today=new Date().toISOString().slice(0,10);
-  const active=allGuests.filter(g=>g.status!=='picked_up'&&g.status!=='car_returned');
+  const active=allGuests.filter(g=>g.status!=='picked_up'&&g.status!=='car_returned' && g.deleted!=='yes');
   const arrivals=active.filter(g=>journeyType(g)==='arrival');
   const deps=active.filter(g=>journeyType(g)==='departure');
-  const done=allGuests.filter(g=>g.status==='picked_up'||g.status==='car_returned');
+  const done=allGuests.filter(g=>(g.status==='picked_up'||g.status==='car_returned') && g.deleted!=='yes');
   const todayAll=active.filter(g=>g.arrival_date===today);
   const tiles=[
     {label:"Today's Guests",     value:todayAll.length,                                    sub:'groups'},
@@ -1955,32 +2069,34 @@ function saveSettings(){
 
 // ── Helpers ───────────────────────────────────────────────────
 function fmtDate(d){
-  if(!d) return '';
+  if(!d) return '—';
   const str=String(d).includes('T')?String(d).split('T')[0]:String(d);
-  const p=str.split('-');if(p.length!==3||parseInt(p[0])<1900) return '';
+  const p=str.split('-');if(p.length!==3||parseInt(p[0])<1900) return '⚠️ '+String(d).slice(0,10);
   const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   return parseInt(p[2])+' '+(months[parseInt(p[1])-1]||'');
 }
 function fmtAmPm(t){
-  if(!t) return '';
+  if(!t) return '—';
   let s=String(t).trim();
-  // Handle ISO datetime: "2026-03-25T06:05:00.000Z" → take time part
   if(s.includes('T')){
     const tPart=s.split('T')[1];
-    // Only use if it looks like a valid time, not 1899
-    if(s.startsWith('1899')) return '';
+    if(s.startsWith('1899')) return '—';
     s=tPart;
   }
-  // Handle "YYYY-MM-DD HH:MM" plain string from Apps Script
   if(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(s)) s=s.split(' ')[1];
-  // Now s should be "HH:MM" or "HH:MM:SS"
   s=s.slice(0,5);
-  if(!s||s.length<4) return '';
+  if(!s||s.length<4){
+    console.warn('fmtAmPm: malformed time input:', t);
+    return '⚠️ '+String(t).slice(0,8);
+  }
   const p=s.split(':');
-  if(p.length<2) return '';
+  if(p.length<2) return '⚠️ '+String(t).slice(0,8);
   const h=parseInt(p[0]);
   const m=String(p[1]).padStart(2,'0');
-  if(isNaN(h)||h<0||h>23) return '';
+  if(isNaN(h)||h<0||h>23){
+    console.warn('fmtAmPm: invalid hour in:', t);
+    return '⚠️ '+String(t).slice(0,8);
+  }
   const ap=h>=12?'PM':'AM';
   const h12=h%12||12;
   return `${h12}:${m} ${ap}`;
@@ -2005,7 +2121,7 @@ function loadTestData(){
     {driver_id:'D001',driver_name:'Suresh Kumar', driver_phone:'9000000001',car_type:'Innova',        car_no:'WB02AB1042',capacity:'7', assigned:'yes'},
     {driver_id:'D002',driver_name:'Ramesh Das',   driver_phone:'9000000002',car_type:'Ertiga',         car_no:'WB02CD2031',capacity:'6', assigned:'yes'},
     {driver_id:'D003',driver_name:'Bikash Roy',   driver_phone:'9000000003',car_type:'Tempo Traveller',car_no:'WB02EF3099',capacity:'12',assigned:'yes'},
-    {driver_id:'D004',driver_name:'Manoj Singh',  driver_phone:'9000000004',car_type:'Scorpio',        car_no:'WB02GH4011',capacity:'7', assigned:'no'},
+    {driver_id:'D004',driver_name:'Manoj Singh',  driver_phone:'9000000004',car_type:'ScorpioX',        car_no:'WB02GH4011',capacity:'7', assigned:'no'},
   ];
   const today=new Date().toISOString().slice(0,10);
   const tom=new Date(Date.now()+86400000).toISOString().slice(0,10);
