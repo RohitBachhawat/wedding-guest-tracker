@@ -469,8 +469,7 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
 const TRAVEL_MINS   = 90;
 const CONFLICT_MINS = 120;
 const LUGGAGE_KW    = ['luggage','bag','suitcase','baggage','wheelchair','equipment','heavy','lots','bulky','cargo'];
-const KOLKATA_STATIONS = ['howrah','sealdah','kolkata','kolkata station','nscbi','dumdum','netaji','calcutta','ccu'];
-function isKolkataStation(str){ return KOLKATA_STATIONS.some(s=>str.includes(s)); }
+
 
 function departureBufMins(type,pax){
   const large=(parseInt(pax)||0)>3;
@@ -692,11 +691,17 @@ function journeyType(g){
   const jt=(g.journey_type||'').toLowerCase().trim();
   if(jt==='departure') return 'departure';
   if(jt==='arrival') return 'arrival';
-  // Fallback 1: infer from origin — if origin is a Kolkata station, it's a departure
-  if(g.journey_origin&&isKolkataStation(g.journey_origin.toLowerCase())) return 'departure';
-  // Fallback 2: if destination (pickup_location) is one of our 4 stations AND
-  // origin is NOT a Kolkata station → it's an arrival
-  // If pickup_location is one of our 4 AND origin IS Kolkata → departure (already caught above)
+  const wc=WEDDING_CITY.toLowerCase();
+  // Fallback 1: if origin matches wedding city or a local hub → departure
+  if(g.journey_origin){
+    const ori=g.journey_origin.toLowerCase();
+    if((wc && (ori.includes(wc)||wc.includes(ori))) || isLocalHub(g.journey_origin)) return 'departure';
+  }
+  // Fallback 2: if destination matches wedding city or a local hub → arrival
+  if(g.journey_destination){
+    const des=g.journey_destination.toLowerCase();
+    if((wc && (des.includes(wc)||wc.includes(des))) || isLocalHub(g.journey_destination)) return 'arrival';
+  }
   // Additional signal: if live_status_text mentions 'depart' → departure
   if(g.live_status_text&&g.live_status_text.toLowerCase().includes('depart')) return 'departure';
   return 'arrival';
@@ -1072,10 +1077,10 @@ async function refreshStatus(id){
   if(box) box.innerHTML='<span class="ls-icon">⏳</span><div class="ls-text">Fetching live status…</div>';
   const isDep=journeyType(g)==='departure';
   const prompt=g.transport_type==='Flight'
-    ?(isDep?`What is the current status of flight ${g.transport_number} (${g.transport_name}) departing from Kolkata today? Is it on time or delayed? Give current scheduled departure time. 2-3 sentences.`
-           :`What is the current status of flight ${g.transport_number} (${g.transport_name}) arriving at Kolkata airport today? Is it on time or delayed? Give current estimated arrival time. 2-3 sentences.`)
-    :(isDep?`What is the current running status of Indian Railways train ${g.transport_number} (${g.transport_name}) today? Is it on time or delayed from Kolkata? Give delay info. 2-3 sentences.`
-           :`What is the current running status of Indian Railways train ${g.transport_number} (${g.transport_name}), PNR ${g.pnr}? Which station is it at now and what is expected arrival time at ${g.pickup_location} Kolkata? Is it delayed? 2-3 sentences.`);
+    ?(isDep?`What is the current status of flight ${g.transport_number} (${g.transport_name}) departing from ${WEDDING_CITY} today? Is it on time or delayed? Give current scheduled departure time. 2-3 sentences.`
+           :`What is the current status of flight ${g.transport_number} (${g.transport_name}) arriving at ${WEDDING_CITY} airport today? Is it on time or delayed? Give current estimated arrival time. 2-3 sentences.`)
+    :(isDep?`What is the current running status of Indian Railways train ${g.transport_number} (${g.transport_name}) today? Is it on time or delayed from ${WEDDING_CITY}? Give delay info. 2-3 sentences.`
+           :`What is the current running status of Indian Railways train ${g.transport_number} (${g.transport_name}), PNR ${g.pnr}? Which station is it at now and what is expected arrival time at ${g.pickup_location} ${WEDDING_CITY}? Is it delayed? 2-3 sentences.`);
   try{
     const result=await callGemini(prompt);
     await apiPost({action:'updateLiveStatus',group_id:id,live_status_text:result});
@@ -1366,6 +1371,7 @@ function populateForm(g){
   const m={'f-group-id':'group_id','f-group-name':'group_name','f-individual-names':'individual_names',
     'f-pax':'pax','f-phone-primary':'phone_primary','f-phone-backup':'phone_backup',
     'f-pickup-location':'pickup_location','f-journey-origin':'journey_origin',
+    'f-journey-destination':'journey_destination',
     'f-transport-type':'transport_type','f-transport-name':'transport_name',
     'f-transport-number':'transport_number','f-pnr':'pnr','f-notes':'notes'};
   Object.entries(m).forEach(([el,k])=>{const e=document.getElementById(el);if(e) e.value=sg[k]||'';});
@@ -1499,14 +1505,16 @@ async function submitGuestForm(e){
   }
 
   // ── Journey Type Mismatch Check (Final Safety) ────────────────
-  const pl = (data.pickup_location||'').toLowerCase();
   const ori = (data.journey_origin||'').toLowerCase();
   const des = (data.journey_destination||'').toLowerCase();
+  const wc = WEDDING_CITY.toLowerCase();
   
-  if (data.journey_type === 'arrival' && (ori.includes(pl) || pl.includes(ori))) {
+  // If set as arrival but origin is wedding city or a local hub → should be departure
+  if (data.journey_type === 'arrival' && ori && wc && ((ori.includes(wc)||wc.includes(ori)) || isLocalHub(data.journey_origin))) {
     showJTMismatchModal(data, 'departure'); return;
   }
-  if (data.journey_type === 'departure' && (des.includes(pl) || pl.includes(des))) {
+  // If set as departure but destination is wedding city or a local hub → should be arrival
+  if (data.journey_type === 'departure' && des && wc && ((des.includes(wc)||wc.includes(des)) || isLocalHub(data.journey_destination))) {
     showJTMismatchModal(data, 'arrival'); return;
   }
 
@@ -1646,11 +1654,23 @@ async function handleFileUpload(event){
 
     // Determine journey type and data for each leg
     const processedLegs=parsed.legs.map(leg=>{
-      const jt = leg.journey_type === 'departure' ? 'departure' : 'arrival';
+      // Determine journey type: validate/override Gemini's classification using city matching
+      let jt = leg.journey_type === 'departure' ? 'departure' : 'arrival';
+      const wc = WEDDING_CITY.toLowerCase();
+      const legOri = (leg.journey_origin||'').toLowerCase();
+      const legDest = (leg.journey_destination||'').toLowerCase();
+      
+      // Override Gemini if we can infer from city names vs wedding city
+      if (wc) {
+        const oriIsLocal = (legOri.includes(wc)||wc.includes(legOri)) || isLocalHub(leg.journey_origin);
+        const destIsLocal = (legDest.includes(wc)||wc.includes(legDest)) || isLocalHub(leg.journey_destination);
+        if (oriIsLocal && !destIsLocal) jt = 'departure';
+        else if (destIsLocal && !oriIsLocal) jt = 'arrival';
+      }
 
       // Pick correct date/time based on journey type
-      // For Arrival: we care about when they REACH the hub
-      // For Departure: we care about when they LEAVE the hub
+      // For Arrival: use arrive time (when they REACH the wedding city hub)
+      // For Departure: use depart time (when they LEAVE the wedding city hub)
       const date=jt==='departure'?leg.depart_date:leg.arrive_date;
       const time=jt==='departure'?leg.depart_time:leg.arrive_time;
 
