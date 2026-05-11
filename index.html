@@ -706,25 +706,42 @@ function journeyType(g){
   if(g.live_status_text&&g.live_status_text.toLowerCase().includes('depart')) return 'departure';
   return 'arrival';
 }
-function isLocalHub(str){
+// Extract meaningful words (4+ chars) from a location string, stripping codes like (HWH)
+function locationWords(str){
+  return (str||'').toLowerCase()
+    .replace(/\([^)]*\)/g,'')   // remove (HWH), (MZP) etc
+    .replace(/[^a-z\s]/g,' ')   // remove non-alpha
+    .split(/\s+/)
+    .filter(w=>w.length>=4);    // only words 4+ chars
+}
+function hubMatch(str){
+  // Full substring check first (fast path)
   const s=(str||'').toLowerCase();
-  return HUBS.some(k=> {
-    const h = k.toLowerCase();
-    return s.includes(h) || h.includes(s);
-  });
+  for(const k of HUBS){
+    const h=k.toLowerCase();
+    if(s.includes(h)||h.includes(s)) return k;
+  }
+  // Keyword word check (handles abbreviations like JN, parenthetical codes)
+  const inWords=locationWords(str);
+  if(!inWords.length) return null;
+  for(const k of HUBS){
+    const hubWords=locationWords(k);
+    // Any significant word from input found in hub name or vice versa
+    if(inWords.some(w=>hubWords.some(hw=>hw.includes(w)||w.includes(hw)))) return k;
+  }
+  return null;
+}
+function isLocalHub(str){
+  return !!hubMatch(str);
 }
 function mapToStation(str, type){
-  const s=(str||'').toLowerCase();
   const isFlight = (type||'').toLowerCase() === 'flight';
   
   if(!HUBS || !HUBS.length) return '';
 
-  // 1. Try exact matches or clear keyword matches against our Hubs list
-  for(const hub of HUBS){
-    const h = hub.toLowerCase();
-    // If hub name is in the string, or vice versa
-    if(s.includes(h) || h.includes(s)) return hub;
-  }
+  // 1. Try hub match (handles abbreviations, codes etc)
+  const matched = hubMatch(str);
+  if(matched) return matched;
 
   // 2. Flight-specific logic
   if(isFlight){
