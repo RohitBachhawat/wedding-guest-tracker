@@ -314,6 +314,7 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
               <select id="f-transport-type" required><option value="">Select…</option><option value="Train">Train</option><option value="Flight">Flight</option></select>
             </div>
             <div class="form-group"><label>Journey Origin *</label><input type="text" id="f-journey-origin" placeholder="e.g. New Delhi" required/></div>
+            <div class="form-group"><label>Journey Destination *</label><input type="text" id="f-journey-destination" placeholder="e.g. Kolkata" required/></div>
           </div>
           <div class="form-row">
             <div class="form-group"><label>Train / Flight Name</label><input type="text" id="f-transport-name" placeholder="e.g. SpiceJet SG-759"/></div>
@@ -1378,7 +1379,8 @@ function populateFormFromLeg(leg){
   if(leg.transport_name) document.getElementById('f-transport-name').value=leg.transport_name;
   if(leg.transport_number) document.getElementById('f-transport-number').value=leg.transport_number;
   if(leg.pnr) document.getElementById('f-pnr').value=leg.pnr;
-  if(leg.journey_origin) document.getElementById('f-journey-origin').value=leg.journey_origin;
+  if(leg.journey_origin)  document.getElementById('f-journey-origin').value=leg.journey_origin||'';
+  document.getElementById('f-journey-destination').value=leg.journey_destination||'';
   if(leg.arrival_date) document.getElementById('f-arrival-date').value=leg.arrival_date;
   if(leg.arrival_time) document.getElementById('f-arrival-time').value=leg.arrival_time;
   if(leg.pickup_location) document.getElementById('f-pickup-location').value=leg.pickup_location;
@@ -1402,7 +1404,9 @@ function collectForm(){
   return{
     group_id:v('f-group-id'),group_name:v('f-group-name'),individual_names:v('f-individual-names'),
     pax:v('f-pax'),phone_primary:v('f-phone-primary'),phone_backup:v('f-phone-backup'),
-    pickup_location:v('f-pickup-location'),journey_origin:v('f-journey-origin'),
+    pickup_location:v('f-pickup-location'),
+    journey_origin:v('f-journey-origin'),
+    journey_destination:v('f-journey-destination'),
     arrival_date:v('f-arrival-date'),arrival_time:v('f-arrival-time'),
     transport_type:v('f-transport-type'),transport_name:v('f-transport-name'),
     transport_number:v('f-transport-number'),pnr:v('f-pnr'),
