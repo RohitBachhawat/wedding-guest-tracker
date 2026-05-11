@@ -511,16 +511,21 @@ function showLoading(v){
 
 // ── Fetch with timeout + response validation ─────────────────
 async function fetchWithTimeout(url,options={},timeoutMs=12000){
-  const controller=new AbortController();
-  const timer=setTimeout(()=>controller.abort(),timeoutMs);
-  try{
-    const r=await fetch(url,{...options,signal:controller.signal});
+  let timer;
+  const timeoutPromise = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error('Request timed out')), timeoutMs);
+  });
+  
+  try {
+    const r = await Promise.race([
+      fetch(url, options),
+      timeoutPromise
+    ]);
     clearTimeout(timer);
     if(!r.ok) throw new Error('Server error '+r.status+': '+r.statusText);
     return r;
-  }catch(e){
+  } catch(e) {
     clearTimeout(timer);
-    if(e.name==='AbortError') throw new Error('Request timed out. Check your connection.');
     throw e;
   }
 }
@@ -1386,50 +1391,46 @@ document.getElementById('car-opt-switch').addEventListener('click',async()=>{
 
 async function proceedSave(data){
   showLoading(true);
-  if(editingId){
-    data.group_id=editingId;
-    const ex=allGuests.find(g=>g.group_id===editingId)||{};
-    data.status=ex.status||'active';data.dispatched=ex.dispatched||'no';
-    data.driver_arrived=ex.driver_arrived||'no';data.guest_in_car=ex.guest_in_car||'no';
-    data.dropped_off=ex.dropped_off||'no';data.car_returned=ex.car_returned||'no';
-    data.last_refreshed=ex.last_refreshed||'';data.live_status_text=ex.live_status_text||'';
-    data.deleted=ex.deleted||'no';
-    await apiPost({action:'updateGuest',data});
-    const idx=allGuests.findIndex(g=>g.group_id===editingId);
-    if(idx>=0) allGuests[idx]={...allGuests[idx],...data};
-    showToast('Guest updated ✓','success');
-    showLoading(false);showDashboard();renderDashboard();
-  } else {
-    const res=await apiPost({action:'addGuest',data});
-    data.group_id=res.group_id;data.status='active';
-    data.dispatched='no';data.driver_arrived='no';data.guest_in_car='no';
-    data.dropped_off='no';data.car_returned='no';data.deleted='no';
-    data.live_status_text='';data.last_refreshed='';
-    allGuests.push(data);
-    showToast('Guest added 🎉','success');
-    showLoading(false);
-
-    // Round trip: if more legs in queue, load next
-    if(rtQueue.length>0&&rtQueueIdx<rtQueue.length){
-      // Save personal details from first leg for carry-over
-      rtPersonal={group_name:data.group_name,phone_primary:data.phone_primary,
-        phone_backup:data.phone_backup,individual_names:data.individual_names,pax:data.pax};
-      const nextLeg=rtQueue[rtQueueIdx];rtQueueIdx++;
-      document.getElementById('guest-form').reset();
-      document.getElementById('f-group-id').value='';
-      document.getElementById('driver-detail-row').style.display='none';
-      document.getElementById('extraction-result').classList.remove('show');
-      populateFormFromLeg(nextLeg);
-      // Update banner
-      const banner=document.getElementById('roundtrip-banner');
-      banner.innerHTML=`🔄 <span>Round trip detected — now saving <strong>Leg ${rtQueueIdx+1} of ${rtQueue.length+1}</strong>. Review details and assign a driver.</span>`;
-      banner.classList.remove('hidden');
-      return; // Don't go to dashboard yet
+  try{
+    if(editingId){
+      data.group_id=editingId;
+      const ex=allGuests.find(g=>g.group_id===editingId)||{};
+      data.status=ex.status||'active';data.dispatched=ex.dispatched||'no';
+      data.driver_arrived=ex.driver_arrived||'no';data.guest_in_car=ex.guest_in_car||'no';
+      data.dropped_off=ex.dropped_off||'no';data.car_returned=ex.car_returned||'no';
+      data.last_refreshed=ex.last_refreshed||'';data.live_status_text=ex.live_status_text||'';
+      data.deleted=ex.deleted||'no';
+      await apiPost({action:'updateGuest',data});
+      const idx=allGuests.findIndex(g=>g.group_id===editingId);
+      if(idx>=0) allGuests[idx]={...allGuests[idx],...data};
+      showToast('Guest updated ✓','success');
+      showLoading(false);showDashboard();renderDashboard();
+    } else {
+      const res=await apiPost({action:'addGuest',data});
+      data.group_id=res.group_id;data.status='active';
+      data.dispatched='no';data.driver_arrived='no';data.guest_in_car='no';
+      data.dropped_off='no';data.car_returned='no';data.deleted='no';
+      data.live_status_text='';data.last_refreshed='';
+      allGuests.push(data);
+      showToast('Guest added 🎉','success');
+      showLoading(false);
+      if(rtQueue.length>0&&rtQueueIdx<rtQueue.length){
+        rtPersonal={group_name:data.group_name,phone_primary:data.phone_primary,
+          phone_backup:data.phone_backup,individual_names:data.individual_names,pax:data.pax};
+        const nextLeg=rtQueue[rtQueueIdx];rtQueueIdx++;
+        document.getElementById('guest-form').reset();
+        document.getElementById('f-group-id').value='';
+        document.getElementById('driver-detail-row').style.display='none';
+        document.getElementById('extraction-result').classList.remove('show');
+        populateFormFromLeg(nextLeg);
+        const banner=document.getElementById('roundtrip-banner');
+        banner.innerHTML=`🔄 <span>Round trip detected — now saving <strong>Leg ${rtQueueIdx+1} of ${rtQueue.length+1}</strong>. Review details and assign a driver.</span>`;
+        banner.classList.remove('hidden');
+        return;
+      }
+      document.getElementById('roundtrip-banner').classList.add('hidden');
+      showDashboard();renderDashboard();
     }
-    // All legs saved
-    document.getElementById('roundtrip-banner').classList.add('hidden');
-    showDashboard();renderDashboard();
-  }
   }catch(e){
     console.error('proceedSave error:',e);
     showToast(e.message||'Save failed. Please retry.','error');
