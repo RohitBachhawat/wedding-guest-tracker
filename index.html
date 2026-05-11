@@ -310,11 +310,13 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
         <div class="form-card">
           <h3>🚂 Travel Details</h3>
           <div class="form-row">
+            <div class="form-group"><label>Journey Origin *</label><input type="text" id="f-journey-origin" placeholder="e.g. New Delhi" required/></div>
+            <div class="form-group"><label>Journey Destination *</label><input type="text" id="f-journey-destination" placeholder="e.g. Kolkata" required/></div>
+          </div>
+          <div class="form-row">
             <div class="form-group"><label>Transport Type *</label>
               <select id="f-transport-type" required><option value="">Select…</option><option value="Train">Train</option><option value="Flight">Flight</option></select>
             </div>
-            <div class="form-group"><label>Journey Origin *</label><input type="text" id="f-journey-origin" placeholder="e.g. New Delhi" required/></div>
-            <div class="form-group"><label>Journey Destination *</label><input type="text" id="f-journey-destination" placeholder="e.g. Kolkata" required/></div>
           </div>
           <div class="form-row">
             <div class="form-group"><label>Train / Flight Name</label><input type="text" id="f-transport-name" placeholder="e.g. SpiceJet SG-759"/></div>
@@ -468,6 +470,7 @@ const TRAVEL_MINS   = 90;
 const CONFLICT_MINS = 120;
 const LUGGAGE_KW    = ['luggage','bag','suitcase','baggage','wheelchair','equipment','heavy','lots','bulky','cargo'];
 const KOLKATA_STATIONS = ['howrah','sealdah','kolkata','kolkata station','nscbi','dumdum','netaji','calcutta','ccu'];
+function isKolkataStation(str){ return KOLKATA_STATIONS.some(s=>str.includes(s)); }
 
 function departureBufMins(type,pax){
   const large=(parseInt(pax)||0)>3;
@@ -568,7 +571,7 @@ function showLoading(v){
     _loadingTimer=setTimeout(()=>{
       document.getElementById('loading-overlay').classList.add('hidden');
       showToast('Request timed out. Please try again.','error');
-    },15000);
+    },20000);
   } else {
     clearTimeout(_loadingTimer);
   }
@@ -1283,6 +1286,14 @@ function populateStationDropdown(){
   const sel=document.getElementById('f-pickup-location');
   const current=sel.value;
   sel.innerHTML='<option value="">Select station…</option>';
+  if(!HUBS||!HUBS.length){
+    const opt=document.createElement('option');
+    opt.value='';opt.textContent='⚠ No hubs loaded — check Settings';opt.disabled=true;
+    sel.appendChild(opt);
+    sel.removeAttribute('required');
+    return;
+  }
+  sel.setAttribute('required','');
   HUBS.forEach(h=>{
     const opt=document.createElement('option');
     opt.value=h;opt.textContent=h;
@@ -1437,9 +1448,10 @@ function openDupModal(data,existing){
 function closeDupModal(){document.getElementById('dup-modal').classList.remove('open');dupPendingData=null;dupExistingId=null;}
 
 document.getElementById('dup-view-btn').addEventListener('click',()=>{
+  const savedId=dupExistingId;
   closeDupModal();showDashboard();
   setTimeout(()=>{
-    const card=document.getElementById('card-'+dupExistingId);
+    const card=document.getElementById('card-'+savedId);
     if(card){card.scrollIntoView({behavior:'smooth',block:'center'});card.querySelector('.card-expanded')?.classList.add('open');}
   },300);
 });
@@ -1656,6 +1668,7 @@ async function handleFileUpload(event){
         journey_type:jt,transport_type:leg.transport_type||'',
         transport_name:leg.transport_name||'',transport_number:leg.transport_number||'',
         pnr:leg.pnr||'',journey_origin:leg.journey_origin||'',
+        journey_destination:leg.journey_destination||'',
         arrival_date:date||'',arrival_time:time||'',
         pickup_location:station || (HUBS[0] || ''),
         individual_names:leg.individual_names||'',
@@ -1700,6 +1713,7 @@ async function handleFileUpload(event){
     showToast('Extraction failed — please fill in manually','error');
   }
   showLoading(false);
+  event.target.value='';
 }
 function toBase64(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(file);});}
 
@@ -1800,13 +1814,24 @@ async function callGemini(prompt){
   }
 }
 async function callGeminiFile(prompt,b64,mime){
-  const r=await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${GEMINI_KEY}`,
-    {method:'POST',headers:{'Content-Type':'application/json'},
-     body:JSON.stringify({contents:[{parts:[{inline_data:{mime_type:mime,data:b64}},{text:prompt}]}]})}
-  );
-  const d=await r.json();if(d.error) throw new Error(d.error.message);
-  return d.candidates?.[0]?.content?.parts?.[0]?.text||'{}';
+  try{
+    const r=await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${GEMINI_KEY}`,
+      {method:'POST',headers:{'Content-Type':'application/json'},
+       body:JSON.stringify({contents:[{parts:[{inline_data:{mime_type:mime,data:b64}},{text:prompt}]}]})}
+    );
+    const d=await r.json();if(d.error) throw new Error(d.error.message);
+    return d.candidates?.[0]?.content?.parts?.[0]?.text||'{}';
+  }catch(e1){
+    console.warn('callGeminiFile first attempt failed, retrying without inline_data hint:',e1.message);
+    const r=await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${GEMINI_KEY}`,
+      {method:'POST',headers:{'Content-Type':'application/json'},
+       body:JSON.stringify({contents:[{parts:[{inline_data:{mime_type:mime,data:b64}},{text:prompt}]}]})}
+    );
+    const d=await r.json();if(d.error) throw new Error(d.error.message);
+    return d.candidates?.[0]?.content?.parts?.[0]?.text||'{}';
+  }
 }
 
 // ── Summary ───────────────────────────────────────────────────
