@@ -459,6 +459,18 @@ function departureBufMins(type,pax){
   return (type||'').toLowerCase()==='flight'?(large?255:240):(large?180:165);
 }
 
+const CACHE_KEY_GUESTS  = 'wgt_cache_guests';
+const CACHE_KEY_DRIVERS = 'wgt_cache_drivers';
+const CACHE_KEY_TS      = 'wgt_cache_ts';
+
+function saveToCache() {
+  try {
+    localStorage.setItem(CACHE_KEY_GUESTS, JSON.stringify(allGuests));
+    localStorage.setItem(CACHE_KEY_DRIVERS, JSON.stringify(allDrivers));
+    localStorage.setItem(CACHE_KEY_TS, Date.now().toString());
+  } catch(e) { console.warn('Failed to save to cache:', e); }
+}
+
 // ── State ─────────────────────────────────────────────────────
 let SCRIPT_URL='',GEMINI_KEY='';
 let allGuests=[],allDrivers=[];
@@ -544,16 +556,33 @@ async function apiPost(p){
 }
 
 async function initAndLoad(){
+  // 1. Load from cache for instant display
+  try {
+    const cachedG = localStorage.getItem(CACHE_KEY_GUESTS);
+    const cachedD = localStorage.getItem(CACHE_KEY_DRIVERS);
+    if(cachedG && cachedD) {
+      allGuests = JSON.parse(cachedG).map(sanitizeGuest);
+      allDrivers = JSON.parse(cachedD);
+      renderDashboard();
+    }
+  } catch(e) { console.warn('Cache load failed:', e); }
+
   showLoading(true);
   try{
     await apiPost({action:'initSheet'});
     const [g,d]=await Promise.all([apiGet('getGuests'),apiGet('getDrivers')]);
     allGuests=(g.guests||[]).filter(x=>x.deleted!=='yes').map(sanitizeGuest);
     allDrivers=d.drivers||[];
+    
+    saveToCache();
     renderDashboard();
   }catch(e){
     console.error('initAndLoad error:',e);
-    showToast(e.message||'Cannot connect. Check your Apps Script URL.','error');
+    if(allGuests.length) {
+      showToast('Offline Mode: Showing cached data', 'error');
+    } else {
+      showToast(e.message||'Cannot connect. Check your Apps Script URL.','error');
+    }
   }
   showLoading(false);
 }
@@ -617,12 +646,26 @@ function journeyType(g){
   return 'arrival';
 }
 function isKolkataStation(str){const s=(str||'').toLowerCase();return KOLKATA_STATIONS.some(k=>s.includes(k));}
-function mapToStation(str){
+function mapToStation(str, type){
   const s=(str||'').toLowerCase();
+  const isFlight = (type||'').toLowerCase() === 'flight';
+  
+  // Priority 1: Specific Airport Keywords/Codes
+  if(s.includes('airport') || s.includes('nscbi') || s.includes('ccu') || s.includes('dumdum') || 
+     s.includes('netaji') || s.includes('subhash') || s.includes('international')) return 'Airport';
+     
+  // Priority 2: Specific Train Stations
   if(s.includes('howrah')) return 'Howrah';
   if(s.includes('sealdah')) return 'Sealdah';
-  if(s.includes('airport')||s.includes('nscbi')||s.includes('dumdum')||s.includes('netaji')||s==='ccu') return 'Airport';
-  if(s.includes('kolkata')||s.includes('calcutta')) return 'Kolkata Station';
+  if(s.includes('chitpur')) return 'Kolkata Station'; // Alternate name for KOAA
+  
+  // Priority 3: General "Kolkata" or "Calcutta"
+  if(s.includes('kolkata') || s.includes('calcutta')) {
+    // If it's a flight, "Kolkata" almost always means the Airport
+    if(isFlight) return 'Airport';
+    return 'Kolkata Station';
+  }
+  
   return '';
 }
 
@@ -825,6 +868,7 @@ document.getElementById('pooling-confirm-btn').addEventListener('click',async()=
     await apiPost({action:'updateGuest',data:updated});
     const idx=allGuests.findIndex(g=>g.group_id===tgt.group_id);
     if(idx>=0) allGuests[idx]={...allGuests[idx],...updated};
+    saveToCache();
     closePoolingModal();renderDashboard();
     showToast('Driver assigned to '+tgt.group_name+' ✓','success');
   }catch(e){showToast(e.message||'Save failed. Please retry.','error');}
@@ -974,6 +1018,7 @@ async function refreshStatus(id){
     await apiPost({action:'updateLiveStatus',group_id:id,live_status_text:result});
     const idx=allGuests.findIndex(x=>x.group_id===id);
     if(idx>=0){allGuests[idx].live_status_text=result;allGuests[idx].last_refreshed=new Date().toISOString();}
+    saveToCache();
     if(box) box.innerHTML=`<span class="ls-icon">📡</span><div class="ls-text"><div>${esc(result)}</div><div class="ls-timestamp">Last checked: just now</div></div>`;
     const card=document.getElementById('card-'+id);
     if(card&&idx>=0){
@@ -995,6 +1040,7 @@ async function toggleField(id,field,current){
   try{
     await apiPost({action:'updateGuestStatus',group_id:id,field,value:newVal});
     const idx=allGuests.findIndex(x=>x.group_id===id);if(idx>=0) allGuests[idx][field]=newVal;
+    saveToCache();
     renderDashboard();
   }catch(e){showToast(e.message||'Save failed. Please retry.','error');}
   showLoading(false);
@@ -1005,6 +1051,7 @@ async function markFinal(id,type){
   try{
     await apiPost({action:'updateGuestStatus',group_id:id,field:'status',value});
     const idx=allGuests.findIndex(x=>x.group_id===id);if(idx>=0) allGuests[idx].status=value;
+    saveToCache();
     renderDashboard();showToast(type==='arrival'?'Picked up 🎉':'Trip completed ✓','success');
   }catch(e){showToast(e.message||'Save failed. Please retry.','error');}
   showLoading(false);
@@ -1014,6 +1061,7 @@ async function markActive(id){
   try{
     await apiPost({action:'updateGuestStatus',group_id:id,field:'status',value:'active'});
     const idx=allGuests.findIndex(x=>x.group_id===id);if(idx>=0) allGuests[idx].status='active';
+    saveToCache();
     renderDashboard();showToast('Moved back to active','success');
   }catch(e){showToast(e.message||'Save failed. Please retry.','error');}
   showLoading(false);
@@ -1032,6 +1080,7 @@ document.getElementById('delete-confirm-btn').addEventListener('click',async()=>
   try{
     await apiPost({action:'deleteGuest',group_id:deletePendingId});
     allGuests=allGuests.filter(g=>g.group_id!==deletePendingId);
+    saveToCache();
     closeDeleteModal();renderDashboard();showToast('Entry deleted','success');
   }catch(e){showToast(e.message||'Delete failed. Please retry.','error');}
   showLoading(false);
@@ -1141,6 +1190,7 @@ async function driverMarkComplete(groupId){
     ]);
     const idx=allGuests.findIndex(g=>g.group_id===groupId);
     if(idx>=0){allGuests[idx].car_returned='yes';allGuests[idx].status='car_returned';}
+    saveToCache();
     renderDrivers();renderDashboard();showToast('Trip completed ✓','success');
   }catch(e){showToast(e.message||'Save failed. Please retry.','error');}
   showLoading(false);
@@ -1150,6 +1200,7 @@ async function toggleDriverField(groupId,field,current){
   try{
     await apiPost({action:'updateGuestStatus',group_id:groupId,field,value:v});
     const idx=allGuests.findIndex(g=>g.group_id===groupId);if(idx>=0) allGuests[idx][field]=v;
+    saveToCache();
     renderDrivers();showToast('Updated ✓','success');
   }catch(e){showToast(e.message||'Save failed. Please retry.','error');}
   showLoading(false);
@@ -1403,6 +1454,7 @@ async function proceedSave(data){
       await apiPost({action:'updateGuest',data});
       const idx=allGuests.findIndex(g=>g.group_id===editingId);
       if(idx>=0) allGuests[idx]={...allGuests[idx],...data};
+      saveToCache();
       showToast('Guest updated ✓','success');
       showLoading(false);showDashboard();renderDashboard();
     } else {
@@ -1412,6 +1464,7 @@ async function proceedSave(data){
       data.dropped_off='no';data.car_returned='no';data.deleted='no';
       data.live_status_text='';data.last_refreshed='';
       allGuests.push(data);
+      saveToCache();
       showToast('Guest added 🎉','success');
       showLoading(false);
       if(rtQueue.length>0&&rtQueueIdx<rtQueue.length){
@@ -1507,7 +1560,7 @@ IMPORTANT:
 
       // Map Kolkata station
       const stationSrc=jt==='departure'?origin:dest;
-      const station=mapToStation(stationSrc)||'Airport';
+      const station=mapToStation(stationSrc, leg.transport_type)||'Airport';
 
       // Auto group name from first passenger
       const firstName=(leg.individual_names||'').split(',')[0].trim();
