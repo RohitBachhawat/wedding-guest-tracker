@@ -221,6 +221,7 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
     <div class="mandala">🪔</div>
     <h1>Wedding Guest Tracker</h1>
     <p>Enter your credentials to get started. Saved locally on this device.</p>
+    <div class="form-group"><label>Wedding City (e.g. Kolkata, Daman)</label><input type="text" id="setup-wedding-city" placeholder="Kolkata"/></div>
     <div class="form-group"><label>Google Apps Script Web App URL</label><input type="url" id="setup-script-url" placeholder="https://script.google.com/macros/s/…/exec"/></div>
     <div class="form-group"><label>Gemini API Key</label><input type="password" id="setup-gemini-key" placeholder="AIza…"/></div>
     <button class="btn btn-primary" style="width:100%;justify-content:center;padding:14px" onclick="saveSetup()">🎉 Open Dashboard</button>
@@ -324,10 +325,6 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
               <label id="location-label">Pickup Station *</label>
               <select id="f-pickup-location" required>
                 <option value="">Select station…</option>
-                <option value="Howrah">Howrah</option>
-                <option value="Sealdah">Sealdah</option>
-                <option value="Airport">Airport (NSCBI)</option>
-                <option value="Kolkata Station">Kolkata Station</option>
               </select>
             </div>
           </div>
@@ -378,6 +375,12 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
 <div class="modal-overlay" id="settings-modal">
   <div class="modal">
     <h3>⚙️ Settings</h3>
+    <div class="form-group"><label>Wedding City</label><input type="text" id="settings-wedding-city" onchange="onCityChange()"/></div>
+    <div class="form-group">
+      <label>Transport Hubs (One per line)</label>
+      <textarea id="settings-hubs" rows="5" placeholder="Railway Station A&#10;Airport B"></textarea>
+      <div style="font-size:11px;color:var(--text-2);margin-top:4px">These appear in the dropdowns. Changing city will auto-refresh these.</div>
+    </div>
     <div class="form-group"><label>Apps Script Web App URL</label><input type="url" id="settings-script-url"/></div>
     <div class="form-group"><label>Gemini API Key</label><input type="password" id="settings-gemini-key"/></div>
     <div class="modal-actions">
@@ -472,7 +475,7 @@ function saveToCache() {
 }
 
 // ── State ─────────────────────────────────────────────────────
-let SCRIPT_URL='',GEMINI_KEY='';
+let SCRIPT_URL='',GEMINI_KEY='',WEDDING_CITY='',HUBS=[];
 let allGuests=[],allDrivers=[];
 let activeTab='all',editingId=null,completedOpen=false;
 let pendingSubmitData=null,pendingPooling=null,currentRecs=[];
@@ -488,16 +491,53 @@ let rtPersonal={};
 window.addEventListener('DOMContentLoaded',()=>{
   SCRIPT_URL=localStorage.getItem('wgt_script_url')||'';
   GEMINI_KEY=localStorage.getItem('wgt_gemini_key')||'';
-  if(SCRIPT_URL&&GEMINI_KEY) launchApp();
-  else document.getElementById('screen-setup').style.display='flex';
+  WEDDING_CITY=localStorage.getItem('wgt_wedding_city')||'';
+  HUBS=JSON.parse(localStorage.getItem('wgt_hubs')||'[]');
+  if(SCRIPT_URL&&GEMINI_KEY&&WEDDING_CITY) launchApp();
+  else {
+    document.getElementById('screen-setup').style.display='flex';
+    document.getElementById('setup-wedding-city').value=WEDDING_CITY;
+  }
 });
 
-function saveSetup(){
+async function saveSetup(){
   const url=document.getElementById('setup-script-url').value.trim();
   const key=document.getElementById('setup-gemini-key').value.trim();
-  if(!url||!key){showToast('Please fill in both fields','error');return;}
-  localStorage.setItem('wgt_script_url',url);localStorage.setItem('wgt_gemini_key',key);
-  SCRIPT_URL=url;GEMINI_KEY=key;launchApp();
+  const city=document.getElementById('setup-wedding-city').value.trim();
+  if(!url||!key||!city){showToast('Please fill all fields','error');return;}
+  
+  showLoading(true);
+  localStorage.setItem('wgt_script_url',url);
+  localStorage.setItem('wgt_gemini_key',key);
+  localStorage.setItem('wgt_wedding_city',city);
+  SCRIPT_URL=url;GEMINI_KEY=key;WEDDING_CITY=city;
+
+  // Auto-fetch hubs if none exist or city changed
+  if(!HUBS.length || city !== localStorage.getItem('wgt_last_fetched_city')){
+    await refreshHubs(city);
+  }
+  showLoading(false);
+  launchApp();
+}
+
+async function refreshHubs(city){
+  const prompt = `List the major transport hubs (Railway Stations and Airports) for a guest arriving in ${city}, India. 
+  Return ONLY a valid JSON array of strings, e.g. ["Station Name", "Airport Name"]. 
+  Include exactly one primary airport (even if it's in a nearby city like Vapi for Daman) and 3-5 main railway stations.
+  No markdown, no talk.`;
+  try {
+    const raw = await callGemini(prompt);
+    const clean = raw.replace(/```json|```/g, '').trim();
+    const list = JSON.parse(clean);
+    if(Array.isArray(list) && list.length){
+      HUBS = list;
+      localStorage.setItem('wgt_hubs', JSON.stringify(HUBS));
+      localStorage.setItem('wgt_last_fetched_city', city);
+    }
+  } catch(e) {
+    console.error('Hub fetch failed:', e);
+    showToast('Could not auto-fetch hubs. Please add them in Settings.', 'error');
+  }
 }
 async function launchApp(){
   document.getElementById('screen-setup').style.display='none';
@@ -650,23 +690,24 @@ function mapToStation(str, type){
   const s=(str||'').toLowerCase();
   const isFlight = (type||'').toLowerCase() === 'flight';
   
-  // Priority 1: Specific Airport Keywords/Codes
-  if(s.includes('airport') || s.includes('nscbi') || s.includes('ccu') || s.includes('dumdum') || 
-     s.includes('netaji') || s.includes('subhash') || s.includes('international')) return 'Airport';
-     
-  // Priority 2: Specific Train Stations
-  if(s.includes('howrah')) return 'Howrah';
-  if(s.includes('sealdah')) return 'Sealdah';
-  if(s.includes('chitpur')) return 'Kolkata Station'; // Alternate name for KOAA
-  
-  // Priority 3: General "Kolkata" or "Calcutta"
-  if(s.includes('kolkata') || s.includes('calcutta')) {
-    // If it's a flight, "Kolkata" almost always means the Airport
-    if(isFlight) return 'Airport';
-    return 'Kolkata Station';
+  if(!HUBS || !HUBS.length) return '';
+
+  // 1. Try exact matches or clear keyword matches against our Hubs list
+  for(const hub of HUBS){
+    const h = hub.toLowerCase();
+    // If hub name is in the string, or vice versa
+    if(s.includes(h) || h.includes(s)) return hub;
   }
-  
-  return '';
+
+  // 2. Flight-specific logic
+  if(isFlight){
+    const airport = HUBS.find(h => h.toLowerCase().includes('airport'));
+    if(airport) return airport;
+  }
+
+  // 3. Fallback: ask Gemini to pick the best match from our list
+  // (Optional, for now just return first or empty)
+  return HUBS[0] || '';
 }
 
 // ── Time helpers (string-based, no Date object) ───────────────
@@ -1216,6 +1257,19 @@ function setJourneyType(type){
   document.getElementById('location-label').textContent=type==='departure'?'Drop Station *':'Pickup Station *';
   document.getElementById('date-label').textContent=type==='departure'?'Departure Date *':'Arrival Date *';
   document.getElementById('time-label').textContent=type==='departure'?'Departure Time *':'Arrival Time *';
+  populateStationDropdown();
+}
+
+function populateStationDropdown(){
+  const sel=document.getElementById('f-pickup-location');
+  const current=sel.value;
+  sel.innerHTML='<option value="">Select station…</option>';
+  HUBS.forEach(h=>{
+    const opt=document.createElement('option');
+    opt.value=h;opt.textContent=h;
+    sel.appendChild(opt);
+  });
+  if(current) sel.value=current;
 }
 
 function showGuestForm(id){
@@ -1716,16 +1770,39 @@ function openSummaryModal(){
 function openSettings(){
   document.getElementById('settings-script-url').value=SCRIPT_URL;
   document.getElementById('settings-gemini-key').value=GEMINI_KEY;
+  document.getElementById('settings-wedding-city').value=WEDDING_CITY;
+  document.getElementById('settings-hubs').value=HUBS.join('\n');
   document.getElementById('settings-modal').classList.add('open');
+}
+async function onCityChange(){
+  const city = document.getElementById('settings-wedding-city').value.trim();
+  if(!city || city === WEDDING_CITY) return;
+  showLoading(true);
+  await refreshHubs(city);
+  document.getElementById('settings-hubs').value=HUBS.join('\n');
+  showLoading(false);
+  showToast('Hubs refreshed for '+city, 'success');
 }
 function saveSettings(){
   const url=document.getElementById('settings-script-url').value.trim();
   const key=document.getElementById('settings-gemini-key').value.trim();
-  if(!url||!key){showToast('Both fields required','error');return;}
-  localStorage.setItem('wgt_script_url',url);localStorage.setItem('wgt_gemini_key',key);
-  SCRIPT_URL=url;GEMINI_KEY=key;
+  const city=document.getElementById('settings-wedding-city').value.trim();
+  const hubsRaw=document.getElementById('settings-hubs').value.trim();
+  
+  if(!url||!key||!city){showToast('Fields required','error');return;}
+  
+  const newHubs = hubsRaw.split('\n').map(s=>s.trim()).filter(Boolean);
+  
+  localStorage.setItem('wgt_script_url',url);
+  localStorage.setItem('wgt_gemini_key',key);
+  localStorage.setItem('wgt_wedding_city',city);
+  localStorage.setItem('wgt_hubs', JSON.stringify(newHubs));
+  
+  SCRIPT_URL=url;GEMINI_KEY=key;WEDDING_CITY=city;HUBS=newHubs;
+  
   document.getElementById('settings-modal').classList.remove('open');
   showToast('Settings saved','success');
+  renderDashboard();
 }
 
 // ── Helpers ───────────────────────────────────────────────────
