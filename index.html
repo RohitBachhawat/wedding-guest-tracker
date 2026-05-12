@@ -576,7 +576,7 @@ let rtPersonal={};
 window.addEventListener('DOMContentLoaded',()=>{
   SCRIPT_URL=localStorage.getItem('wgt_script_url')||'';
   GEMINI_KEY=localStorage.getItem('wgt_gemini_key')||'';
-  WEDDING_CITY=localStorage.getItem('wgt_wedding_city')||'';
+  WEDDING_CITY=(localStorage.getItem('wgt_wedding_city')||'').trim();
   HUBS=JSON.parse(localStorage.getItem('wgt_hubs')||'[]');
   if(SCRIPT_URL&&GEMINI_KEY&&WEDDING_CITY) launchApp();
   else {
@@ -598,7 +598,7 @@ async function saveSetup(){
   SCRIPT_URL=url;GEMINI_KEY=key;WEDDING_CITY=city;
 
   // Auto-fetch hubs if none exist or city changed
-  if(!HUBS.length || city !== localStorage.getItem('wgt_last_fetched_city')){
+  if(!HUBS.length || city !== (localStorage.getItem('wgt_last_fetched_city')||'').trim()){
     await refreshHubs(city);
   }
   showLoading(false);
@@ -1984,7 +1984,7 @@ function closeJTMismatchModal(){
 async function callGemini(prompt){
   try{
     const r=await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${GEMINI_KEY}`,
       {method:'POST',headers:{'Content-Type':'application/json'},
        body:JSON.stringify({contents:[{parts:[{text:prompt}]}],tools:[{google_search:{}}]})}
     );
@@ -1995,7 +1995,7 @@ async function callGemini(prompt){
   }catch(e1){
     console.warn('Gemini search fallback:',e1.message);
     const r=await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${GEMINI_KEY}`,
       {method:'POST',headers:{'Content-Type':'application/json'},
        body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})}
     );
@@ -2008,7 +2008,7 @@ async function callGeminiFile(prompt,b64,mime){
   // First attempt: primary model
   try{
     const r=await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${GEMINI_KEY}`,
       {method:'POST',headers:{'Content-Type':'application/json'},body}
     );
     const d=await r.json();
@@ -2089,8 +2089,8 @@ async function saveSettings(){
   localStorage.setItem('wgt_wedding_city',city);
   SCRIPT_URL=url;GEMINI_KEY=key;WEDDING_CITY=city;
   
-  // Only fetch hubs if city changed AND user hasn't manually edited the hub list
-  if(cityChanged && city !== localStorage.getItem('wgt_last_fetched_city')){
+  // Only fetch hubs if city changed AND differs from last fetched city
+  if(cityChanged && city !== (localStorage.getItem('wgt_last_fetched_city')||'').trim()){
     showLoading(true);
     await refreshHubs(city);
     showLoading(false);
