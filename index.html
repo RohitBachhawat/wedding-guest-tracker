@@ -1,0 +1,2307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Wedding Guest Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --cream:#FDF8F2;--gold:#C8922A;--gold-lt:#F5E6C8;
+  --saffron:#E8833A;--saffron-lt:#FDE8D4;
+  --blue:#3A6EA8;--blue-lt:#D4E4F7;
+  --green:#2D7D5A;--green-lt:#D4EDE3;
+  --amber:#D97706;--amber-lt:#FEF3C7;
+  --red:#C0392B;--red-lt:#FDECEA;
+  --purple:#6D3BB0;--purple-lt:#EDE5F7;
+  --gray:#94A3B8;--gray-lt:#F1F5F9;
+  --text:#1E1E2E;--text-2:#64748B;--white:#FFFFFF;--border:#E8E0D5;
+  --shadow:0 2px 12px rgba(0,0,0,0.08);--shadow-lg:0 8px 32px rgba(0,0,0,0.14);
+  --radius:14px;--font-h:'Playfair Display',Georgia,serif;--font-b:'DM Sans',sans-serif;
+}
+body{font-family:var(--font-b);background:var(--cream);color:var(--text);min-height:100vh;line-height:1.5}
+.hidden{display:none!important}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:10px 20px;border-radius:8px;border:none;font-family:var(--font-b);font-size:14px;font-weight:500;cursor:pointer;transition:all .18s ease}
+.btn-primary{background:var(--gold);color:var(--white)}.btn-primary:hover{background:#b07d20}
+.btn-secondary{background:var(--white);color:var(--text);border:1.5px solid var(--border)}.btn-secondary:hover{background:var(--gray-lt)}
+.btn-danger{background:var(--red-lt);color:var(--red);border:1.5px solid #f5c6c2}.btn-danger:hover{background:#fdd}
+.btn-sm{padding:7px 14px;font-size:13px}
+.btn-icon{padding:8px;border-radius:8px;background:none;border:1.5px solid var(--border);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:all .15s;font-size:16px}.btn-icon:hover{background:var(--gray-lt)}
+input,select,textarea{width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font-b);font-size:14px;color:var(--text);background:var(--white);outline:none;transition:border-color .15s}
+input:focus,select:focus,textarea:focus{border-color:var(--gold)}
+label{display:block;font-size:13px;font-weight:500;color:var(--text-2);margin-bottom:5px}
+.form-group{margin-bottom:16px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:600px){.form-row{grid-template-columns:1fr}}
+
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--text);color:var(--white);padding:12px 22px;border-radius:10px;font-size:14px;font-weight:500;z-index:9999;transition:transform .3s ease;pointer-events:none}
+#toast.show{transform:translateX(-50%) translateY(0)}
+#toast.success{background:var(--green)}#toast.error{background:var(--red)}
+
+#loading-overlay{position:fixed;inset:0;background:rgba(253,248,242,.85);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:8000;backdrop-filter:blur(4px)}
+.spinner{width:40px;height:40px;border:3px solid var(--gold-lt);border-top-color:var(--gold);border-radius:50%;animation:spin .8s linear infinite;margin-bottom:14px}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:5000;padding:20px}
+.modal-overlay.open{display:flex}
+.modal{background:var(--white);border-radius:var(--radius);padding:32px;max-width:460px;width:100%;box-shadow:var(--shadow-lg);max-height:90vh;overflow-y:auto}
+.modal h3{font-family:var(--font-h);font-size:20px;margin-bottom:14px}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px;flex-wrap:wrap}
+
+#screen-setup{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.setup-card{background:var(--white);border-radius:20px;padding:48px 40px;max-width:480px;width:100%;box-shadow:var(--shadow-lg);border:1px solid var(--border)}
+.setup-card .mandala{text-align:center;font-size:48px;margin-bottom:8px;animation:pulse 3s ease infinite}
+.setup-card h1{font-family:var(--font-h);font-size:28px;text-align:center;color:var(--gold);margin-bottom:6px}
+.setup-card p{text-align:center;color:var(--text-2);font-size:14px;margin-bottom:32px}
+.setup-help{background:var(--gold-lt);border-radius:8px;padding:12px 14px;font-size:12px;color:var(--text-2);margin-top:16px;line-height:1.6}
+
+#app{display:none;flex-direction:column;min-height:100vh}
+header{background:var(--white);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:64px;position:sticky;top:0;z-index:100}
+.header-brand{display:flex;align-items:center;gap:10px}
+.header-brand span:first-child{font-size:22px}
+.header-brand h1{font-family:var(--font-h);font-size:20px;color:var(--gold);font-weight:500}
+.header-actions{display:flex;gap:8px}
+main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
+
+.section-label{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--text-2);font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.section-label::after{content:'';flex:1;height:1px;background:var(--border)}
+.date-tabs{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
+.date-tab{padding:8px 16px;border-radius:8px;border:1.5px solid var(--border);background:var(--white);font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;color:var(--text-2)}
+.date-tab.active{background:var(--gold);color:var(--white);border-color:var(--gold)}
+.date-tab:hover:not(.active){background:var(--gray-lt)}
+
+.journey-toggle{display:flex;border-radius:10px;overflow:hidden;border:1.5px solid var(--border);width:fit-content;margin-bottom:20px}
+.jt-btn{padding:9px 22px;border:none;font-family:var(--font-b);font-size:13px;font-weight:600;cursor:pointer;background:var(--white);color:var(--text-2);transition:all .15s}
+.jt-btn.active-arrival{background:var(--green);color:var(--white)}
+.jt-btn.active-departure{background:var(--purple);color:var(--white)}
+.jt-btn:not(:last-child){border-right:1.5px solid var(--border)}
+
+.roundtrip-banner{background:var(--purple-lt);border:1.5px solid var(--purple);border-radius:10px;padding:14px 18px;margin-bottom:20px;font-size:13px;color:var(--purple);display:flex;align-items:center;gap:10px;line-height:1.5}
+
+#pooling-section{margin-bottom:24px}
+.pooling-banner{background:var(--amber-lt);border:1.5px solid #f6c752;border-radius:var(--radius);padding:16px 18px}
+.pooling-banner-header{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--amber);margin-bottom:10px}
+.pooling-card{background:var(--white);border-radius:10px;padding:14px 16px;border:1px solid #f6c752;margin-bottom:8px}
+.pooling-card:last-child{margin-bottom:0}
+.pooling-card-title{font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px}
+.pooling-card-detail{font-size:13px;color:var(--text-2);margin-bottom:10px;line-height:1.6}
+.pooling-card-actions{display:flex;gap:8px}
+
+.cards-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px;align-items:start}
+@media(max-width:900px){.cards-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.cards-grid{grid-template-columns:1fr}}
+.guest-card{background:var(--white);border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow);overflow:hidden;transition:box-shadow .2s;cursor:pointer;align-self:start}
+.guest-card:hover{box-shadow:var(--shadow-lg)}
+.guest-card.priority-high{border:2px solid var(--red)}
+
+.card-strip{height:5px;width:100%}
+.strip-green{background:var(--green)}.strip-amber{background:var(--amber)}.strip-red{background:var(--red)}.strip-gray{background:var(--gray)}
+.card-body{padding:14px 16px}
+.card-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px;gap:8px}
+.card-name{font-family:var(--font-h);font-size:16px;color:var(--text);line-height:1.3;flex:1}
+.card-time-block{display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;text-align:right;gap:1px}
+.card-time-block .ct-time{font-size:17px;font-weight:700;color:var(--text);line-height:1.1}
+.card-time-block .ct-date{font-size:11px;color:var(--text-2)}
+.card-pax{background:var(--gold-lt);color:var(--gold);font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;white-space:nowrap}
+.card-badges{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-bottom:5px;min-height:4px}
+.card-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px}
+.card-train-line{font-size:11px;color:var(--text-2);margin-top:2px}
+.card-driver-line{font-size:12px;color:var(--text-2);margin-top:2px;display:flex;align-items:center;gap:4px}
+.card-driver-line.has-driver{color:var(--green);font-weight:500}
+@media(min-width:601px){.card-train-mobile{display:none}}
+
+.location-badge{font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;text-transform:uppercase;letter-spacing:.4px}
+.loc-rail{background:var(--saffron-lt);color:var(--saffron)}.loc-airport{background:var(--blue-lt);color:var(--blue)}
+.journey-badge-arrival{background:var(--green-lt);color:var(--green);font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;text-transform:uppercase}
+.journey-badge-departure{background:var(--purple-lt);color:var(--purple);font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;text-transform:uppercase}
+.no-driver-badge{background:var(--red-lt);color:var(--red);font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;animation:pulse 2s ease infinite}
+.soon-badge{background:var(--amber-lt);color:var(--amber);font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px}
+.same-train-badge{background:var(--blue-lt);color:var(--blue);font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px}
+
+.card-time{font-size:13px;color:var(--text-2)}
+.card-status-text{font-size:12px;font-weight:500;margin-left:auto}
+.status-on-time{color:var(--green)}.status-delayed{color:var(--amber)}.status-late{color:var(--red)}.status-unknown{color:var(--gray)}
+
+.card-expanded{border-top:1px solid var(--border);padding:16px 18px;display:none;flex-direction:column;gap:14px}
+.card-expanded.open{display:flex}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:480px){.detail-grid{grid-template-columns:1fr}}
+.detail-item .d-label{font-size:11px;color:var(--text-2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px}
+.detail-item .d-value{font-size:14px;font-weight:500;color:var(--text)}
+.detail-item .d-value a{color:var(--blue);text-decoration:none}
+.live-status-box{background:var(--gray-lt);border-radius:8px;padding:12px 14px;font-size:13px;color:var(--text-2);line-height:1.6;display:flex;align-items:flex-start;gap:10px}
+.ls-icon{font-size:16px;flex-shrink:0;margin-top:1px}.ls-text{flex:1}
+.ls-timestamp{font-size:11px;color:var(--gray);margin-top:4px}
+.card-actions{display:flex;gap:8px;flex-wrap:wrap;padding-top:4px;border-top:1px solid var(--border)}
+
+.section-block{margin-bottom:32px}
+.completed-toggle{width:100%;background:none;border:1.5px dashed var(--border);border-radius:10px;padding:14px;font-family:var(--font-b);font-size:14px;font-weight:500;color:var(--text-2);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .15s;margin-bottom:16px}
+.completed-toggle:hover{background:var(--white)}
+.completed-cards{display:none}.completed-cards.open{display:block}
+.completed-cards .guest-card{opacity:.6}.completed-cards .guest-card:hover{opacity:1}
+.empty-state{text-align:center;padding:40px 20px;color:var(--text-2);grid-column:1/-1}
+.empty-state .e-icon{font-size:40px;margin-bottom:10px}
+.empty-state h3{font-family:var(--font-h);font-size:18px;color:var(--text);margin-bottom:4px}
+
+#screen-drivers{display:none}
+.screen-header{display:flex;align-items:center;gap:14px;margin-bottom:28px}
+.screen-header h2{font-family:var(--font-h);font-size:24px;color:var(--text)}
+.driver-cards-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:24px}
+@media(max-width:640px){.driver-cards-grid{grid-template-columns:1fr}}
+.driver-card{background:var(--white);border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow);overflow:hidden}
+.driver-card.unassigned{border:2px dashed var(--amber);background:var(--amber-lt)}
+.driver-card-head{padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:8px;border-bottom:1px solid var(--border)}
+.driver-card.unassigned .driver-card-head{border-bottom-color:#f6c752}
+.driver-name-block{display:flex;flex-direction:column;gap:2px}
+.driver-name{font-family:var(--font-h);font-size:16px;color:var(--text)}
+.driver-car{font-size:12px;color:var(--text-2)}
+.driver-car-no{background:var(--gold-lt);color:var(--gold);font-size:13px;font-weight:700;padding:4px 10px;border-radius:8px;letter-spacing:1px}
+.driver-card.unassigned .driver-car-no{background:var(--amber-lt);color:var(--amber)}
+.driver-card-body{padding:14px 16px;display:flex;flex-direction:column;gap:12px}
+.driver-assignment{background:var(--gray-lt);border-radius:8px;padding:10px 12px;font-size:13px}
+.driver-assignment.dep-assignment{background:var(--purple-lt)}
+.da-label{font-size:11px;color:var(--text-2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px}
+.da-group{font-weight:600;color:var(--text);margin-bottom:2px}
+.da-detail{color:var(--text-2);line-height:1.6}
+.driver-timing{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.timing-box{background:var(--cream);border-radius:8px;padding:8px 10px;text-align:center;position:relative}
+.timing-box .tb-label{font-size:10px;color:var(--text-2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px}
+.timing-box .tb-value{font-size:15px;font-weight:600;color:var(--text)}
+.timing-box.urgent .tb-value{color:var(--red)}
+.delay-badge{position:absolute;top:-8px;right:-6px;background:var(--amber);color:var(--white);font-size:10px;font-weight:700;padding:2px 6px;border-radius:20px;white-space:nowrap}
+.driver-toggles{display:flex;gap:8px;flex-wrap:wrap}
+.toggle-btn{flex:1;min-width:120px;padding:8px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--white);font-family:var(--font-b);font-size:12px;font-weight:500;cursor:pointer;transition:all .15s;text-align:center;color:var(--text-2)}
+.toggle-btn.active-green{background:var(--green-lt);border-color:var(--green);color:var(--green)}
+.toggle-btn.active-blue{background:var(--blue-lt);border-color:var(--blue);color:var(--blue)}
+.toggle-btn.active-purple{background:var(--purple-lt);border-color:var(--purple);color:var(--purple)}
+.toggle-btn.active-gold{background:var(--gold-lt);border-color:var(--gold);color:var(--gold)}
+.toggle-btn:hover:not(.active-green):not(.active-blue):not(.active-purple):not(.active-gold){background:var(--gray-lt)}
+.unassigned-badge{background:var(--amber);color:var(--white);font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px}
+
+#screen-guest{display:none}
+.upload-zone{border:2px dashed var(--gold);border-radius:var(--radius);background:var(--gold-lt);padding:32px 24px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:24px;position:relative}
+.upload-zone:hover{background:#EDD9A3}
+.upload-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.upload-zone .uz-icon{font-size:36px;margin-bottom:8px}
+.upload-zone h3{font-family:var(--font-h);font-size:18px;color:var(--gold);margin-bottom:4px}
+.upload-zone p{font-size:13px;color:var(--text-2)}
+.extraction-result{background:var(--green-lt);border:1px solid #a8d5c2;border-radius:10px;padding:14px 16px;margin-bottom:20px;font-size:13px;color:var(--green);display:none}
+.extraction-result.show{display:block}
+.form-card{background:var(--white);border-radius:var(--radius);border:1px solid var(--border);padding:28px;box-shadow:var(--shadow);margin-bottom:20px}
+.form-card h3{font-family:var(--font-h);font-size:17px;color:var(--text);margin-bottom:18px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+.form-actions{display:flex;gap:12px;justify-content:flex-end;margin-top:8px}
+
+.summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.summary-tile{background:var(--cream);border-radius:10px;padding:16px;border:1px solid var(--border);text-align:center}
+.summary-tile .st-label{font-size:11px;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.summary-tile .st-value{font-size:28px;font-weight:700;font-family:var(--font-h);color:var(--gold)}
+.summary-tile .st-sub{font-size:11px;color:var(--text-2);margin-top:2px}
+.conflict-detail{background:var(--red-lt);border:1px solid #f5c6c2;border-radius:8px;padding:12px 14px;font-size:13px;color:var(--red);line-height:1.7;margin-bottom:4px}
+.car-opt-detail{background:var(--green-lt);border:1px solid #a8d5c2;border-radius:8px;padding:12px 14px;font-size:13px;color:var(--green);line-height:1.7;margin-bottom:4px}
+.dup-detail{background:var(--amber-lt);border:1px solid #f6c752;border-radius:8px;padding:12px 14px;font-size:13px;color:var(--amber);line-height:1.7;margin-bottom:4px}
+.date-group{width:100%;margin-bottom:8px}
+.date-divider{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-2);padding:6px 0 10px;display:flex;align-items:center;gap:10px;width:100%}
+.date-divider::after{content:'';flex:1;height:1px;background:var(--border)}
+</style>
+</head>
+<body>
+
+<div id="toast"></div>
+<div id="loading-overlay" class="hidden">
+  <div class="spinner"></div>
+  <p class="loading-msg" style="color:var(--text-2);font-size:14px;">Loading…</p>
+</div>
+
+<!-- SETUP -->
+<div id="screen-setup">
+  <div class="setup-card">
+    <div class="mandala">🪔</div>
+    <h1>Wedding Guest Tracker</h1>
+    <p>Enter your credentials to get started. Saved locally on this device.</p>
+    <div class="form-group"><label>Wedding City (e.g. Kolkata, Daman)</label><input type="text" id="setup-wedding-city" placeholder="Kolkata"/></div>
+    <div class="form-group"><label>Google Apps Script Web App URL</label><input type="url" id="setup-script-url" placeholder="https://script.google.com/macros/s/…/exec"/></div>
+    <div class="form-group"><label>Gemini API Key</label><input type="password" id="setup-gemini-key" placeholder="AIza…"/></div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:14px" onclick="saveSetup()">🎉 Open Dashboard</button>
+    <div class="setup-help"><strong>Where to get these?</strong> See the README setup guide.</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <header>
+    <div class="header-brand"><span>🪔</span><h1>Wedding Tracker</h1></div>
+    <div class="header-actions">
+      <button class="btn-icon" onclick="openSummaryModal()" title="Summary">📊</button>
+      <button class="btn btn-secondary btn-sm" onclick="showDrivers()">🚗 Drivers</button>
+      <button class="btn btn-primary btn-sm" onclick="showGuestForm()">+ Add Guest</button>
+      <button class="btn-icon" onclick="openSettings()" title="Settings">⚙️</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- DASHBOARD -->
+    <div id="screen-dashboard">
+      <div class="date-tabs" id="date-tabs"></div>
+      <div id="multi-train-section"></div>
+      <div id="pooling-section"></div>
+      <div id="active-cards-container"></div>
+      <button class="completed-toggle" id="completed-toggle" onclick="toggleCompleted()">
+        <span>✅</span><span id="completed-label">Show Completed</span>
+      </button>
+      <div class="completed-cards" id="completed-cards"></div>
+    </div>
+
+    <!-- DRIVER ANALYTICS -->
+    <div id="screen-drivers">
+      <div class="screen-header">
+        <button class="btn-icon" onclick="showDashboard()">←</button>
+        <h2>🚗 Driver Analytics</h2>
+      </div>
+      <div id="unassigned-drivers-section"></div>
+      <div id="assigned-drivers-section"></div>
+    </div>
+
+    <!-- ADD / EDIT GUEST -->
+    <div id="screen-guest">
+      <div class="screen-header">
+        <button class="btn-icon" onclick="showDashboard()">←</button>
+        <h2 id="guest-form-title">Add Guest Group</h2>
+      </div>
+
+      <!-- Round trip progress banner -->
+      <div class="roundtrip-banner hidden" id="roundtrip-banner"></div>
+
+      <div style="margin-bottom:20px">
+        <label style="margin-bottom:8px">Journey Type</label>
+        <div class="journey-toggle">
+          <button type="button" class="jt-btn" id="jt-arrival" onclick="setJourneyType('arrival')">🛬 Arrival</button>
+          <button type="button" class="jt-btn" id="jt-departure" onclick="setJourneyType('departure')">🛫 Departure</button>
+        </div>
+      </div>
+      <input type="hidden" id="f-journey-type" value="arrival"/>
+
+      <div class="upload-zone" id="upload-zone-wrapper">
+        <input type="file" accept="image/*,.pdf" id="ticket-file" onchange="handleFileUpload(event)"/>
+        <div class="uz-icon">📄</div>
+        <h3>Upload Ticket / Booking</h3>
+        <p>Gemini extracts all legs automatically</p>
+      </div>
+      <div class="extraction-result" id="extraction-result"></div>
+
+      <form id="guest-form" onsubmit="submitGuestForm(event)">
+        <input type="hidden" id="f-group-id"/>
+
+        <div class="form-card">
+          <h3>👨‍👩‍👧 Guest Group Details</h3>
+          <div class="form-row">
+            <div class="form-group"><label>Merged Group Name *</label><input type="text" id="f-group-name" placeholder="e.g. Sharma Family" required/></div>
+            <div class="form-group"><label>Total Pax *</label><input type="number" id="f-pax" min="1" max="30" placeholder="1" required oninput="onDriverSelect()"/></div>
+          </div>
+          <div class="form-group"><label>Individual Names (for records)</label><input type="text" id="f-individual-names" placeholder="Rishab Bachhawat"/></div>
+          <div class="form-row">
+            <div class="form-group"><label>Primary Phone *</label><input type="tel" id="f-phone-primary" placeholder="+91 98765 43210" required/></div>
+            <div class="form-group"><label>Backup Phone</label><input type="tel" id="f-phone-backup" placeholder="+91 98765 43211"/></div>
+          </div>
+        </div>
+
+        <div class="form-card">
+          <h3>🚂 Travel Details</h3>
+          <div class="form-row">
+            <div class="form-group"><label>Journey Origin *</label><input type="text" id="f-journey-origin" placeholder="e.g. New Delhi" required/></div>
+            <div class="form-group"><label>Journey Destination *</label><input type="text" id="f-journey-destination" placeholder="e.g. Kolkata" required/></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label id="location-label">Pickup Station *</label><select id="f-pickup-location" required></select></div>
+            <div class="form-group"><label>Transport Type *</label><select id="f-transport-type" required><option value="">Select type…</option><option value="Train">Train</option><option value="Flight">Flight</option></select></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Train / Flight Name</label><input type="text" id="f-transport-name" placeholder="e.g. SpiceJet SG-759"/></div>
+            <div class="form-group"><label>Train / Flight Number</label><input type="text" id="f-transport-number" placeholder="e.g. SG-759"/></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>PNR / Airline PNR</label><input type="text" id="f-pnr" placeholder="e.g. SJ3Q3H"/></div>
+            <div class="form-group"><label id="date-label">Arrival Date *</label><input type="date" id="f-arrival-date" required/></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label id="time-label">Arrival Time *</label><input type="time" id="f-arrival-time" required/></div>
+          </div>
+        </div>
+
+        <div class="form-card">
+          <h3>🚗 Car & Driver Assignment</h3>
+          <div class="form-group">
+            <label>Select Driver</label>
+            <select id="f-driver-select" onchange="onDriverSelect()">
+              <option value="">— No driver assigned —</option>
+            </select>
+          </div>
+          <input type="hidden" id="f-car-type"/>
+          <input type="hidden" id="f-car-no"/>
+          <input type="hidden" id="f-driver-name"/>
+          <input type="hidden" id="f-driver-phone"/>
+          <div id="driver-detail-row" style="display:none;background:var(--gray-lt);border-radius:8px;padding:12px 14px;font-size:13px;color:var(--text-2);margin-top:4px;line-height:1.7"></div>
+        </div>
+
+        <div class="form-card">
+          <h3>📝 Notes</h3>
+          <div class="form-group"><textarea id="f-notes" rows="3" placeholder="Elderly passenger / lots of luggage / wheelchair needed…"></textarea></div>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary" onclick="showDashboard()">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="form-submit-btn">Save Guest Group</button>
+        </div>
+      </form>
+    </div>
+  </main>
+</div>
+
+<!-- MODALS -->
+<div class="modal-overlay" id="summary-modal">
+  <div class="modal" style="max-width:500px">
+    <h3>📊 Dashboard Summary</h3>
+    <div class="summary-grid" id="summary-grid"></div>
+    <div class="modal-actions"><button class="btn btn-secondary" onclick="document.getElementById('summary-modal').classList.remove('open')">Close</button></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="settings-modal">
+  <div class="modal">
+    <h3>⚙️ Settings</h3>
+    <div class="form-group"><label>Wedding City</label><input type="text" id="settings-wedding-city"/></div>
+    <div class="form-group">
+      <label>Transport Hubs (One per line)</label>
+      <textarea id="settings-hubs" rows="5" placeholder="Railway Station A&#10;Airport B"></textarea>
+      <div style="font-size:11px;color:var(--text-2);margin-top:4px">These appear in the dropdowns. Changing city will auto-refresh these.</div>
+    </div>
+    <div class="form-group"><label>Apps Script Web App URL</label><input type="url" id="settings-script-url"/></div>
+    <div class="form-group"><label>Gemini API Key</label><input type="password" id="settings-gemini-key"/></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="document.getElementById('settings-modal').classList.remove('open')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveSettings()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="conflict-modal">
+  <div class="modal">
+    <h3>⚠️ Driver Conflict Detected</h3>
+    <div class="conflict-detail" id="conflict-detail"></div>
+    <p style="font-size:13px;color:var(--text-2);margin-top:12px">Gap is less than 120 minutes. Driver may not have time for both trips.</p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeConflictModal()">Cancel</button>
+      <button class="btn btn-danger" id="conflict-save-anyway">Save Anyway</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="pooling-modal">
+  <div class="modal">
+    <h3>🚗 Confirm Pooling</h3>
+    <p id="pooling-modal-text" style="font-size:14px;color:var(--text-2);line-height:1.7;margin-bottom:4px"></p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closePoolingModal()">Cancel</button>
+      <button class="btn btn-primary" id="pooling-confirm-btn">Confirm & Assign</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="car-opt-modal">
+  <div class="modal">
+    <h3>💡 Smaller Car Available</h3>
+    <div class="car-opt-detail" id="car-opt-detail"></div>
+    <p style="font-size:13px;color:var(--text-2);margin-top:12px">Using a smaller car keeps larger vehicles free for bigger groups.</p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="car-opt-keep">Keep Current</button>
+      <button class="btn btn-primary" id="car-opt-switch">Switch to Smaller Car</button>
+    </div>
+  </div>
+</div>
+
+<!-- Duplicate detection modal -->
+<div class="modal-overlay" id="dup-modal">
+  <div class="modal">
+    <h3>⚠️ Possible Duplicate Entry</h3>
+    <div class="dup-detail" id="dup-detail"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeDupModal()">Cancel</button>
+      <button class="btn btn-secondary" id="dup-view-btn">View Existing</button>
+      <button class="btn btn-primary" id="dup-save-anyway">Save as New</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete confirmation modal -->
+<div class="modal-overlay" id="delete-modal">
+  <div class="modal">
+    <h3>🗑️ Delete Guest Entry</h3>
+    <p style="font-size:14px;color:var(--text-2);line-height:1.6">Are you sure you want to delete <strong id="delete-guest-name"></strong>? The entry will be hidden from the dashboard but kept in the sheet.</p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button>
+      <button class="btn btn-danger" id="delete-confirm-btn">Yes, Delete</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="jt-mismatch-modal">
+  <div class="modal">
+    <h3>⚠️ Journey Type Mismatch</h3>
+    <p id="jt-mismatch-text" style="font-size:14px;color:var(--text-2);line-height:1.7;margin-bottom:12px"></p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="jt-mismatch-keep">Continue with current</button>
+      <button class="btn btn-primary" id="jt-mismatch-switch">Switch & Populate</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Config ────────────────────────────────────────────────────
+const TRAVEL_MINS   = 90;
+const CONFLICT_MINS = 120;
+const LUGGAGE_KW    = ['luggage','bag','suitcase','baggage','wheelchair','equipment','heavy','lots','bulky','cargo'];
+
+// ── Sheet formula-injection sanitizer ────────────────────────
+// Prefixes a single apostrophe on any free-text value that starts with a
+// formula trigger character (=, +, -, @) so Google Sheets treats it as
+// plain text and never executes it as a formula.
+const FORMULA_CHARS = /^[=+\-@]/;
+function sanitizeForSheet(value){
+  if(typeof value !== 'string') return value;
+  return FORMULA_CHARS.test(value.trimStart()) ? "'" + value : value;
+}
+const FREE_TEXT_FIELDS = [
+  'group_name','individual_names','journey_origin','journey_destination',
+  'transport_name','transport_number','pnr','notes',
+  'pickup_location','driver_name','car_type','car_no',
+  'phone_primary','phone_backup','driver_phone'
+];
+function sanitizeDataForSheet(data){
+  const out = {...data};
+  FREE_TEXT_FIELDS.forEach(field => {
+    if(out[field] !== undefined) out[field] = sanitizeForSheet(out[field]);
+  });
+  return out;
+}
+
+// ── Offline write queue ──────────────────────────────────────
+const SYNC_QUEUE_KEY = 'wgt_sync_queue';
+let syncQueue = JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY)||'[]');
+let syncInProgress = false;
+function enqueueSyncAction(payload){
+  syncQueue.push({payload, ts:Date.now()});
+  localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(syncQueue));
+  updateSyncBadge();
+}
+function updateSyncBadge(){
+  let badge=document.getElementById('sync-badge');
+  if(!badge){badge=document.createElement('div');badge.id='sync-badge';
+    badge.style.cssText='position:fixed;bottom:70px;right:16px;background:var(--amber);color:#000;padding:6px 14px;border-radius:20px;font-size:13px;font-weight:600;z-index:999;cursor:pointer;display:none;box-shadow:0 2px 8px rgba(0,0,0,.3)';
+    badge.onclick=()=>flushSyncQueue();
+    document.body.appendChild(badge);}
+  if(syncQueue.length){badge.textContent='🔄 '+syncQueue.length+' pending';badge.style.display='block';}
+  else{badge.style.display='none';}
+}
+async function flushSyncQueue(){
+  if(syncInProgress||!syncQueue.length||!SCRIPT_URL) return;
+  syncInProgress=true;updateSyncBadge();
+  const MAX_AGE_MS = 24*60*60*1000; // drop items older than 24 hours
+  const now = Date.now();
+  const remaining=[];
+  for(const item of syncQueue){
+    if(item.ts && (now - item.ts) > MAX_AGE_MS){ console.warn('Dropping stale sync item:', item); continue; }
+    try{await apiPostRaw(item.payload);}catch(e){remaining.push(item);}
+  }
+  syncQueue=remaining;
+  localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(syncQueue));
+  syncInProgress=false;updateSyncBadge();
+  if(!remaining.length) showToast('All changes synced ✓','success');
+}
+window.addEventListener('online',()=>{setTimeout(flushSyncQueue,2000);});
+setInterval(()=>{if(navigator.onLine) flushSyncQueue();},60000);
+
+// ── Absolute time helpers ────────────────────────────────────
+function toAbsoluteMs(date,time){
+  if(!date||!time) return NaN;
+  return new Date(date+'T'+time+':00').getTime();
+}
+
+
+function departureBufMins(type,pax){
+  const large=(parseInt(pax)||0)>3;
+  return (type||'').toLowerCase()==='flight'?(large?255:240):(large?180:165);
+}
+
+const CACHE_KEY_GUESTS  = 'wgt_cache_guests';
+const CACHE_KEY_DRIVERS = 'wgt_cache_drivers';
+const CACHE_KEY_TS      = 'wgt_cache_ts';
+
+let _cacheTimer;
+function saveToCache() {
+  clearTimeout(_cacheTimer);
+  _cacheTimer = setTimeout(() => {
+    try {
+      localStorage.setItem(CACHE_KEY_GUESTS, JSON.stringify(allGuests));
+      localStorage.setItem(CACHE_KEY_DRIVERS, JSON.stringify(allDrivers));
+      localStorage.setItem(CACHE_KEY_TS, Date.now().toString());
+    } catch(e) { console.warn('Failed to save to cache:', e); }
+  }, 2000);
+}
+
+// Derive driver assignment status from the active guest list (source of truth)
+function syncDriverAssignment(){
+  const activeDriverNames = new Set(
+    allGuests
+      .filter(g => g.status!=='picked_up' && g.status!=='car_returned' && g.deleted!=='yes' && g.driver_name)
+      .map(g => g.driver_name)
+  );
+  allDrivers.forEach(d => {
+    d.assigned = activeDriverNames.has(d.driver_name) ? 'yes' : 'no';
+  });
+}
+
+// ── State ─────────────────────────────────────────────────────
+let SCRIPT_URL='',GEMINI_KEY='',WEDDING_CITY='',HUBS=[];
+let allGuests=[],allDrivers=[];
+let activeTab='all',editingId=null,completedOpen=false;
+let pendingSubmitData=null,pendingPooling=null,currentRecs=[];
+let carOptPendingData=null,carOptSmallerDriver=null;
+let dupPendingData=null,dupExistingId=null;
+let deletePendingId=null;
+let jtMismatchPendingData=null;
+
+// Robust deleted check — handles 'yes', 'Yes', 'YES', true, ' yes ' from Sheets
+function isDeleted(g){ return String(g.deleted||'').trim().toLowerCase()==='yes'; }
+// Round trip queue: array of extracted leg objects waiting to be filled
+let rtQueue=[], rtQueueIdx=0;
+// Personal details carried over between round trip legs
+let rtPersonal={};
+
+// ── Boot ──────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded',()=>{
+  SCRIPT_URL=localStorage.getItem('wgt_script_url')||'';
+  GEMINI_KEY=localStorage.getItem('wgt_gemini_key')||'';
+  WEDDING_CITY=(localStorage.getItem('wgt_wedding_city')||'').trim();
+  HUBS=JSON.parse(localStorage.getItem('wgt_hubs')||'[]');
+  if(SCRIPT_URL&&GEMINI_KEY&&WEDDING_CITY) launchApp();
+  else {
+    document.getElementById('screen-setup').style.display='flex';
+    document.getElementById('setup-wedding-city').value=WEDDING_CITY;
+  }
+});
+
+async function saveSetup(){
+  const url=document.getElementById('setup-script-url').value.trim();
+  const key=document.getElementById('setup-gemini-key').value.trim();
+  const city=document.getElementById('setup-wedding-city').value.trim();
+  if(!url||!key||!city){showToast('Please fill all fields','error');return;}
+  
+  showLoading(true);
+  localStorage.setItem('wgt_script_url',url);
+  localStorage.setItem('wgt_gemini_key',key);
+  localStorage.setItem('wgt_wedding_city',city);
+  SCRIPT_URL=url;GEMINI_KEY=key;WEDDING_CITY=city;
+
+  // Auto-fetch hubs if none exist or city changed
+  if(!HUBS.length || city !== (localStorage.getItem('wgt_last_fetched_city')||'').trim()){
+    await refreshHubs(city);
+  }
+  showLoading(false);
+  launchApp();
+}
+
+async function refreshHubs(city){
+  const prompt = `List the major transport hubs (Railway Stations and Airports) for a guest arriving in ${city}, India. 
+  Return ONLY a valid JSON array of strings, e.g. ["Station Name", "Airport Name"]. 
+  Include exactly one primary airport (even if it's in a nearby city like Vapi for Daman) and 3-5 main railway stations.
+  No markdown, no talk.`;
+  try {
+    const raw = await callGemini(prompt);
+    const clean = raw.replace(/```json|```/g, '').trim();
+    const list = JSON.parse(clean);
+    if(Array.isArray(list) && list.length){
+      HUBS = list;
+      localStorage.setItem('wgt_hubs', JSON.stringify(HUBS));
+      localStorage.setItem('wgt_last_fetched_city', city);
+    }
+  } catch(e) {
+    console.error('Hub fetch failed:', e);
+    showToast('Could not auto-fetch hubs. Please add them in Settings.', 'error');
+  }
+}
+async function launchApp(){
+  document.getElementById('screen-setup').style.display='none';
+  document.getElementById('app').style.display='flex';
+  await initAndLoad();
+}
+
+// ── API ───────────────────────────────────────────────────────
+// ── Loading with auto force-clear after 15s ─────────────────
+let _loadingTimer=null;
+let _loadingStage=null;
+function showLoading(v){
+  const overlay=document.getElementById('loading-overlay');
+  overlay.classList.toggle('hidden',!v);
+  if(v){
+    clearTimeout(_loadingTimer);clearTimeout(_loadingStage);
+    // Progressive messaging for GAS cold starts
+    _loadingStage=setTimeout(()=>{
+      const msg=overlay.querySelector('.loading-msg');
+      if(msg) msg.textContent='Waking up server…';
+    },10000);
+    _loadingTimer=setTimeout(()=>{
+      overlay.classList.add('hidden');
+      showToast('Request timed out (40s). Please retry.','error');
+    },40000);
+  } else {
+    clearTimeout(_loadingTimer);clearTimeout(_loadingStage);
+    const msg=document.querySelector('.loading-msg');
+    if(msg) msg.textContent='Loading…';
+  }
+}
+
+// ── Fetch with timeout + CORS-safe for GAS ───────────────────
+async function fetchWithTimeout(url,options={},timeoutMs=35000){
+  let timer;
+  const timeoutPromise = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error('Request timed out')), timeoutMs);
+  });
+  try {
+    const r = await Promise.race([fetch(url, options), timeoutPromise]);
+    clearTimeout(timer);
+    // GAS redirects return 200 after redirect — don't check r.ok for redirects
+    return r;
+  } catch(e) {
+    clearTimeout(timer);
+    throw e;
+  }
+}
+
+// CORS-safe POST: use text/plain to avoid OPTIONS preflight on GAS
+async function apiPostRaw(p){
+  if(!SCRIPT_URL) return {};
+  const r=await fetchWithTimeout(SCRIPT_URL,{
+    method:'POST',
+    headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body:JSON.stringify(p)
+  });
+  const data=await r.json();
+  if(data&&data.error) throw new Error('Sheet error: '+data.error);
+  return data;
+}
+
+async function apiGet(a){
+  if(!SCRIPT_URL) return {};
+  const r=await fetchWithTimeout(SCRIPT_URL+'?action='+a);
+  const data=await r.json();
+  if(data&&data.error) throw new Error('Sheet error: '+data.error);
+  return data;
+}
+async function apiPost(p){
+  if(!SCRIPT_URL) return {};
+  try{
+    return await apiPostRaw(p);
+  }catch(e){
+    // Queue for retry if offline or timeout
+    enqueueSyncAction(p);
+    throw e;
+  }
+}
+
+async function initAndLoad(){
+  if(!SCRIPT_URL) return;
+  // 1. Load from cache for instant display
+  try {
+    const cachedG = localStorage.getItem(CACHE_KEY_GUESTS);
+    const cachedD = localStorage.getItem(CACHE_KEY_DRIVERS);
+    if(cachedG && cachedD) {
+      allGuests = JSON.parse(cachedG).filter(x=>!isDeleted(x)).map(sanitizeGuest);
+      allDrivers = JSON.parse(cachedD);
+      syncDriverAssignment();
+      renderDashboard();
+    }
+  } catch(e) { console.warn('Cache load failed:', e); }
+
+  showLoading(true);
+  try{
+    // FIRE ALL IN PARALLEL: initSheet, getGuests, getDrivers
+    // initSheet is fire-and-forget; it's idempotent.
+    const pInit = apiPostRaw({action:'initSheet'}).catch(e => console.warn('initSheet failed (non-fatal):', e));
+    const pData = Promise.all([apiGet('getGuests'),apiGet('getDrivers')]);
+    
+    const [g,d] = await pData;
+    if(g && g.guests && g.guests.length) allGuests=g.guests.filter(x=>!isDeleted(x)).map(sanitizeGuest);
+    if(d && d.drivers && d.drivers.length) allDrivers=d.drivers;
+    
+    syncDriverAssignment();
+    saveToCache();
+    renderDashboard();
+    
+    // Data integrity pass — surface bad records
+    runDataIntegrityCheck();
+    await pInit; // Ensure it finished eventually
+  }catch(e){
+    console.error('initAndLoad error:',e);
+    if(allGuests.length) {
+      showToast('Offline Mode: Showing cached data', 'error');
+    } else {
+      showToast(e.message||'Cannot connect. Check your Apps Script URL.','error');
+    }
+  }
+  showLoading(false);
+  
+  // Flush any pending offline writes
+  updateSyncBadge();
+  if(navigator.onLine) setTimeout(flushSyncQueue, 3000);
+}
+
+function runDataIntegrityCheck(){
+  const issues = allGuests.filter(g => g._data_warning && g.status==='active');
+  if(!issues.length) return;
+  console.warn('Data integrity issues found:', issues.map(g => g.group_name + ': ' + g._data_warning));
+  showToast('⚠️ '+issues.length+' entries have data issues — check console or edit them', 'error');
+}
+
+// Format-only sanitizer: normalises date/time strings, flags issues instead of silent swaps
+function sanitizeGuest(g){
+  const dStr=String(g.arrival_date||'');
+  const tStr=String(g.arrival_time||'');
+  const dateIsTime=/^\d{1,2}:\d{2}/.test(dStr) && !/^\d{4}/.test(dStr);
+  const timeIsDate=/^\d{4}-\d{2}-\d{2}/.test(tStr);
+  
+  // Flag potential swap instead of silently mutating
+  if(dateIsTime && timeIsDate){
+    g._data_warning = 'Date and Time appear swapped in the spreadsheet';
+    console.warn('Data swap detected for', g.group_id||g.group_name, '— date:', dStr, 'time:', tStr);
+    // Only swap if BOTH are clearly wrong (high confidence)
+    const tmp=g.arrival_date; g.arrival_date=g.arrival_time; g.arrival_time=tmp;
+  } else if(dateIsTime || timeIsDate){
+    // Only ONE field is wrong — don't swap, just flag
+    g._data_warning = dateIsTime ? 'Date field contains a time value' : 'Time field contains a date value';
+    console.warn('Data issue for', g.group_id||g.group_name, ':', g._data_warning);
+  }
+  
+  // arrival_date: extract YYYY-MM-DD
+  if(g.arrival_date){
+    const s=String(g.arrival_date);
+    const isoMatch=s.match(/^(\d{4}-\d{2}-\d{2})/);
+    if(isoMatch) g.arrival_date=isoMatch[1];
+    else if(s.includes('T')) g.arrival_date=s.split('T')[0];
+    if(g.arrival_date&&parseInt(g.arrival_date.slice(0,4))<1900) g.arrival_date='';
+  }
+  // arrival_time: extract HH:MM
+  if(g.arrival_time){
+    const s=String(g.arrival_time);
+    let t=s; if(s.includes('T')) t=s.split('T')[1];
+    const timeMatch=t.match(/^(\d{1,2}:\d{2})/);
+    if(timeMatch){
+      const parts=timeMatch[1].split(':');
+      g.arrival_time=parts[0].padStart(2,'0')+':'+parts[1];
+    } else {
+      g._data_warning = g._data_warning || ('Malformed time: "'+s+'"');
+      g.arrival_time='';
+    }
+    if(g.arrival_time&&g.arrival_time.length>5) g.arrival_time=g.arrival_time.slice(0,5);
+  }
+  // Flag missing critical fields
+  if(!g.arrival_date && g.status==='active') g._data_warning = g._data_warning || 'Missing arrival date';
+  if(!g.arrival_time && g.status==='active') g._data_warning = g._data_warning || 'Missing arrival time';
+  
+  // Performance: Memoize expensive checks
+  g._jt = journeyType(g);
+  return g;
+}
+
+// ── Screen router ─────────────────────────────────────────────
+function screen(n){['dashboard','drivers','guest'].forEach(s=>{document.getElementById('screen-'+s).style.display=s===n?'block':'none';});}
+function showDashboard(){screen('dashboard');renderDashboard();}
+
+// ── Journey helpers ───────────────────────────────────────────
+function journeyType(g){
+  if(g._jt) return g._jt;
+  const jt=(g.journey_type||'').toLowerCase().trim();
+  if(jt==='departure') return 'departure';
+  if(jt==='arrival') return 'arrival';
+  const wc=WEDDING_CITY.toLowerCase();
+  // Fallback 1: if origin matches wedding city or a local hub → departure
+  if(g.journey_origin){
+    const ori=g.journey_origin.toLowerCase();
+    if((wc && (ori.includes(wc)||wc.includes(ori))) || isLocalHub(g.journey_origin)) return 'departure';
+  }
+  // Fallback 2: if destination matches wedding city or a local hub → arrival
+  if(g.journey_destination){
+    const des=g.journey_destination.toLowerCase();
+    if((wc && (des.includes(wc)||wc.includes(des))) || isLocalHub(g.journey_destination)) return 'arrival';
+  }
+  // Additional signal: if live_status_text mentions 'depart' → departure
+  if(g.live_status_text&&g.live_status_text.toLowerCase().includes('depart')) return 'departure';
+  return 'arrival';
+}
+// Extract meaningful words (4+ chars) from a location string, stripping codes like (HWH)
+function locationWords(str){
+  return (str||'').toLowerCase()
+    .replace(/\([^)]*\)/g,'')   // remove (HWH), (MZP) etc
+    .replace(/[^a-z\s]/g,' ')   // remove non-alpha
+    .split(/\s+/)
+    .filter(w=>w.length>=4);    // only words 4+ chars
+}
+function hubMatch(str){
+  // Full substring check first (fast path)
+  const s=(str||'').toLowerCase();
+  for(const k of HUBS){
+    const h=k.toLowerCase();
+    if(s.includes(h)||h.includes(s)) return k;
+  }
+  // Keyword word check (handles abbreviations like JN, parenthetical codes)
+  const inWords=locationWords(str);
+  if(!inWords.length) return null;
+  for(const k of HUBS){
+    const hubWords=locationWords(k);
+    // Any significant word from input found in hub name or vice versa
+    if(inWords.some(w=>hubWords.some(hw=>hw.includes(w)||w.includes(hw)))) return k;
+  }
+  return null;
+}
+function isLocalHub(str){
+  return !!hubMatch(str);
+}
+// Helper: does this string match the wedding city or any local hub?
+function matchesLocal(str){
+  if(!str) return false;
+  const wc = (WEDDING_CITY||'').toLowerCase();
+  const s=str.toLowerCase();
+  return (wc && (s.includes(wc)||wc.includes(s))) || isLocalHub(str);
+}
+function mapToStation(str, type){
+  const isFlight = (type||'').toLowerCase() === 'flight';
+  
+  if(!HUBS || !HUBS.length) return '';
+
+  // 1. Try hub match (handles abbreviations, codes etc)
+  const matched = hubMatch(str);
+  if(matched) return matched;
+
+  // 2. Flight-specific logic
+  if(isFlight){
+    const airport = HUBS.find(h => h.toLowerCase().includes('airport'));
+    if(airport) return airport;
+  }
+
+  // 3. Fallback: ask Gemini to pick the best match from our list
+  // (Optional, for now just return first or empty)
+  return HUBS[0] || '';
+}
+
+// ── Time helpers (string-based, no Date object) ───────────────
+function parseTimeMins(t){
+  if(!t) return 0;
+  const clean=String(t).includes('T')?String(t).split('T')[1].slice(0,5):String(t).slice(0,5);
+  const p=clean.split(':');return parseInt(p[0]||0)*60+parseInt(p[1]||0);
+}
+function addMinsToTime(t,delta){
+  let total=((parseTimeMins(t)+delta)%1440+1440)%1440;
+  return String(Math.floor(total/60)).padStart(2,'0')+':'+String(total%60).padStart(2,'0');
+}
+function calcLeaveByArrival(t,delayMins){return addMinsToTime(t,(delayMins||0)-TRAVEL_MINS);}
+function calcLeaveByDeparture(t,type,pax){return addMinsToTime(t,-departureBufMins(type,pax));}
+
+// ══════════════════════════════════════════════════════════════
+// DASHBOARD
+// ══════════════════════════════════════════════════════════════
+// Dismissed multi-train banner trains (session only)
+const dismissedMultiTrain=new Set();
+
+// Debounce renderDashboard to prevent layout thrashing
+let _renderTimer;
+function renderDashboard(){
+  clearTimeout(_renderTimer);
+  _renderTimer = setTimeout(_renderDashboardInternal, 50);
+}
+
+function _renderDashboardInternal(){
+  screen('dashboard');
+  buildDateTabs();
+  buildMultiTrainBanner();
+  buildPooling();
+
+  const active=filteredGuests();
+  // Sort all active by date+time ascending, priority (no driver+soon) first within same time
+  active.sort((a,b)=>{
+    const ap=isPriority(a)?0:1,bp=isPriority(b)?0:1;
+    if(ap!==bp) return ap-bp;
+    const da=(a.arrival_date||'9999')+(a.arrival_time||'99:99');
+    const db=(b.arrival_date||'9999')+(b.arrival_time||'99:99');
+    return da.localeCompare(db);
+  });
+
+  // Group by date for dividers — each date gets its own full-width label + fresh grid
+  const today=new Date().toISOString().slice(0,10);
+  // Build date → guests map preserving sort order
+  const dateMap=new Map();
+  active.forEach(g=>{
+    const d=g.arrival_date||'none';
+    if(!dateMap.has(d)) dateMap.set(d,[]);
+    dateMap.get(d).push(g);
+  });
+  let html='';
+  dateMap.forEach((guests,d)=>{
+    const label=d===today?'Today — '+fmtDate(d):d&&d!=='none'?fmtDate(d):'No Date';
+    html+=`<div class="date-group">`;
+    html+=`<div class="date-divider">📅 ${label}</div>`;
+    html+=`<div class="cards-grid">`;
+    guests.forEach(g=>{ html+=renderCard(g); });
+    html+=`</div></div>`;
+  });
+  document.getElementById('active-cards-container').innerHTML=
+    active.length?html:`<div class="empty-state"><div class="e-icon">🎊</div><h3>No upcoming guests</h3><p>Tap <strong>+ Add Guest</strong> to get started</p></div>`;
+
+  const done=allGuests.filter(g=>(g.status==='picked_up'||g.status==='car_returned')&&!isDeleted(g));
+  document.getElementById('completed-cards').innerHTML=done.map(g=>renderCard(g,true)).join('');
+  document.getElementById('completed-label').textContent=(completedOpen?'Hide':'Show')+' Completed ('+done.length+')';
+  document.getElementById('completed-cards').classList.toggle('open',completedOpen);
+}
+
+function buildMultiTrainBanner(){
+  const active=filteredGuests();
+  // Group by transport_number+transport_type, only where count > 1
+  const groups={};
+  active.forEach(g=>{
+    if(!g.transport_number) return;
+    const key=(g.transport_type||'')+'|'+(g.transport_number||'');
+    if(!groups[key]) groups[key]={num:g.transport_number,type:g.transport_type,name:g.transport_name,guests:[],totalPax:0};
+    groups[key].guests.push(g);
+    groups[key].totalPax+=(parseInt(g.pax)||0);
+  });
+  const multi=Object.values(groups).filter(gr=>gr.guests.length>1&&!dismissedMultiTrain.has(gr.num));
+  const sec=document.getElementById('multi-train-section');
+  if(!multi.length){sec.innerHTML='';return;}
+  const items=multi.map(gr=>
+    `<strong>${gr.name||gr.num}</strong> ${gr.num} — ${gr.guests.length} groups, ${gr.totalPax} pax`
+  ).join(' &nbsp;·&nbsp; ');
+  sec.innerHTML=`<div class="multi-train-banner">
+    <span class="mt-icon">ℹ️</span>
+    <div class="mt-body">Multiple families on same transport: ${items}</div>
+    <button class="mt-dismiss" onclick="dismissMultiTrain()" title="Dismiss">✕</button>
+  </div>`;
+}
+
+function dismissMultiTrain(){
+  // Dismiss all currently shown
+  const active=filteredGuests();
+  const groups={};
+  active.forEach(g=>{if(g.transport_number) groups[g.transport_number]=true;});
+  Object.keys(groups).forEach(k=>dismissedMultiTrain.add(k));
+  document.getElementById('multi-train-section').innerHTML='';
+}
+
+function filteredGuests(){
+  let list=allGuests.filter(g=>g.status!=='picked_up'&&g.status!=='car_returned'&&!isDeleted(g));
+  if(activeTab!=='all') list=list.filter(g=>g.arrival_date===activeTab);
+  return list;
+}
+
+function isPriority(g){
+  if(g.driver_name) return false;
+  if(!g.arrival_date||!g.arrival_time) return false;
+  const ms=new Date(g.arrival_date+'T'+g.arrival_time+':00').getTime();
+  const diff=(ms-Date.now())/60000;
+  return diff>=0&&diff<=180;
+}
+
+function buildDateTabs(){
+  const dates=[...new Set(allGuests.filter(g=>g.status!=='picked_up'&&g.status!=='car_returned'&&g.deleted!=='yes').map(g=>g.arrival_date).filter(Boolean))].sort();
+  const today=new Date().toISOString().slice(0,10);
+  const tabs=[{val:'all',label:'All Days'},...dates.map(d=>({val:d,label:d===today?'Today':fmtDate(d)}))];
+  document.getElementById('date-tabs').innerHTML=tabs.map(t=>
+    `<button class="date-tab${activeTab===t.val?' active':''}" onclick="setTab('${t.val}')">${t.label}</button>`
+  ).join('');
+}
+function setTab(v){activeTab=v;renderDashboard();}
+function toggleCompleted(){completedOpen=!completedOpen;renderDashboard();}
+
+// ── Pooling ───────────────────────────────────────────────────
+function buildPooling(){
+  currentRecs=[];
+  const active=allGuests.filter(g=>g.status!=='picked_up'&&g.status!=='car_returned'&&!isDeleted(g));
+  for(let i=0;i<active.length;i++){
+    for(let j=i+1;j<active.length;j++){
+      const a=active[i],b=active[j];
+      if(journeyType(a)!==journeyType(b)) continue;
+      if(!a.arrival_date||!a.arrival_time||!b.arrival_date||!b.arrival_time) continue;
+      if(a.pickup_location!==b.pickup_location) continue;
+      if(a.driver_name&&b.driver_name&&a.driver_name===b.driver_name) continue;
+      const diff=Math.abs(parseTimeMins(a.arrival_time)-parseTimeMins(b.arrival_time));
+      if(diff>30) continue;
+      const combo=(parseInt(a.pax)||0)+(parseInt(b.pax)||0);
+      let sd=null;
+      if(a.driver_name&&a.car_no){const dc=allDrivers.find(d=>(d.car_no||d.car_token)===a.car_no);if(dc&&parseInt(dc.capacity||0)>=combo) sd={name:a.driver_name,car_no:a.car_no,car:a.car_type,phone:a.driver_phone,target:b};}
+      if(!sd&&b.driver_name&&b.car_no){const dc=allDrivers.find(d=>(d.car_no||d.car_token)===b.car_no);if(dc&&parseInt(dc.capacity||0)>=combo) sd={name:b.driver_name,car_no:b.car_no,car:b.car_type,phone:b.driver_phone,target:a};}
+      if(!sd){const fd=allDrivers.find(d=>d.assigned!=='yes'&&parseInt(d.capacity||0)>=combo);if(fd) sd={name:fd.driver_name,car_no:fd.car_no||fd.car_token,car:fd.car_type,phone:fd.driver_phone,target:b};}
+      currentRecs.push({a,b,diff,combo,sd,type:journeyType(a)});
+    }
+  }
+  const sec=document.getElementById('pooling-section');
+  if(!currentRecs.length){sec.innerHTML='';return;}
+  sec.innerHTML=`<div class="pooling-banner">
+    <div class="pooling-banner-header">💡 Pooling Recommendations (${currentRecs.length})</div>
+    ${currentRecs.map((r,i)=>`<div class="pooling-card" id="pc-${i}">
+      <div class="pooling-card-title">${r.type==='departure'?'🛫':'🛬'} ${esc(r.a.group_name)} + ${esc(r.b.group_name)} · ${esc(r.a.pickup_location)}</div>
+      <div class="pooling-card-detail">
+        ${esc(r.a.group_name)}: ${fmtAmPm(r.a.arrival_time)} (${fmtDate(r.a.arrival_date)}) · ${r.a.pax} pax<br>
+        ${esc(r.b.group_name)}: ${fmtAmPm(r.b.arrival_time)} (${fmtDate(r.b.arrival_date)}) · ${r.b.pax} pax<br>
+        Combined: <strong>${r.combo} pax</strong> · Gap: <strong>${r.diff} min</strong>
+        ${r.sd?' · '+esc(r.sd.car)+' ('+esc(r.sd.car_no)+')':''}
+      </div>
+      <div class="pooling-card-actions">
+        ${r.sd?`<button class="btn btn-primary btn-sm" onclick="openPoolingConfirm(${i})">Assign ${esc(r.sd.name)}</button>`
+              :`<span style="font-size:12px;color:var(--red)">⚠️ No car with ${r.combo}+ capacity</span>`}
+        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('pc-${i}').remove()">Dismiss</button>
+      </div>
+    </div>`).join('')}
+  </div>`;
+}
+
+function openPoolingConfirm(i){
+  pendingPooling=i;const r=currentRecs[i];const tgt=r.sd.target;
+  document.getElementById('pooling-modal-text').innerHTML=
+    `Assign <strong>${esc(r.sd.name)}</strong> (${esc(r.sd.car)}, Car No. ${esc(r.sd.car_no)}) to <strong>${esc(tgt.group_name)}</strong> as well?<br>
+    <span style="color:var(--text-2);font-size:12px">Combined ${r.combo} pax · ${r.type==='departure'?'Departing from':'Arriving at'}: ${esc(r.a.pickup_location)}</span>`;
+  document.getElementById('pooling-modal').classList.add('open');
+}
+function closePoolingModal(){
+  document.getElementById('pooling-modal').classList.remove('open');
+  pendingPooling=null;
+  document.getElementById('pooling-confirm-btn').classList.remove('hidden');
+}
+document.getElementById('pooling-confirm-btn').addEventListener('click',async()=>{
+  if(pendingPooling===null) return;
+  const r=currentRecs[pendingPooling];const tgt=r.sd.target;const sd=r.sd;
+
+  // Hard block: recheck capacity at point of confirm
+  const assignedDriver=allDrivers.find(d=>(d.car_no||d.car_token)===sd.car_no);
+  const carCap=parseInt(assignedDriver?.capacity||0);
+  if(carCap>0&&r.combo>carCap){
+    // Find a free car that fits
+    const betterCar=allDrivers.find(d=>d.assigned!=='yes'&&parseInt(d.capacity||0)>=r.combo);
+    const suggestion=betterCar
+      ?`<br><br>💡 <strong>${betterCar.driver_name}</strong> (${betterCar.car_type}, Cap: ${betterCar.capacity}, Car No. ${betterCar.car_no||betterCar.car_token}) is free and fits all ${r.combo} passengers.`
+      :'<br><br>No free car with enough capacity found. Please assign a larger car manually.';
+    document.getElementById('pooling-modal-text').innerHTML=
+      `⚠️ Cannot merge — combined <strong>${r.combo} pax</strong> exceeds <strong>${esc(sd.name)}'s</strong> car capacity of <strong>${carCap}</strong>.${suggestion}`;
+    document.getElementById('pooling-confirm-btn').classList.add('hidden');
+    return;
+  }
+
+  showLoading(true);
+  try{
+    const updated={...tgt,driver_name:sd.name,car_no:sd.car_no,car_type:sd.car,driver_phone:sd.phone||''};
+    await apiPost({action:'updateGuest',data:sanitizeDataForSheet(updated)});
+    const idx=allGuests.findIndex(g=>g.group_id===tgt.group_id);
+    if(idx>=0) allGuests[idx]={...allGuests[idx],...updated};
+    saveToCache();
+    closePoolingModal();renderDashboard();
+    showToast('Driver assigned to '+tgt.group_name+' ✓','success');
+  }catch(e){showToast(e.message||'Save failed. Please retry.','error');}
+  showLoading(false);
+});
+
+// ── Guest card ────────────────────────────────────────────────
+function renderCard(g, isCompleted){
+  const jt=journeyType(g);const isDep=jt==='departure';
+  const isAirport=(g.pickup_location||'').toLowerCase().includes('airport');
+  const pri=isPriority(g);
+
+  // Same-train badge: count how many active guests share this train number
+  const sameTrainCount=g.transport_number
+    ?allGuests.filter(x=>x.transport_number===g.transport_number&&x.group_id!==g.group_id&&x.arrival_date===g.arrival_date&&!isDeleted(x)&&x.status!=='picked_up'&&x.status!=='car_returned').length
+    :0;
+  const sameTrainBadge=sameTrainCount>0
+    ?`<span class="same-train-badge">🚂 ${sameTrainCount+1} groups on ${esc(g.transport_number)}</span>`:'';
+
+  const jBadge=isDep?'<span class="journey-badge-departure">🛫 Dep</span>':'<span class="journey-badge-arrival">🛬 Arr</span>';
+  const noDriverBadge=pri?'<span class="no-driver-badge">⚠️ No Driver</span>':'';
+  const soonBadge=(()=>{
+    if(!g.arrival_date||!g.arrival_time||!g.driver_name) return '';
+    const ms=new Date(g.arrival_date+'T'+g.arrival_time+':00').getTime();
+    const mins=(ms-Date.now())/60000;
+    return mins>=0&&mins<=180?'<span class="soon-badge">🕐 Soon</span>':'';
+  })();
+  const driverLine=g.driver_name
+    ?`<div class="card-driver-line has-driver">🚗 ${esc(g.driver_name)} · ${esc(g.car_no||'—')}</div>`
+    :'';
+  // Train line: always shown on mobile, hidden on desktop (via CSS)
+  const trainLine=g.transport_number
+    ?`<div class="card-train-line card-train-mobile">🚂 ${esc(g.transport_name||'')} ${esc(g.transport_number)}</div>`:'';
+
+  const stationLabel=isDep?'Drop Station':'Pickup Station';
+  const timeLabel=isDep?'Departure Time':'Arrival Time';
+  const originLabel=isDep?'Departing From':'Coming From';
+
+  return `<div class="guest-card${pri?' priority-high':''}" id="card-${g.group_id}" onclick="toggleCard('${g.group_id}')">
+    <div class="card-strip ${stripClass(g)}"></div>
+    <div class="card-body">
+      <div class="card-header">
+        <div class="card-name">${esc(g.group_name)}</div>
+        <div class="card-time-block">
+          <div class="ct-time">${g.arrival_time?fmtAmPm(g.arrival_time):'—'}</div>
+          <div class="ct-date">${g.arrival_date?fmtDate(g.arrival_date):'—'}</div>
+        </div>
+      </div>
+      <div class="card-badges">
+        ${jBadge}
+        <span class="card-pax">👥 ${g.pax||0}</span>
+        ${noDriverBadge}${soonBadge}${sameTrainBadge}
+      </div>
+      <div class="card-meta">
+        <span class="location-badge ${isAirport?'loc-airport':'loc-rail'}">${isDep?'Drop: ':''}${esc(g.pickup_location||'—')}</span>
+        <span class="card-status-text ${statusClass(g)}">${statusLabel(g)}</span>
+      </div>
+      ${driverLine}
+      ${trainLine}
+    </div>
+    <div class="card-expanded" id="exp-${g.group_id}">
+      <div class="detail-grid">
+        <div class="detail-item"><div class="d-label">Transport</div>
+          <div class="d-value">${esc(g.transport_type||'—')} · ${esc(g.transport_name||'')} ${esc(g.transport_number||'')}</div></div>
+        <div class="detail-item"><div class="d-label">PNR</div><div class="d-value">${esc(g.pnr||'—')}</div></div>
+        <div class="detail-item"><div class="d-label">${originLabel}</div><div class="d-value">${esc(g.journey_origin||'—')}</div></div>
+        <div class="detail-item"><div class="d-label">${timeLabel}</div>
+          <div class="d-value">${g.arrival_date?fmtDate(g.arrival_date):''} ${g.arrival_time?fmtAmPm(g.arrival_time):''}</div></div>
+        <div class="detail-item"><div class="d-label">${stationLabel}</div><div class="d-value">${esc(g.pickup_location||'—')}</div></div>
+        <div class="detail-item"><div class="d-label">Car</div>
+          <div class="d-value">${esc(g.car_type||'—')} · Car No. <strong>${esc(g.car_no||'—')}</strong></div></div>
+        <div class="detail-item"><div class="d-label">Driver</div>
+          <div class="d-value">${esc(g.driver_name||'—')}<br>
+          ${g.driver_phone?`<a href="tel:${g.driver_phone}" onclick="event.stopPropagation()">📞 ${esc(g.driver_phone)}</a>`:''}</div></div>
+        <div class="detail-item"><div class="d-label">Guest Phone</div>
+          <div class="d-value">${g.phone_primary?`<a href="tel:${g.phone_primary}" onclick="event.stopPropagation()">📞 ${esc(g.phone_primary)}</a>`:'—'}</div></div>
+        <div class="detail-item"><div class="d-label">Backup Phone</div>
+          <div class="d-value">${g.phone_backup?`<a href="tel:${g.phone_backup}" onclick="event.stopPropagation()">📞 ${esc(g.phone_backup)}</a>`:'—'}</div></div>
+      </div>
+      ${g.notes?`<div class="detail-item"><div class="d-label">Notes</div><div class="d-value" style="color:var(--text-2)">${esc(g.notes)}</div></div>`:''}
+      <div class="live-status-box" id="ls-${g.group_id}">
+        <span class="ls-icon">📡</span>
+        <div class="ls-text">
+          <div>${g.live_status_text||'No status yet. Tap Refresh to check.'}</div>
+          ${g.last_refreshed?`<div class="ls-timestamp">Last checked: ${fmtTs(g.last_refreshed)}</div>`:''}
+        </div>
+      </div>
+      <div class="card-actions" onclick="event.stopPropagation()">
+        <button class="btn btn-secondary btn-sm" onclick="refreshStatus('${g.group_id}')">🔄 Refresh</button>
+        ${cardActions(g)}
+        <button class="btn btn-secondary btn-sm" onclick="editGuest('${g.group_id}')">✏️ Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="confirmDelete('${g.group_id}','${esc(g.group_name)}')">🗑️ Delete</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function cardActions(g){
+  const jt=journeyType(g);
+  if(g.status==='picked_up'||g.status==='car_returned')
+    return `<button class="btn btn-secondary btn-sm" onclick="markActive('${g.group_id}')">↩ Mark Active</button>`;
+  if(jt==='arrival')
+    return `<button class="btn btn-secondary btn-sm" onclick="toggleField('${g.group_id}','dispatched','${g.dispatched||'no'}')">
+        ${g.dispatched==='yes'?'🚗 Dispatched ✓':'🚗 Dispatch'}</button>
+      <button class="btn btn-primary btn-sm" onclick="markFinal('${g.group_id}','arrival')">✅ Picked Up</button>`;
+  if(g.dropped_off==='yes')
+    return `<span style="font-size:12px;color:var(--purple);font-weight:500">🏁 Dropped Off</span>
+      <button class="btn btn-primary btn-sm" onclick="markFinal('${g.group_id}','departure')">🔑 Car Returned → Complete</button>`;
+  return `<button class="btn btn-secondary btn-sm" onclick="toggleField('${g.group_id}','dispatched','${g.dispatched||'no'}')">
+      ${g.dispatched==='yes'?'🚗 Dispatched ✓':'🚗 Dispatch'}</button>
+    <button class="btn btn-secondary btn-sm" onclick="toggleField('${g.group_id}','guest_in_car','${g.guest_in_car||'no'}')">
+      ${g.guest_in_car==='yes'?'👤 In Car ✓':'👤 In Car'}</button>
+    <button class="btn btn-primary btn-sm" onclick="toggleField('${g.group_id}','dropped_off','${g.dropped_off||'no'}')">🏁 Dropped Off</button>`;
+}
+
+function toggleCard(id){document.getElementById('exp-'+id)?.classList.toggle('open');}
+function stripClass(g){
+  const t=(g.live_status_text||'').toLowerCase();
+  if(!g.live_status_text) return 'strip-gray';
+  if(t.includes('on time')||t.includes('arrived')||t.includes('landed')) return 'strip-green';
+  if(t.includes('delay')||t.includes('late')||t.includes('behind')) return 'strip-amber';
+  if(t.includes('cancel')||t.includes('diverted')) return 'strip-red';
+  return 'strip-green';
+}
+function statusLabel(g){
+  if(!g.live_status_text) return 'Not refreshed';
+  const t=g.live_status_text.toLowerCase();
+  if(t.includes('on time')) return 'On time';
+  if(t.includes('arrived')||t.includes('landed')) return 'Arrived';
+  const m=g.live_status_text.match(/delay[^,\.]{0,25}/i);return m?m[0].slice(0,25):'';
+}
+function statusClass(g){const s=stripClass(g);return s==='strip-green'?'status-on-time':s==='strip-amber'?'status-delayed':s==='strip-red'?'status-late':'status-unknown';}
+
+function updateCardUI(id){
+  const g = allGuests.find(x=>x.group_id===id);
+  if(!g) return;
+  const card = document.getElementById('card-'+id);
+  if(!card) return;
+  
+  // Re-render the entire card content into the existing shell
+  // This is surgical but captures all badge/status changes
+  const parent = card.parentElement;
+  const placeholder = document.createElement('div');
+  placeholder.innerHTML = renderCard(g);
+  const newCard = placeholder.firstElementChild;
+  
+  // Maintain 'open' state if it was open
+  const wasOpen = card.querySelector('.card-expanded').classList.contains('open');
+  if(wasOpen) newCard.querySelector('.card-expanded').classList.add('open');
+  
+  parent.replaceChild(newCard, card);
+}
+
+// ── Card actions ──────────────────────────────────────────────
+async function refreshStatus(id){
+  const g=allGuests.find(x=>x.group_id===id);if(!g) return;
+  const box=document.getElementById('ls-'+id);
+  if(box) box.innerHTML='<span class="ls-icon">⏳</span><div class="ls-text">Fetching live status…</div>';
+  const isDep=journeyType(g)==='departure';
+  const prompt=g.transport_type==='Flight'
+    ?(isDep?`What is the current status of flight ${g.transport_number} (${g.transport_name}) departing from ${WEDDING_CITY} today? Is it on time or delayed? Give current scheduled departure time. 2-3 sentences.`
+           :`What is the current status of flight ${g.transport_number} (${g.transport_name}) arriving at ${WEDDING_CITY} airport today? Is it on time or delayed? Give current estimated arrival time. 2-3 sentences.`)
+    :(isDep?`What is the current running status of Indian Railways train ${g.transport_number} (${g.transport_name}) today? Is it on time or delayed from ${WEDDING_CITY}? Give delay info. 2-3 sentences.`
+           :`What is the current running status of Indian Railways train ${g.transport_number} (${g.transport_name}), PNR ${g.pnr}? Which station is it at now and what is expected arrival time at ${g.pickup_location} ${WEDDING_CITY}? Is it delayed? 2-3 sentences.`);
+  try{
+    const result=await callGemini(prompt);
+    await apiPost({action:'updateLiveStatus',group_id:id,live_status_text:result});
+    const idx=allGuests.findIndex(x=>x.group_id===id);
+    if(idx>=0){allGuests[idx].live_status_text=result;allGuests[idx].last_refreshed=new Date().toISOString();}
+    saveToCache();
+    if(box) box.innerHTML=`<span class="ls-icon">📡</span><div class="ls-text"><div>${esc(result)}</div><div class="ls-timestamp">Last checked: just now</div></div>`;
+    const card=document.getElementById('card-'+id);
+    if(card&&idx>=0){
+      const g2=allGuests[idx];
+      const strip=card.querySelector('.card-strip');const sl=card.querySelector('.card-status-text');
+      if(strip) strip.className='card-strip '+stripClass(g2);
+      if(sl){sl.className='card-status-text '+statusClass(g2);sl.textContent=statusLabel(g2);}
+    }
+    showToast('Status updated','success');
+  }catch(e){
+    console.error('Refresh error:',e);
+    if(box) box.innerHTML='<span class="ls-icon">⚠️</span><div class="ls-text">Status unavailable — tap Refresh to retry</div>';
+    showToast('Could not fetch status','error');
+  }
+}
+
+async function toggleField(id,field,current){
+  const newVal=current==='yes'?'no':'yes';
+  // Optimistic UI
+  const idx=allGuests.findIndex(x=>x.group_id===id);
+  if(idx>=0) allGuests[idx][field]=newVal;
+  updateCardUI(id); 
+  saveToCache();
+  
+  try{
+    await apiPost({action:'updateGuestStatus',group_id:id,field,value:newVal});
+  }catch(e){
+    // Revert on failure
+    if(idx>=0) allGuests[idx][field]=current;
+    updateCardUI(id);
+    showToast(e.message||'Save failed. Please retry.','error');
+  }
+}
+async function markFinal(id,type){
+  const value=type==='arrival'?'picked_up':'car_returned';
+  // Optimistic UI
+  const idx=allGuests.findIndex(x=>x.group_id===id);
+  const oldVal = idx>=0?allGuests[idx].status:'';
+  if(idx>=0) allGuests[idx].status=value;
+  
+  // This one usually moves sections, so full render is safer but we do it fast
+  renderDashboard();
+  saveToCache();
+  
+  try{
+    await apiPost({action:'updateGuestStatus',group_id:id,field:'status',value});
+    showToast(type==='arrival'?'Picked up 🎉':'Trip completed ✓','success');
+  }catch(e){
+    if(idx>=0) allGuests[idx].status=oldVal;
+    renderDashboard();
+    showToast(e.message||'Save failed. Please retry.','error');
+  }
+}
+async function markActive(id){
+  // Optimistic UI
+  const idx=allGuests.findIndex(x=>x.group_id===id);
+  const oldVal = idx>=0?allGuests[idx].status:'';
+  if(idx>=0) allGuests[idx].status='active';
+  
+  renderDashboard();
+  saveToCache();
+  
+  try{
+    await apiPost({action:'updateGuestStatus',group_id:id,field:'status',value:'active'});
+    showToast('Moved back to active','success');
+  }catch(e){
+    if(idx>=0) allGuests[idx].status=oldVal;
+    renderDashboard();
+    showToast(e.message||'Save failed. Please retry.','error');
+  }
+}
+
+// ── Delete ────────────────────────────────────────────────────
+function confirmDelete(id,name){
+  deletePendingId=id;
+  document.getElementById('delete-guest-name').textContent=name;
+  document.getElementById('delete-modal').classList.add('open');
+}
+function closeDeleteModal(){document.getElementById('delete-modal').classList.remove('open');deletePendingId=null;}
+document.getElementById('delete-confirm-btn').addEventListener('click',async()=>{
+  if(!deletePendingId) return;
+  showLoading(true);
+  try{
+    await apiPost({action:'deleteGuest',group_id:deletePendingId});
+    allGuests=allGuests.filter(g=>g.group_id!==deletePendingId);
+    saveToCache();
+    closeDeleteModal();renderDashboard();showToast('Entry deleted','success');
+  }catch(e){showToast(e.message||'Delete failed. Please retry.','error');}
+  showLoading(false);
+});
+
+// ══════════════════════════════════════════════════════════════
+// DRIVER ANALYTICS
+// ══════════════════════════════════════════════════════════════
+function showDrivers(){screen('drivers');renderDrivers();}
+function renderDrivers(){
+  const unassigned=allDrivers.filter(d=>d.assigned!=='yes');
+  const assigned=allDrivers.filter(d=>d.assigned==='yes');
+  const uSec=document.getElementById('unassigned-drivers-section');
+  const aSec=document.getElementById('assigned-drivers-section');
+  if(!allDrivers.length){
+    uSec.innerHTML=`<div class="empty-state"><div class="e-icon">🚗</div><h3>No drivers added yet</h3><p>Add in the drivers tab of your Google Sheet</p></div>`;
+    aSec.innerHTML='';return;
+  }
+  uSec.innerHTML=unassigned.length
+    ?`<div class="section-label">🔴 Unassigned (${unassigned.length})</div><div class="driver-cards-grid">${unassigned.map(d=>driverCard(d,[])).join('')}</div>`
+    :`<div class="section-label">Unassigned Drivers</div><p style="color:var(--text-2);font-size:13px;margin-bottom:24px">All assigned ✓</p>`;
+  if(assigned.length){
+    const cards=assigned.map(d=>{
+      const cn=d.car_no||d.car_token||'';
+      const groups=allGuests.filter(g=>g.car_no===cn&&!isDeleted(g)&&g.status!=='picked_up'&&g.status!=='car_returned');
+      return driverCard(d,groups);
+    }).join('');
+    aSec.innerHTML=`<div class="section-label">✅ Assigned (${assigned.length})</div><div class="driver-cards-grid">${cards}</div>`;
+  } else { aSec.innerHTML=''; }
+}
+
+function parseDelayMins(text){
+  if(!text) return 0;const t=text.toLowerCase();
+  let m=t.match(/(\d+)\s*hour[s]?\s*(?:and\s*)?(\d+)?\s*min/);if(m) return parseInt(m[1])*60+(parseInt(m[2])||0);
+  m=t.match(/(\d+)\s*hr[s]?\s*(?:and\s*)?(\d+)?\s*min/);if(m) return parseInt(m[1])*60+(parseInt(m[2])||0);
+  m=t.match(/(\d+)\s*hour/);if(m) return parseInt(m[1])*60;
+  m=t.match(/(\d+)\s*min/);if(m) return parseInt(m[1]);return 0;
+}
+function fmtDelayBadge(d){if(!d||d<=0) return '';return d<60?'+'+d+'m':`+${Math.floor(d/60)}h${d%60?' '+(d%60)+'m':''}`;}
+
+function driverCard(driver,groups){
+  const isUnassigned=!groups||groups.length===0;
+  const now=new Date();const cn=driver.car_no||driver.car_token||'—';
+  const assignmentHtml=isUnassigned
+    ?`<div class="driver-assignment" style="background:var(--amber-lt)"><div class="da-label">Status</div><div class="da-group" style="color:var(--amber)">No assignment — available</div></div>`
+    :groups.map(g=>{
+        const jt=journeyType(g);const isDep=jt==='departure';
+        const delayMins=parseDelayMins(g.live_status_text);
+        const delayBadge=fmtDelayBadge(delayMins);
+        const leaveByTime=isDep?calcLeaveByDeparture(g.arrival_time,g.transport_type,g.pax):calcLeaveByArrival(g.arrival_time,delayMins);
+        const leaveMins=parseTimeMins(leaveByTime);
+        const nowMins=now.getHours()*60+now.getMinutes();
+        const urgent=(leaveMins-nowMins)>0&&(leaveMins-nowMins)<30;
+        const tLabel=g.transport_type==='Flight'?(isDep?'Flight Departs':'Flight Arrives'):(isDep?'Train Departs':'Train Arrives');
+        return `<div class="driver-assignment${isDep?' dep-assignment':''}">
+          <div class="da-label">${isDep?'🛫 Departure':'🛬 Arrival'}</div>
+          <div class="da-group">${esc(g.group_name)} · ${g.pax} pax</div>
+          <div class="da-detail">📍 ${isDep?'Drop':'Pickup'}: ${esc(g.pickup_location)} · ${fmtAmPm(g.arrival_time)} (${fmtDate(g.arrival_date)})<br>
+            🚦 ${g.live_status_text?esc(g.live_status_text.slice(0,65))+'…':'Not refreshed'}</div>
+          <div class="driver-timing">
+            <div class="timing-box">${delayBadge?`<span class="delay-badge">${delayBadge}</span>`:''}
+              <div class="tb-label">${tLabel}</div><div class="tb-value">${fmtAmPm(g.arrival_time)||'—'}</div></div>
+            <div class="timing-box${urgent?' urgent':''}">
+              <div class="tb-label">Leave By</div><div class="tb-value">${fmtAmPm(leaveByTime)||'—'}</div></div>
+          </div>
+        </div>
+        <div class="driver-toggles">
+          ${isDep?`
+            <button class="toggle-btn${g.dispatched==='yes'?' active-green':''}" onclick="toggleDriverField('${g.group_id}','dispatched','${g.dispatched||'no'}')">
+              ${g.dispatched==='yes'?'🚗 Dispatched ✓':'🚗 Dispatch'}</button>
+            <button class="toggle-btn${g.guest_in_car==='yes'?' active-blue':''}" onclick="toggleDriverField('${g.group_id}','guest_in_car','${g.guest_in_car||'no'}')">
+              ${g.guest_in_car==='yes'?'👤 In Car ✓':'👤 In Car'}</button>
+            <button class="toggle-btn${g.dropped_off==='yes'?' active-purple':''}" onclick="toggleDriverField('${g.group_id}','dropped_off','${g.dropped_off||'no'}')">
+              ${g.dropped_off==='yes'?'🏁 Dropped ✓':'🏁 Dropped Off'}</button>
+            <button class="toggle-btn${g.car_returned==='yes'?' active-gold':''}" onclick="driverMarkComplete('${g.group_id}')">
+              ${g.car_returned==='yes'?'🔑 Returned ✓':'🔑 Car Returned'}</button>
+          `:`
+            <button class="toggle-btn${g.driver_arrived==='yes'?' active-green':''}" onclick="toggleDriverField('${g.group_id}','driver_arrived','${g.driver_arrived||'no'}')">
+              ${g.driver_arrived==='yes'?'📍 At Station ✓':'📍 At Station'}</button>
+            <button class="toggle-btn${g.guest_in_car==='yes'?' active-blue':''}" onclick="toggleDriverField('${g.group_id}','guest_in_car','${g.guest_in_car||'no'}')">
+              ${g.guest_in_car==='yes'?'🚗 En Route ✓':'🚗 In Car'}</button>
+          `}
+        </div>`;
+      }).join('');
+
+  return `<div class="driver-card${isUnassigned?' unassigned':''}">
+    <div class="driver-card-head">
+      <div class="driver-name-block">
+        <div class="driver-name">${esc(driver.driver_name)}</div>
+        <div class="driver-car">${esc(driver.car_type||'')} · Cap: ${driver.capacity||'?'} · 📞 ${esc(driver.driver_phone||'—')}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        ${isUnassigned?'<span class="unassigned-badge">Free</span>':''}
+        <div class="driver-car-no">${esc(cn)}</div>
+      </div>
+    </div>
+    <div class="driver-card-body">${assignmentHtml}</div>
+  </div>`;
+}
+
+async function driverMarkComplete(groupId){
+  showLoading(true);
+  try{
+    await Promise.all([
+      apiPost({action:'updateGuestStatus',group_id:groupId,field:'car_returned',value:'yes'}),
+      apiPost({action:'updateGuestStatus',group_id:groupId,field:'status',value:'car_returned'})
+    ]);
+    const idx=allGuests.findIndex(g=>g.group_id===groupId);
+    if(idx>=0){allGuests[idx].car_returned='yes';allGuests[idx].status='car_returned';}
+    saveToCache();
+    renderDrivers();renderDashboard();showToast('Trip completed ✓','success');
+  }catch(e){showToast(e.message||'Save failed. Please retry.','error');}
+  showLoading(false);
+}
+async function toggleDriverField(groupId,field,current){
+  const v=current==='yes'?'no':'yes';
+  // Optimistic UI for drivers too
+  const idx=allGuests.findIndex(g=>g.group_id===groupId);
+  if(idx>=0) allGuests[idx][field]=v;
+  renderDrivers(); // Drivers view re-render is small
+  saveToCache();
+  
+  try{
+    await apiPost({action:'updateGuestStatus',group_id:groupId,field,value:v});
+  }catch(e){
+    if(idx>=0) allGuests[idx][field]=current;
+    renderDrivers();
+    showToast(e.message||'Save failed. Please retry.','error');
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// ADD / EDIT GUEST FORM
+// ══════════════════════════════════════════════════════════════
+function setJourneyType(type){
+  document.getElementById('f-journey-type').value=type;
+  document.getElementById('jt-arrival').className='jt-btn'+(type==='arrival'?' active-arrival':'');
+  document.getElementById('jt-departure').className='jt-btn'+(type==='departure'?' active-departure':'');
+  document.getElementById('location-label').textContent=type==='departure'?'Drop Station *':'Pickup Station *';
+  document.getElementById('date-label').textContent=type==='departure'?'Departure Date *':'Arrival Date *';
+  document.getElementById('time-label').textContent=type==='departure'?'Departure Time *':'Arrival Time *';
+  populateStationDropdown();
+}
+
+function populateStationDropdown(){
+  const sel=document.getElementById('f-pickup-location');
+  const current=sel.value;
+  sel.innerHTML='<option value="">Select station…</option>';
+  if(!HUBS||!HUBS.length){
+    const opt=document.createElement('option');
+    opt.value='';opt.textContent='⚠ No hubs loaded — check Settings';opt.disabled=true;
+    sel.appendChild(opt);
+    sel.removeAttribute('required');
+    return;
+  }
+  sel.setAttribute('required','');
+  HUBS.forEach(h=>{
+    const opt=document.createElement('option');
+    opt.value=h;opt.textContent=h;
+    sel.appendChild(opt);
+  });
+  if(current) sel.value=current;
+}
+
+function showGuestForm(id){
+  editingId=id||null;
+  rtQueue=[];rtQueueIdx=0;rtPersonal={};
+  screen('guest');
+  document.getElementById('guest-form-title').textContent=id?'Edit Guest Group':'Add Guest Group';
+  document.getElementById('form-submit-btn').textContent=id?'Save Changes':'Save Guest Group';
+  document.getElementById('extraction-result').classList.remove('show');
+  document.getElementById('roundtrip-banner').classList.add('hidden');
+  populateDriverDropdown();
+  populateStationDropdown();
+  if(id){
+    const g=allGuests.find(x=>x.group_id===id);
+    if(g){populateForm(g);setJourneyType(journeyType(g));}
+  } else {
+    document.getElementById('guest-form').reset();
+    document.getElementById('f-group-id').value='';
+    document.getElementById('driver-detail-row').style.display='none';
+    setJourneyType('arrival');
+  }
+  document.getElementById('ticket-file').value='';
+}
+function editGuest(id){showGuestForm(id);}
+
+function populateDriverDropdown(){
+  const sel=document.getElementById('f-driver-select');
+  sel.innerHTML='<option value="">— No driver assigned —</option>';
+  if(!allDrivers||!allDrivers.length) return;
+  allDrivers.forEach(d=>{
+    const cn=d.car_no||d.car_token||'';
+    const opt=document.createElement('option');
+    opt.value=d.driver_id||d.driver_name||cn;
+    opt.textContent=`${d.driver_name||'?'} (${cn}) · ${d.car_type||'?'} · Cap: ${d.capacity||'?'}`;
+    opt.dataset.name=d.driver_name||'';opt.dataset.phone=d.driver_phone||'';
+    opt.dataset.carType=d.car_type||'';opt.dataset.carNo=cn;opt.dataset.capacity=d.capacity||'0';
+    sel.appendChild(opt);
+  });
+}
+function onDriverSelect(){
+  const sel=document.getElementById('f-driver-select');
+  const opt=sel.selectedIndex>0?sel.options[sel.selectedIndex]:null;
+  const row=document.getElementById('driver-detail-row');
+  if(!opt||!opt.dataset||!opt.dataset.name){
+    ['f-driver-name','f-driver-phone','f-car-type','f-car-no'].forEach(id=>{const el=document.getElementById(id);if(el) el.value='';});
+    row.style.display='none';return;
+  }
+  document.getElementById('f-driver-name').value=opt.dataset.name;
+  document.getElementById('f-driver-phone').value=opt.dataset.phone;
+  document.getElementById('f-car-type').value=opt.dataset.carType;
+  document.getElementById('f-car-no').value=opt.dataset.carNo;
+
+  const pax=parseInt(document.getElementById('f-pax').value)||0;
+  const cap=parseInt(opt.dataset.capacity)||0;
+  const overCapacity=pax>0&&cap>0&&pax>cap;
+
+  row.style.display='block';
+  row.innerHTML=`<strong>${esc(opt.dataset.name)}</strong> · ${esc(opt.dataset.carType)} · Car No. <strong>${esc(opt.dataset.carNo)}</strong> · Cap: ${opt.dataset.capacity} · 📞 ${esc(opt.dataset.phone)}`+
+    (overCapacity?`<br><span style="color:var(--amber);font-weight:600">⚠️ Car capacity (${cap}) is less than group size (${pax}). You can still save.</span>`:'');
+}
+
+function populateForm(g){
+  // Sanitize before populating to ensure date/time inputs get correct format
+  const sg=sanitizeGuest({...g});
+  const m={'f-group-id':'group_id','f-group-name':'group_name','f-individual-names':'individual_names',
+    'f-pax':'pax','f-phone-primary':'phone_primary','f-phone-backup':'phone_backup',
+    'f-pickup-location':'pickup_location','f-journey-origin':'journey_origin',
+    'f-journey-destination':'journey_destination',
+    'f-transport-type':'transport_type','f-transport-name':'transport_name',
+    'f-transport-number':'transport_number','f-pnr':'pnr','f-notes':'notes'};
+  Object.entries(m).forEach(([el,k])=>{const e=document.getElementById(el);if(e) e.value=sg[k]||'';});
+  // Set date and time inputs explicitly from sanitized values
+  document.getElementById('f-arrival-date').value=sg.arrival_date||'';
+  document.getElementById('f-arrival-time').value=sg.arrival_time||'';
+  document.getElementById('f-driver-name').value=g.driver_name||'';
+  document.getElementById('f-driver-phone').value=g.driver_phone||'';
+  document.getElementById('f-car-type').value=g.car_type||'';
+  document.getElementById('f-car-no').value=g.car_no||'';
+  const sel=document.getElementById('f-driver-select');
+  let matched=false;
+  const targetName = g.driver_name || '';
+  for(let i=1;i<sel.options.length;i++){
+    if(sel.options[i].dataset.name === targetName){
+      sel.selectedIndex=i; matched=true; break;
+    }
+  }
+  if(!matched) sel.selectedIndex=0;
+  // Crucial: ensure hidden fields are filled from the selected option
+  onDriverSelect();
+}
+
+// Fill form from an extracted leg object (round trip flow)
+function populateFormFromLeg(leg){
+  setJourneyType(leg.journey_type||'arrival');
+  if(leg.transport_type) document.getElementById('f-transport-type').value=leg.transport_type;
+  if(leg.transport_name) document.getElementById('f-transport-name').value=leg.transport_name;
+  if(leg.transport_number) document.getElementById('f-transport-number').value=leg.transport_number;
+  if(leg.pnr) document.getElementById('f-pnr').value=leg.pnr;
+  if(leg.journey_origin)  document.getElementById('f-journey-origin').value=leg.journey_origin||'';
+  document.getElementById('f-journey-destination').value=leg.journey_destination||'';
+  if(leg.arrival_date) document.getElementById('f-arrival-date').value=leg.arrival_date;
+  if(leg.arrival_time) document.getElementById('f-arrival-time').value=leg.arrival_time;
+  if(leg.pickup_location) document.getElementById('f-pickup-location').value=leg.pickup_location;
+  if(leg.pax) document.getElementById('f-pax').value=leg.pax;
+  if(leg.individual_names) document.getElementById('f-individual-names').value=leg.individual_names;
+  if(leg.group_name&&!document.getElementById('f-group-name').value)
+    document.getElementById('f-group-name').value=leg.group_name;
+  // Carry personal details over from first leg
+  if(rtPersonal.group_name&&!document.getElementById('f-group-name').value)
+    document.getElementById('f-group-name').value=rtPersonal.group_name;
+  if(rtPersonal.phone_primary) document.getElementById('f-phone-primary').value=rtPersonal.phone_primary;
+  if(rtPersonal.phone_backup)  document.getElementById('f-phone-backup').value=rtPersonal.phone_backup;
+  if(rtPersonal.individual_names) document.getElementById('f-individual-names').value=rtPersonal.individual_names;
+  if(rtPersonal.pax) document.getElementById('f-pax').value=rtPersonal.pax;
+  // Driver reset for each leg
+  document.getElementById('f-driver-select').selectedIndex=0;
+  onDriverSelect();
+}
+
+function collectForm(){
+  return{
+    group_id:v('f-group-id'),group_name:v('f-group-name'),individual_names:v('f-individual-names'),
+    pax:v('f-pax'),phone_primary:v('f-phone-primary'),phone_backup:v('f-phone-backup'),
+    pickup_location:v('f-pickup-location'),
+    journey_origin:v('f-journey-origin'),
+    journey_destination:v('f-journey-destination'),
+    arrival_date:v('f-arrival-date'),arrival_time:v('f-arrival-time'),
+    transport_type:v('f-transport-type'),transport_name:v('f-transport-name'),
+    transport_number:v('f-transport-number'),pnr:v('f-pnr'),
+    car_type:v('f-car-type'),car_no:v('f-car-no'),
+    driver_name:v('f-driver-name'),driver_phone:v('f-driver-phone'),
+    notes:v('f-notes'),journey_type:v('f-journey-type')
+  };
+}
+function v(id){return document.getElementById(id)?.value||'';}
+
+// ── Duplicate check ────────────────────────────────────────────
+function checkDuplicate(data){
+  // Only match on PNR — train numbers repeat daily, only PNR is unique per booking
+  if(!data.pnr) return null;
+  return allGuests.find(g=>{
+    if(g.group_id===data.group_id) return false;
+    if(g.deleted==='yes') return false;   // deleted entries must not block re-adds
+    if(!g.pnr) return false;
+    return data.pnr.trim().toUpperCase()===g.pnr.trim().toUpperCase();
+  })||null;
+}
+
+function openDupModal(data,existing){
+  dupPendingData=data;dupExistingId=existing.group_id;
+  document.getElementById('dup-detail').innerHTML=
+    `An entry with PNR <strong>${esc(data.pnr)}</strong> already exists: <strong>${esc(existing.group_name)}</strong> · ${fmtDate(existing.arrival_date)} ${fmtAmPm(existing.arrival_time)}.`;
+  document.getElementById('dup-modal').classList.add('open');
+}
+function closeDupModal(){document.getElementById('dup-modal').classList.remove('open');dupPendingData=null;dupExistingId=null;}
+
+document.getElementById('dup-view-btn').addEventListener('click',()=>{
+  const savedId=dupExistingId;
+  closeDupModal();showDashboard();
+  setTimeout(()=>{
+    const card=document.getElementById('card-'+savedId);
+    if(card){card.scrollIntoView({behavior:'smooth',block:'center'});card.querySelector('.card-expanded')?.classList.add('open');}
+  },300);
+});
+document.getElementById('dup-save-anyway').addEventListener('click',async()=>{
+  closeDupModal();if(dupPendingData) await proceedSave(dupPendingData);
+});
+
+// ── Conflict & car opt ─────────────────────────────────────────
+function checkConflict(data){
+  if(!data.driver_name||!data.arrival_date||!data.arrival_time) return null;
+  const dataMs=toAbsoluteMs(data.arrival_date,data.arrival_time);
+  if(isNaN(dataMs)) return null;
+  const conflicts=allGuests.filter(g=>{
+    if(g.group_id===data.group_id) return false;
+    if(g.status==='picked_up'||g.status==='car_returned') return false;
+    if(g.driver_name!==data.driver_name) return false;
+    if(!g.arrival_date||!g.arrival_time) return false;
+    
+    // Use absolute timestamps — catches cross-midnight conflicts
+    const gMs=toAbsoluteMs(g.arrival_date,g.arrival_time);
+    if(isNaN(gMs)) return false;
+    const diffMins=Math.abs(gMs-dataMs)/60000;
+    if(diffMins >= CONFLICT_MINS) return false;
+    
+    // If different stations, it's definitely a conflict
+    if(g.pickup_location !== data.pickup_location) return true;
+    
+    // If SAME station: arrival+departure back-to-back is OK
+    if(g.journey_type !== data.journey_type) return false;
+    
+    return true;
+  });
+  return conflicts.length?conflicts:null;
+}
+function hasLuggageNotes(n){return n&&LUGGAGE_KW.some(k=>n.toLowerCase().includes(k));}
+function checkCarOpt(data){
+  if(!data.driver_name||!data.car_no||!data.pax) return null;
+  if(hasLuggageNotes(data.notes)) return null;
+  const ad=allDrivers.find(d=>(d.car_no||d.car_token)===data.car_no);if(!ad) return null;
+  const ac=parseInt(ad.capacity||0);const pax=parseInt(data.pax)||0;
+  const smaller=allDrivers.filter(d=>{if(d.assigned==='yes') return false;const c=parseInt(d.capacity||0);return c>=pax&&c<ac;}).sort((a,b)=>parseInt(a.capacity)-parseInt(b.capacity));
+  return smaller.length?smaller[0]:null;
+}
+
+async function submitGuestForm(e){
+  e.preventDefault();const data=collectForm();
+  // Duplicate check
+  const dup=checkDuplicate(data);
+  if(dup){openDupModal(data,dup);return;}
+  // Conflict check
+  const conflicts=checkConflict(data);
+  if(conflicts&&conflicts.length){
+    pendingSubmitData=data;
+    document.getElementById('conflict-detail').innerHTML=
+      `<strong>${esc(data.driver_name)}</strong> is already assigned to:<br>`+
+      conflicts.map(c=>`• <strong>${esc(c.group_name)}</strong> · ${esc(c.pickup_location)} · ${fmtAmPm(c.arrival_time)} (${fmtDate(c.arrival_date)})`).join('<br>');
+    document.getElementById('conflict-modal').classList.add('open');return;
+  }
+
+  // ── Journey Type Mismatch Check (Final Safety) ────────────────
+  if(data.journey_origin && data.journey_destination) {
+    const oriIsLocal = matchesLocal(data.journey_origin);
+    const desIsLocal = matchesLocal(data.journey_destination);
+    if (data.journey_type === 'arrival' && oriIsLocal && !desIsLocal) {
+      showJTMismatchModal(data, 'departure'); return;
+    }
+    if (data.journey_type === 'departure' && desIsLocal && !oriIsLocal) {
+      showJTMismatchModal(data, 'arrival'); return;
+    }
+  }
+
+  const smallerDriver=checkCarOpt(data);
+  if(smallerDriver){
+    carOptPendingData=data;carOptSmallerDriver=smallerDriver;
+    const ad=allDrivers.find(d=>(d.car_no||d.car_token)===data.car_no);
+    const cn=smallerDriver.car_no||smallerDriver.car_token||'';
+    document.getElementById('car-opt-detail').innerHTML=
+      `You assigned a <strong>${esc(data.car_type)}</strong> (Cap: ${ad?.capacity||'?'}) for ${data.pax} pax.<br>
+      A smaller <strong>${esc(smallerDriver.car_type)}</strong> (Cap: ${smallerDriver.capacity}, Car No. ${esc(cn)}, Driver: ${esc(smallerDriver.driver_name)}) is free and fits.`;
+    document.getElementById('car-opt-modal').classList.add('open');return;
+  }
+  await proceedSave(data);
+}
+
+function closeConflictModal(){document.getElementById('conflict-modal').classList.remove('open');pendingSubmitData=null;}
+document.getElementById('conflict-save-anyway').addEventListener('click',async()=>{
+  document.getElementById('conflict-modal').classList.remove('open');
+  const d=pendingSubmitData;pendingSubmitData=null;if(d) await proceedSave(d);
+});
+document.getElementById('car-opt-keep').addEventListener('click',async()=>{
+  document.getElementById('car-opt-modal').classList.remove('open');
+  const d=carOptPendingData;carOptPendingData=null;carOptSmallerDriver=null;if(d) await proceedSave(d);
+});
+document.getElementById('car-opt-switch').addEventListener('click',async()=>{
+  document.getElementById('car-opt-modal').classList.remove('open');
+  if(!carOptPendingData||!carOptSmallerDriver) return;
+  const d={...carOptPendingData,driver_name:carOptSmallerDriver.driver_name,
+    driver_phone:carOptSmallerDriver.driver_phone||'',car_type:carOptSmallerDriver.car_type,
+    car_no:carOptSmallerDriver.car_no||carOptSmallerDriver.car_token||''};
+  carOptPendingData=null;carOptSmallerDriver=null;await proceedSave(d);
+});
+
+async function proceedSave(data){
+  showLoading(true);
+  try{
+    if(editingId){
+      data.group_id=editingId;
+      const ex=allGuests.find(g=>g.group_id===editingId)||{};
+      data.status=ex.status||'active';data.dispatched=ex.dispatched||'no';
+      data.driver_arrived=ex.driver_arrived||'no';data.guest_in_car=ex.guest_in_car||'no';
+      data.dropped_off=ex.dropped_off||'no';data.car_returned=ex.car_returned||'no';
+      data.last_refreshed=ex.last_refreshed||'';data.live_status_text=ex.live_status_text||'';
+      data.deleted=ex.deleted||'no';
+      await apiPost({action:'updateGuest',data:sanitizeDataForSheet(data)});
+      const idx=allGuests.findIndex(g=>g.group_id===editingId);
+      if(idx>=0) allGuests[idx]={...allGuests[idx],...data};
+      syncDriverAssignment(); saveToCache();
+      showToast('Guest updated ✓','success');
+      showLoading(false);showDashboard();renderDashboard();
+    } else {
+      const res=await apiPost({action:'addGuest',data:sanitizeDataForSheet(data)});
+      data.group_id=res.group_id;data.status='active';
+      data.dispatched='no';data.driver_arrived='no';data.guest_in_car='no';
+      data.dropped_off='no';data.car_returned='no';data.deleted='no';
+      data.live_status_text='';data.last_refreshed='';
+      allGuests.push(data);
+      syncDriverAssignment(); saveToCache();
+      showToast('Guest added 🎉','success');
+      showLoading(false);
+      if(rtQueue.length>0&&rtQueueIdx<rtQueue.length){
+        rtPersonal={group_name:data.group_name,phone_primary:data.phone_primary,
+          phone_backup:data.phone_backup,individual_names:data.individual_names,pax:data.pax};
+        const nextLeg=rtQueue[rtQueueIdx];rtQueueIdx++;
+        document.getElementById('guest-form').reset();
+        document.getElementById('f-group-id').value='';
+        document.getElementById('driver-detail-row').style.display='none';
+        document.getElementById('extraction-result').classList.remove('show');
+        populateFormFromLeg(nextLeg);
+        const banner=document.getElementById('roundtrip-banner');
+        banner.innerHTML=`🔄 <span>Round trip detected — now saving <strong>Leg ${rtQueueIdx+1} of ${rtQueue.length+1}</strong>. Review details and assign a driver.</span>`;
+        banner.classList.remove('hidden');
+        return;
+      }
+      document.getElementById('roundtrip-banner').classList.add('hidden');
+      showDashboard();renderDashboard();
+    }
+  }catch(e){
+    console.error('proceedSave error:',e);
+    showToast(e.message||'Save failed. Please retry.','error');
+    showLoading(false);
+  }
+}
+
+// ── File upload + Gemini extraction ───────────────────────────
+async function handleFileUpload(event){
+  const file=event.target.files[0];if(!file) return;
+  showLoading(true);
+  document.getElementById('extraction-result').classList.remove('show');
+  document.getElementById('roundtrip-banner').classList.add('hidden');
+  try{
+    const {b64,mime}=await compressIfNeeded(file);
+    if(file.type!=='application/pdf'&&file.size>800*1024) showToast('Image compressed for faster upload','success');
+    const prompt=`You are extracting travel ticket data for a wedding in ${WEDDING_CITY}.
+    The wedding transport hubs are: ${HUBS.join(', ')}.
+
+    Read the ENTIRE ticket and extract ALL journey legs.
+    Return ONLY a valid JSON object. No markdown, no explanation, no extra text.
+
+    JSON structure:
+    {
+      "legs": [
+        {
+          "journey_type": "departure",
+          "matched_hub": "Howrah Junction",
+          "transport_type": "Train",
+          "transport_name": "Netaji Express",
+          "transport_number": "13051",
+          "pnr": "6102913335",
+          "journey_origin": "Howrah",
+          "journey_destination": "Mirzapur",
+          "depart_date": "2026-06-29",
+          "depart_time": "21:55",
+          "arrive_date": "2026-06-30",
+          "arrive_time": "09:08",
+          "individual_names": "Virendra S Binay",
+          "pax": 1
+        }
+      ]
+    }
+
+    Rules:
+    - journey_type: "arrival" = guest coming TO ${WEDDING_CITY}. "departure" = guest leaving FROM ${WEDDING_CITY}.
+    - matched_hub: pick the EXACT string from [${HUBS.join(', ')}] that matches the station on this ticket. Empty string if none match.
+    - journey_origin: actual city/station name from the ticket where journey STARTS (e.g. "Howrah Junction", "New Delhi").
+    - journey_destination: actual city/station name from the ticket where journey ENDS (e.g. "Mirzapur", "Mumbai CST").
+    - depart_date/depart_time: when it leaves origin.
+    - arrive_date/arrive_time: when it arrives at destination (may be next day for overnight trains).
+    - All date fields MUST be YYYY-MM-DD format. All time fields MUST be HH:MM 24-hour format.
+    - pax: number of passengers on this leg (integer).`;
+
+    const raw=await callGeminiFile(prompt,b64,mime);
+    let parsed={legs:[]};
+    try{
+      const clean=raw.replace(/```json|```/g,'').trim();
+      const match=clean.match(/\{[\s\S]*\}/);
+      if(match) parsed=JSON.parse(match[0]);
+    }catch(e){console.error('Parse error:',e,raw);}
+
+    console.log('Gemini extraction:',parsed);
+
+    if(!parsed.legs||parsed.legs.length===0){
+      showToast('Could not extract details — please fill in manually','error');
+      showLoading(false);return;
+    }
+
+    // Determine journey type and data for each leg
+    const processedLegs=parsed.legs.map(leg=>{
+      // Determine journey type: validate/override Gemini's classification using city matching
+      let jt = leg.journey_type === 'departure' ? 'departure' : 'arrival';
+      const wc = WEDDING_CITY.toLowerCase();
+      const legOri = (leg.journey_origin||'').toLowerCase();
+      const legDest = (leg.journey_destination||'').toLowerCase();
+      
+      // Override Gemini if we can infer from city names vs wedding city
+      if (wc) {
+        const oriIsLocal = (legOri.includes(wc)||wc.includes(legOri)) || isLocalHub(leg.journey_origin);
+        const destIsLocal = (legDest.includes(wc)||wc.includes(legDest)) || isLocalHub(leg.journey_destination);
+        if (oriIsLocal && !destIsLocal) jt = 'departure';
+        else if (destIsLocal && !oriIsLocal) jt = 'arrival';
+      }
+
+      // Pick correct date/time based on journey type
+      // For Arrival: use arrive time (when they REACH the wedding city hub)
+      // For Departure: use depart time (when they LEAVE the wedding city hub)
+      const date=jt==='departure'?leg.depart_date:leg.arrive_date;
+      const time=jt==='departure'?leg.depart_time:leg.arrive_time;
+
+      // Use AI matched hub if valid, else fallback to mapping logic
+      let station = HUBS.find(h => h === leg.matched_hub);
+      if(!station) {
+        const stationSrc=jt==='departure'?leg.journey_origin:leg.journey_destination;
+        station = mapToStation(stationSrc, leg.transport_type);
+      }
+      
+      // Auto group name from first passenger
+      const firstName=(leg.individual_names||'').split(',')[0].trim();
+
+      return {
+        journey_type:jt,transport_type:leg.transport_type||'',
+        transport_name:leg.transport_name||'',transport_number:leg.transport_number||'',
+        pnr:leg.pnr||'',journey_origin:leg.journey_origin||'',
+        journey_destination:leg.journey_destination||'',
+        arrival_date:date||'',arrival_time:time||'',
+        pickup_location:station || (HUBS[0] || ''),
+        individual_names:leg.individual_names||'',
+        pax:leg.pax||1,group_name:firstName||''
+      };
+    });
+
+    if(processedLegs.length===1){
+      // Single leg — fill form directly
+      const leg=processedLegs[0];
+      document.getElementById('guest-form').reset();
+      document.getElementById('f-group-id').value='';
+      document.getElementById('driver-detail-row').style.display='none';
+      document.getElementById('f-driver-select').selectedIndex=0;
+      populateFormFromLeg(leg);
+      const er=document.getElementById('extraction-result');
+      er.textContent=`✅ ${leg.journey_type==='departure'?'Departure':'Arrival'} extracted: ${leg.transport_type} ${leg.transport_number} · ${fmtDate(leg.arrival_date)} ${fmtAmPm(leg.arrival_time)} · Please verify all fields.`;
+      er.classList.add('show');
+      showToast('Details extracted — please verify','success');
+    } else {
+      // Multiple legs — round trip flow
+      // Fill Leg 1 now, queue the rest
+      rtQueue=processedLegs.slice(1);rtQueueIdx=0;rtPersonal={};
+      const leg1=processedLegs[0];
+      document.getElementById('guest-form').reset();
+      document.getElementById('f-group-id').value='';
+      document.getElementById('driver-detail-row').style.display='none';
+      document.getElementById('f-driver-select').selectedIndex=0;
+      populateFormFromLeg(leg1);
+
+      const banner=document.getElementById('roundtrip-banner');
+      banner.innerHTML=`🔄 <span>Round trip with <strong>${processedLegs.length} legs</strong> detected. You are on <strong>Leg 1 of ${processedLegs.length}</strong> — ${leg1.journey_type==='departure'?'Departure':'Arrival'}. Fill in driver details and save. The next leg will open automatically.</span>`;
+      banner.classList.remove('hidden');
+
+      const er=document.getElementById('extraction-result');
+      er.textContent=`✅ ${processedLegs.length} legs extracted. Leg 1: ${leg1.transport_type} ${leg1.transport_number} · ${fmtDate(leg1.arrival_date)} ${fmtAmPm(leg1.arrival_time)}`;
+      er.classList.add('show');
+      showToast(`${processedLegs.length}-leg ticket detected. Fill Leg 1 and save to continue.`,'success');
+    }
+  }catch(err){
+    console.error('Extraction error:',err);
+    showToast('Extraction failed — please fill in manually','error');
+  }
+  showLoading(false);
+  event.target.value='';
+}
+function toBase64(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(file);});}
+
+// Compress image to max 800KB before sending to Gemini
+// PDFs are passed through unchanged
+async function compressIfNeeded(file){
+  const MAX_BYTES=800*1024;
+  // Skip compression for PDFs
+  if(file.type==='application/pdf') return {b64:await toBase64(file),mime:'application/pdf'};
+  // If already small enough, skip compression
+  if(file.size<=MAX_BYTES) return {b64:await toBase64(file),mime:file.type||'image/jpeg'};
+  return new Promise((res,rej)=>{
+    const img=new Image();
+    const url=URL.createObjectURL(file);
+    img.onload=()=>{
+      URL.revokeObjectURL(url);
+      const canvas=document.createElement('canvas');
+      // Scale down proportionally — start at full size, reduce until under limit
+      let w=img.width,h=img.height,quality=0.85;
+      // Max dimension 1600px
+      if(w>1600||h>1600){
+        const scale=Math.min(1600/w,1600/h);
+        w=Math.round(w*scale);h=Math.round(h*scale);
+      }
+      canvas.width=w;canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      // Try reducing quality until under 800KB
+      const tryExport=(q)=>{
+        const dataUrl=canvas.toDataURL('image/jpeg',q);
+        const bytes=(dataUrl.length-'data:image/jpeg;base64,'.length)*0.75;
+        if(bytes<=MAX_BYTES||q<=0.4){
+          res({b64:dataUrl.split(',')[1],mime:'image/jpeg'});
+        } else {
+          tryExport(Math.max(q-0.1,0.4));
+        }
+      };
+      tryExport(quality);
+    };
+    img.onerror=rej;
+    img.src=url;
+  });
+}
+
+function showJTMismatchModal(data, suggested){
+  jtMismatchPendingData = data;
+  const suggestedLabel = suggested === 'arrival' ? '🛬 Arrival' : '🛫 Departure';
+  const currentLabel = data.journey_type === 'arrival' ? '🛬 Arrival' : '🛫 Departure';
+  
+  document.getElementById('jt-mismatch-text').innerHTML = 
+    `This journey appears to be a <strong>${suggestedLabel}</strong> (based on the locations), but is being saved as an <strong>${currentLabel}</strong>.<br><br>Would you like to switch to ${suggestedLabel} or continue saving as ${currentLabel}?`;
+  
+  // Update button actions for this specific data
+  const switchBtn = document.getElementById('jt-mismatch-switch');
+  switchBtn.textContent = `Switch to ${suggestedLabel} & Save`;
+  switchBtn.onclick = async () => {
+    const d = {...jtMismatchPendingData, journey_type: suggested};
+    closeJTMismatchModal();
+    await proceedSave(d);
+  };
+  
+  const keepBtn = document.getElementById('jt-mismatch-keep');
+  keepBtn.textContent = `Keep as ${currentLabel} & Save`;
+  keepBtn.onclick = async () => {
+    const d = jtMismatchPendingData;
+    closeJTMismatchModal();
+    await proceedSave(d);
+  };
+
+  document.getElementById('jt-mismatch-modal').classList.add('open');
+}
+
+function closeJTMismatchModal(){
+  document.getElementById('jt-mismatch-modal').classList.remove('open');
+  jtMismatchPendingData = null;
+}
+
+// ── Gemini ────────────────────────────────────────────────────
+async function callGemini(prompt){
+  try{
+    const r=await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${GEMINI_KEY}`,
+      {method:'POST',headers:{'Content-Type':'application/json'},
+       body:JSON.stringify({contents:[{parts:[{text:prompt}]}],tools:[{google_search:{}}]})}
+    );
+    const d=await r.json();
+    if(d.error) throw new Error(d.error.message);
+    const text=d.candidates?.[0]?.content?.parts?.[0]?.text||'';
+    if(text) return text;throw new Error('Empty');
+  }catch(e1){
+    console.warn('Gemini search fallback:',e1.message);
+    const r=await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${GEMINI_KEY}`,
+      {method:'POST',headers:{'Content-Type':'application/json'},
+       body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})}
+    );
+    const d=await r.json();if(d.error) throw new Error(d.error.message);
+    return d.candidates?.[0]?.content?.parts?.[0]?.text||'No response';
+  }
+}
+async function callGeminiFile(prompt,b64,mime){
+  const body=JSON.stringify({contents:[{parts:[{inline_data:{mime_type:mime,data:b64}},{text:prompt}]}]});
+  // First attempt: primary model
+  try{
+    const r=await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${GEMINI_KEY}`,
+      {method:'POST',headers:{'Content-Type':'application/json'},body}
+    );
+    const d=await r.json();
+    if(d.error) throw new Error(d.error.message);
+    return d.candidates?.[0]?.content?.parts?.[0]?.text||'{}';
+  }catch(e1){
+    // Fallback: secondary model
+    console.warn('callGeminiFile primary failed, trying fallback model:',e1.message);
+    try{
+      const r=await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`,
+        {method:'POST',headers:{'Content-Type':'application/json'},body}
+      );
+      const d=await r.json();
+      if(d.error) throw new Error(d.error.message);
+      return d.candidates?.[0]?.content?.parts?.[0]?.text||'{}';
+    }catch(e2){
+      throw new Error('Extraction failed on all models: '+e2.message);
+    }
+  }
+}
+
+// ── Summary ───────────────────────────────────────────────────
+function openSummaryModal(){
+  const today=new Date().toISOString().slice(0,10);
+  const active=allGuests.filter(g=>g.status!=='picked_up'&&g.status!=='car_returned'&&!isDeleted(g));
+  const arrivals=active.filter(g=>journeyType(g)==='arrival');
+  const deps=active.filter(g=>journeyType(g)==='departure');
+  const done=allGuests.filter(g=>(g.status==='picked_up'||g.status==='car_returned')&&!isDeleted(g));
+  const todayAll=active.filter(g=>g.arrival_date===today);
+  const tiles=[
+    {label:"Today's Guests",     value:todayAll.length,                                    sub:'groups'},
+    {label:"Today's Pax",        value:todayAll.reduce((s,g)=>s+(parseInt(g.pax)||0),0),   sub:'people'},
+    {label:"Today's Arrivals",   value:arrivals.filter(g=>g.arrival_date===today).length,  sub:'groups'},
+    {label:"Today's Departures", value:deps.filter(g=>g.arrival_date===today).length,      sub:'groups'},
+    {label:'Total Pending Pax',  value:active.reduce((s,g)=>s+(parseInt(g.pax)||0),0),     sub:'people'},
+    {label:'Completed',          value:done.length,                                         sub:'total'},
+    {label:'Dispatched',         value:active.filter(g=>g.dispatched==='yes').length,       sub:'drivers sent'},
+    {label:'Free Drivers',       value:allDrivers.filter(d=>d.assigned!=='yes').length,     sub:'available'},
+  ];
+  document.getElementById('summary-grid').innerHTML=tiles.map(t=>
+    `<div class="summary-tile"><div class="st-label">${t.label}</div><div class="st-value">${t.value}</div><div class="st-sub">${t.sub}</div></div>`
+  ).join('');
+  document.getElementById('summary-modal').classList.add('open');
+}
+
+// ── Settings ──────────────────────────────────────────────────
+function openSettings(){
+  document.getElementById('settings-script-url').value=SCRIPT_URL;
+  document.getElementById('settings-gemini-key').value=GEMINI_KEY;
+  document.getElementById('settings-wedding-city').value=WEDDING_CITY;
+  document.getElementById('settings-hubs').value=HUBS.join('\n');
+  document.getElementById('settings-modal').classList.add('open');
+}
+// Exposed for manual use in settings
+async function onCityChange(){
+  const city = document.getElementById('settings-wedding-city').value.trim();
+  if(!city || city === WEDDING_CITY) return;
+  showLoading(true);
+  await refreshHubs(city);
+  document.getElementById('settings-hubs').value=HUBS.join('\n');
+  showLoading(false);
+  showToast('Hubs refreshed for '+city, 'success');
+}
+async function saveSettings(){
+  const url=document.getElementById('settings-script-url').value.trim();
+  const key=document.getElementById('settings-gemini-key').value.trim();
+  const city=document.getElementById('settings-wedding-city').value.trim();
+  const hubsRaw=document.getElementById('settings-hubs').value.trim();
+  
+  if(!url||!key||!city){showToast('Fields required','error');return;}
+  
+  const newHubs = hubsRaw.split('\n').map(s=>s.trim()).filter(Boolean);
+  const cityChanged = city !== WEDDING_CITY;
+  
+  localStorage.setItem('wgt_script_url',url);
+  localStorage.setItem('wgt_gemini_key',key);
+  localStorage.setItem('wgt_wedding_city',city);
+  SCRIPT_URL=url;GEMINI_KEY=key;WEDDING_CITY=city;
+  
+  // Only fetch hubs if city changed AND differs from last fetched city
+  if(cityChanged && city !== (localStorage.getItem('wgt_last_fetched_city')||'').trim()){
+    showLoading(true);
+    await refreshHubs(city);
+    showLoading(false);
+  } else {
+    // Use the manually edited hub list as-is
+    HUBS=newHubs;
+    localStorage.setItem('wgt_hubs', JSON.stringify(HUBS));
+  }
+  
+  document.getElementById('settings-modal').classList.remove('open');
+  showToast('Settings saved','success');
+  renderDashboard();
+}
+
+// ── Helpers ───────────────────────────────────────────────────
+function fmtDate(d){
+  if(!d) return '—';
+  const str=String(d).includes('T')?String(d).split('T')[0]:String(d);
+  const p=str.split('-');if(p.length!==3||parseInt(p[0])<1900) return '⚠️ '+String(d).slice(0,10);
+  const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return parseInt(p[2])+' '+(months[parseInt(p[1])-1]||'');
+}
+function fmtAmPm(t){
+  if(!t) return '—';
+  let s=String(t).trim();
+  if(s.includes('T')){
+    const tPart=s.split('T')[1];
+    if(s.startsWith('1899')) return '—';
+    s=tPart;
+  }
+  if(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(s)) s=s.split(' ')[1];
+  s=s.slice(0,5);
+  if(!s||s.length<4){
+    console.warn('fmtAmPm: malformed time input:', t);
+    return '⚠️ '+String(t).slice(0,8);
+  }
+  const p=s.split(':');
+  if(p.length<2) return '⚠️ '+String(t).slice(0,8);
+  const h=parseInt(p[0]);
+  const m=String(p[1]).padStart(2,'0');
+  if(isNaN(h)||h<0||h>23){
+    console.warn('fmtAmPm: invalid hour in:', t);
+    return '⚠️ '+String(t).slice(0,8);
+  }
+  const ap=h>=12?'PM':'AM';
+  const h12=h%12||12;
+  return `${h12}:${m} ${ap}`;
+}
+function fmtTs(ts){
+  if(!ts) return '';
+  try{
+    if(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(ts)) return fmtAmPm(ts.split(' ')[1]);
+    return fmtAmPm(new Date(ts).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:false}));
+  }catch{return ts;}
+}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+let _tt;
+function showToast(msg,type=''){
+  const t=document.getElementById('toast');t.textContent=msg;t.className='show '+type;
+  clearTimeout(_tt);_tt=setTimeout(()=>{t.className='';},3000);
+}
+
+// ── Test data ─────────────────────────────────────────────────
+function loadTestData(){
+  allDrivers=[
+    {driver_id:'D001',driver_name:'Suresh Kumar', driver_phone:'9000000001',car_type:'Innova',        car_no:'WB02AB1042',capacity:'7', assigned:'yes'},
+    {driver_id:'D002',driver_name:'Ramesh Das',   driver_phone:'9000000002',car_type:'Ertiga',         car_no:'WB02CD2031',capacity:'6', assigned:'yes'},
+    {driver_id:'D003',driver_name:'Bikash Roy',   driver_phone:'9000000003',car_type:'Tempo Traveller',car_no:'WB02EF3099',capacity:'12',assigned:'yes'},
+    {driver_id:'D004',driver_name:'Manoj Singh',  driver_phone:'9000000004',car_type:'ScorpioX',        car_no:'WB02GH4011',capacity:'7', assigned:'no'},
+  ];
+  const today=new Date().toISOString().slice(0,10);
+  const tom=new Date(Date.now()+86400000).toISOString().slice(0,10);
+  const soon=new Date(Date.now()+90*60000);
+  const soonTime=soon.getHours().toString().padStart(2,'0')+':'+soon.getMinutes().toString().padStart(2,'0');
+  allGuests=[
+    // 12303 Poorva Express — today DEPARTURE (Kolkata → New Delhi)
+    {group_id:'G001',group_name:'Sharma Family',pax:'4',phone_primary:'9876543210',phone_backup:'9876543211',
+     pickup_location:'Howrah',journey_origin:'Kolkata',arrival_date:today,arrival_time:'14:00',
+     transport_type:'Train',transport_name:'Poorva Express',transport_number:'12303',pnr:'1234567890',
+     car_type:'Innova',car_no:'WB02AB1042',driver_name:'Suresh Kumar',driver_phone:'9000000001',
+     notes:'',status:'active',journey_type:'departure',dispatched:'no',driver_arrived:'no',guest_in_car:'no',dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:'',deleted:'no'},
+
+    // 13051 Tebhaga Express — today ARRIVAL (Jalpaiguri → Sealdah)
+    {group_id:'G002',group_name:'Roy Family',pax:'3',phone_primary:'9876540001',phone_backup:'',
+     pickup_location:'Sealdah',journey_origin:'Jalpaiguri',arrival_date:today,arrival_time:'07:15',
+     transport_type:'Train',transport_name:'Tebhaga Express',transport_number:'13051',pnr:'2345678901',
+     car_type:'Ertiga',car_no:'WB02CD2031',driver_name:'Ramesh Das',driver_phone:'9000000002',
+     notes:'',status:'active',journey_type:'arrival',dispatched:'no',driver_arrived:'no',guest_in_car:'no',dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:'',deleted:'no'},
+
+    // 12274 Duronto Express — today ARRIVAL (New Delhi → Howrah)
+    {group_id:'G003',group_name:'Kapoor Siblings',pax:'2',phone_primary:'9876540002',phone_backup:'9876540003',
+     pickup_location:'Howrah',journey_origin:'New Delhi',arrival_date:today,arrival_time:'16:30',
+     transport_type:'Train',transport_name:'Duronto Express',transport_number:'12274',pnr:'3456789012',
+     car_type:'Ertiga',car_no:'WB02CD2031',driver_name:'Ramesh Das',driver_phone:'9000000002',
+     notes:'',status:'active',journey_type:'arrival',dispatched:'no',driver_arrived:'no',guest_in_car:'no',dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:'',deleted:'no'},
+
+    // 12304 Poorva Express — today ARRIVAL (New Delhi → Howrah)
+    {group_id:'G004',group_name:'Mehta Family',pax:'5',phone_primary:'9876540004',phone_backup:'',
+     pickup_location:'Howrah',journey_origin:'New Delhi',arrival_date:today,arrival_time:'09:45',
+     transport_type:'Train',transport_name:'Poorva Express',transport_number:'12304',pnr:'4567890123',
+     car_type:'Tempo Traveller',car_no:'WB02EF3099',driver_name:'Bikash Roy',driver_phone:'9000000003',
+     notes:'Elderly couple, needs assistance',status:'active',journey_type:'arrival',dispatched:'no',driver_arrived:'no',guest_in_car:'no',dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:'',deleted:'no'},
+
+    // 12304 Poorva Express — TOMORROW ARRIVAL (New Delhi → Howrah)
+    {group_id:'G005',group_name:'Joshi Brothers',pax:'3',phone_primary:'9876540005',phone_backup:'',
+     pickup_location:'Howrah',journey_origin:'New Delhi',arrival_date:tom,arrival_time:'09:45',
+     transport_type:'Train',transport_name:'Poorva Express',transport_number:'12304',pnr:'5678901234',
+     car_type:'',car_no:'',driver_name:'',driver_phone:'',
+     notes:'',status:'active',journey_type:'arrival',dispatched:'no',driver_arrived:'no',guest_in_car:'no',dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:'',deleted:'no'},
+
+    // 18029 Shalimar Express — today ARRIVAL (Okha → Howrah)
+    {group_id:'G006',group_name:'Patel Group',pax:'6',phone_primary:'9876540006',phone_backup:'9876540007',
+     pickup_location:'Howrah',journey_origin:'Okha',arrival_date:today,arrival_time:'11:30',
+     transport_type:'Train',transport_name:'Shalimar Express',transport_number:'18029',pnr:'6789012345',
+     car_type:'Tempo Traveller',car_no:'WB02EF3099',driver_name:'Bikash Roy',driver_phone:'9000000003',
+     notes:'6 large bags',status:'active',journey_type:'arrival',dispatched:'yes',driver_arrived:'no',guest_in_car:'no',dropped_off:'no',car_returned:'no',
+     live_status_text:'Train 18029 is running on time. Currently at Santragachi. ETA Howrah 11:35 AM.',last_refreshed:'2025-01-01 10:00',deleted:'no'},
+
+    // 12859 Gitanjali Express — today DEPARTURE (Howrah → Mumbai CST)
+    {group_id:'G007',group_name:'Banerjee Uncle',pax:'2',phone_primary:'9876540008',phone_backup:'',
+     pickup_location:'Howrah',journey_origin:'Kolkata',arrival_date:today,arrival_time:'14:05',
+     transport_type:'Train',transport_name:'Gitanjali Express',transport_number:'12859',pnr:'7890123456',
+     car_type:'Innova',car_no:'WB02AB1042',driver_name:'Suresh Kumar',driver_phone:'9000000001',
+     notes:'',status:'active',journey_type:'departure',dispatched:'no',driver_arrived:'no',guest_in_car:'no',dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:'',deleted:'no'},
+
+    // Completed — picked up
+    {group_id:'G008',group_name:'Verma Family',pax:'2',phone_primary:'9876540009',phone_backup:'',
+     pickup_location:'Sealdah',journey_origin:'Bhubaneswar',arrival_date:today,arrival_time:'08:00',
+     transport_type:'Train',transport_name:'Coromandel Express',transport_number:'12841',pnr:'8901234567',
+     car_type:'Ertiga',car_no:'WB02CD2031',driver_name:'Ramesh Das',driver_phone:'9000000002',
+     notes:'',status:'picked_up',journey_type:'arrival',dispatched:'yes',driver_arrived:'yes',guest_in_car:'yes',dropped_off:'no',car_returned:'no',live_status_text:'Arrived on time.',last_refreshed:'',deleted:'no'},
+  ];
+  renderDashboard();
+  console.log('✅ Test data loaded — '+allGuests.length+' guests, '+allDrivers.length+' drivers');
+  console.log('G006 & G007 = Rishab Bachhawat round trip from Cleartrip ticket');
+  console.log('Try: duplicate detection by uploading the Cleartrip PDF again');
+}
+</script>
+
+</body>
+</html>
