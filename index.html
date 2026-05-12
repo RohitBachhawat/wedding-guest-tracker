@@ -538,12 +538,16 @@ const CACHE_KEY_GUESTS  = 'wgt_cache_guests';
 const CACHE_KEY_DRIVERS = 'wgt_cache_drivers';
 const CACHE_KEY_TS      = 'wgt_cache_ts';
 
+let _cacheTimer;
 function saveToCache() {
-  try {
-    localStorage.setItem(CACHE_KEY_GUESTS, JSON.stringify(allGuests));
-    localStorage.setItem(CACHE_KEY_DRIVERS, JSON.stringify(allDrivers));
-    localStorage.setItem(CACHE_KEY_TS, Date.now().toString());
-  } catch(e) { console.warn('Failed to save to cache:', e); }
+  clearTimeout(_cacheTimer);
+  _cacheTimer = setTimeout(() => {
+    try {
+      localStorage.setItem(CACHE_KEY_GUESTS, JSON.stringify(allGuests));
+      localStorage.setItem(CACHE_KEY_DRIVERS, JSON.stringify(allDrivers));
+      localStorage.setItem(CACHE_KEY_TS, Date.now().toString());
+    } catch(e) { console.warn('Failed to save to cache:', e); }
+  }, 2000);
 }
 
 // Derive driver assignment status from the active guest list (source of truth)
@@ -722,8 +726,12 @@ async function initAndLoad(){
 
   showLoading(true);
   try{
-    await apiPostRaw({action:'initSheet'}).catch(e => console.warn('initSheet failed (non-fatal):', e));
-    const [g,d]=await Promise.all([apiGet('getGuests'),apiGet('getDrivers')]);
+    // FIRE ALL IN PARALLEL: initSheet, getGuests, getDrivers
+    // initSheet is fire-and-forget; it's idempotent.
+    const pInit = apiPostRaw({action:'initSheet'}).catch(e => console.warn('initSheet failed (non-fatal):', e));
+    const pData = Promise.all([apiGet('getGuests'),apiGet('getDrivers')]);
+    
+    const [g,d] = await pData;
     if(g && g.guests && g.guests.length) allGuests=g.guests.filter(x=>!isDeleted(x)).map(sanitizeGuest);
     if(d && d.drivers && d.drivers.length) allDrivers=d.drivers;
     
@@ -733,6 +741,7 @@ async function initAndLoad(){
     
     // Data integrity pass — surface bad records
     runDataIntegrityCheck();
+    await pInit; // Ensure it finished eventually
   }catch(e){
     console.error('initAndLoad error:',e);
     if(allGuests.length) {
@@ -799,6 +808,9 @@ function sanitizeGuest(g){
   // Flag missing critical fields
   if(!g.arrival_date && g.status==='active') g._data_warning = g._data_warning || 'Missing arrival date';
   if(!g.arrival_time && g.status==='active') g._data_warning = g._data_warning || 'Missing arrival time';
+  
+  // Performance: Memoize expensive checks
+  g._jt = journeyType(g);
   return g;
 }
 
@@ -808,6 +820,7 @@ function showDashboard(){screen('dashboard');renderDashboard();}
 
 // ── Journey helpers ───────────────────────────────────────────
 function journeyType(g){
+  if(g._jt) return g._jt;
   const jt=(g.journey_type||'').toLowerCase().trim();
   if(jt==='departure') return 'departure';
   if(jt==='arrival') return 'arrival';
@@ -900,7 +913,14 @@ function calcLeaveByDeparture(t,type,pax){return addMinsToTime(t,-departureBufMi
 // Dismissed multi-train banner trains (session only)
 const dismissedMultiTrain=new Set();
 
+// Debounce renderDashboard to prevent layout thrashing
+let _renderTimer;
 function renderDashboard(){
+  clearTimeout(_renderTimer);
+  _renderTimer = setTimeout(_renderDashboardInternal, 50);
+}
+
+function _renderDashboardInternal(){
   screen('dashboard');
   buildDateTabs();
   buildMultiTrainBanner();
@@ -1214,6 +1234,26 @@ function statusLabel(g){
 }
 function statusClass(g){const s=stripClass(g);return s==='strip-green'?'status-on-time':s==='strip-amber'?'status-delayed':s==='strip-red'?'status-late':'status-unknown';}
 
+function updateCardUI(id){
+  const g = allGuests.find(x=>x.group_id===id);
+  if(!g) return;
+  const card = document.getElementById('card-'+id);
+  if(!card) return;
+  
+  // Re-render the entire card content into the existing shell
+  // This is surgical but captures all badge/status changes
+  const parent = card.parentElement;
+  const placeholder = document.createElement('div');
+  placeholder.innerHTML = renderCard(g);
+  const newCard = placeholder.firstElementChild;
+  
+  // Maintain 'open' state if it was open
+  const wasOpen = card.querySelector('.card-expanded').classList.contains('open');
+  if(wasOpen) newCard.querySelector('.card-expanded').classList.add('open');
+  
+  parent.replaceChild(newCard, card);
+}
+
 // ── Card actions ──────────────────────────────────────────────
 async function refreshStatus(id){
   const g=allGuests.find(x=>x.group_id===id);if(!g) return;
@@ -1248,35 +1288,59 @@ async function refreshStatus(id){
 }
 
 async function toggleField(id,field,current){
-  const newVal=current==='yes'?'no':'yes';showLoading(true);
+  const newVal=current==='yes'?'no':'yes';
+  // Optimistic UI
+  const idx=allGuests.findIndex(x=>x.group_id===id);
+  if(idx>=0) allGuests[idx][field]=newVal;
+  updateCardUI(id); 
+  saveToCache();
+  
   try{
     await apiPost({action:'updateGuestStatus',group_id:id,field,value:newVal});
-    const idx=allGuests.findIndex(x=>x.group_id===id);if(idx>=0) allGuests[idx][field]=newVal;
-    saveToCache();
-    renderDashboard();
-  }catch(e){showToast(e.message||'Save failed. Please retry.','error');}
-  showLoading(false);
+  }catch(e){
+    // Revert on failure
+    if(idx>=0) allGuests[idx][field]=current;
+    updateCardUI(id);
+    showToast(e.message||'Save failed. Please retry.','error');
+  }
 }
 async function markFinal(id,type){
   const value=type==='arrival'?'picked_up':'car_returned';
-  showLoading(true);
+  // Optimistic UI
+  const idx=allGuests.findIndex(x=>x.group_id===id);
+  const oldVal = idx>=0?allGuests[idx].status:'';
+  if(idx>=0) allGuests[idx].status=value;
+  
+  // This one usually moves sections, so full render is safer but we do it fast
+  renderDashboard();
+  saveToCache();
+  
   try{
     await apiPost({action:'updateGuestStatus',group_id:id,field:'status',value});
-    const idx=allGuests.findIndex(x=>x.group_id===id);if(idx>=0) allGuests[idx].status=value;
-    saveToCache();
-    renderDashboard();showToast(type==='arrival'?'Picked up 🎉':'Trip completed ✓','success');
-  }catch(e){showToast(e.message||'Save failed. Please retry.','error');}
-  showLoading(false);
+    showToast(type==='arrival'?'Picked up 🎉':'Trip completed ✓','success');
+  }catch(e){
+    if(idx>=0) allGuests[idx].status=oldVal;
+    renderDashboard();
+    showToast(e.message||'Save failed. Please retry.','error');
+  }
 }
 async function markActive(id){
-  showLoading(true);
+  // Optimistic UI
+  const idx=allGuests.findIndex(x=>x.group_id===id);
+  const oldVal = idx>=0?allGuests[idx].status:'';
+  if(idx>=0) allGuests[idx].status='active';
+  
+  renderDashboard();
+  saveToCache();
+  
   try{
     await apiPost({action:'updateGuestStatus',group_id:id,field:'status',value:'active'});
-    const idx=allGuests.findIndex(x=>x.group_id===id);if(idx>=0) allGuests[idx].status='active';
-    saveToCache();
-    renderDashboard();showToast('Moved back to active','success');
-  }catch(e){showToast(e.message||'Save failed. Please retry.','error');}
-  showLoading(false);
+    showToast('Moved back to active','success');
+  }catch(e){
+    if(idx>=0) allGuests[idx].status=oldVal;
+    renderDashboard();
+    showToast(e.message||'Save failed. Please retry.','error');
+  }
 }
 
 // ── Delete ────────────────────────────────────────────────────
@@ -1408,14 +1472,20 @@ async function driverMarkComplete(groupId){
   showLoading(false);
 }
 async function toggleDriverField(groupId,field,current){
-  const v=current==='yes'?'no':'yes';showLoading(true);
+  const v=current==='yes'?'no':'yes';
+  // Optimistic UI for drivers too
+  const idx=allGuests.findIndex(g=>g.group_id===groupId);
+  if(idx>=0) allGuests[idx][field]=v;
+  renderDrivers(); // Drivers view re-render is small
+  saveToCache();
+  
   try{
     await apiPost({action:'updateGuestStatus',group_id:groupId,field,value:v});
-    const idx=allGuests.findIndex(g=>g.group_id===groupId);if(idx>=0) allGuests[idx][field]=v;
-    saveToCache();
-    renderDrivers();showToast('Updated ✓','success');
-  }catch(e){showToast(e.message||'Save failed. Please retry.','error');}
-  showLoading(false);
+  }catch(e){
+    if(idx>=0) allGuests[idx][field]=current;
+    renderDrivers();
+    showToast(e.message||'Save failed. Please retry.','error');
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
