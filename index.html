@@ -212,7 +212,7 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
 <div id="toast"></div>
 <div id="loading-overlay" class="hidden">
   <div class="spinner"></div>
-  <p style="color:var(--text-2);font-size:14px;">Please wait…</p>
+  <p class="loading-msg" style="color:var(--text-2);font-size:14px;">Loading…</p>
 </div>
 
 <!-- SETUP -->
@@ -315,7 +315,7 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
           </div>
           <div class="form-row">
             <div class="form-group"><label id="location-label">Pickup Station *</label><select id="f-pickup-location" required></select></div>
-            <div class="form-group"><label>Transport Type *</label><select id="f-transport-type" required><option value="Train">Train</option><option value="Flight">Flight</option></select></div>
+            <div class="form-group"><label>Transport Type *</label><select id="f-transport-type" required><option value="">Select type…</option><option value="Train">Train</option><option value="Flight">Flight</option></select></div>
           </div>
           <div class="form-row">
             <div class="form-group"><label>Train / Flight Name</label><input type="text" id="f-transport-name" placeholder="e.g. SpiceJet SG-759"/></div>
@@ -371,7 +371,7 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
 <div class="modal-overlay" id="settings-modal">
   <div class="modal">
     <h3>⚙️ Settings</h3>
-    <div class="form-group"><label>Wedding City</label><input type="text" id="settings-wedding-city" onchange="onCityChange()"/></div>
+    <div class="form-group"><label>Wedding City</label><input type="text" id="settings-wedding-city"/></div>
     <div class="form-group">
       <label>Transport Hubs (One per line)</label>
       <textarea id="settings-hubs" rows="5" placeholder="Railway Station A&#10;Airport B"></textarea>
@@ -463,6 +463,29 @@ const TRAVEL_MINS   = 90;
 const CONFLICT_MINS = 120;
 const LUGGAGE_KW    = ['luggage','bag','suitcase','baggage','wheelchair','equipment','heavy','lots','bulky','cargo'];
 
+// ── Sheet formula-injection sanitizer ────────────────────────
+// Prefixes a single apostrophe on any free-text value that starts with a
+// formula trigger character (=, +, -, @) so Google Sheets treats it as
+// plain text and never executes it as a formula.
+const FORMULA_CHARS = /^[=+\-@]/;
+function sanitizeForSheet(value){
+  if(typeof value !== 'string') return value;
+  return FORMULA_CHARS.test(value.trimStart()) ? "'" + value : value;
+}
+const FREE_TEXT_FIELDS = [
+  'group_name','individual_names','journey_origin','journey_destination',
+  'transport_name','transport_number','pnr','notes',
+  'pickup_location','driver_name','car_type','car_no',
+  'phone_primary','phone_backup','driver_phone'
+];
+function sanitizeDataForSheet(data){
+  const out = {...data};
+  FREE_TEXT_FIELDS.forEach(field => {
+    if(out[field] !== undefined) out[field] = sanitizeForSheet(out[field]);
+  });
+  return out;
+}
+
 // ── Offline write queue ──────────────────────────────────────
 const SYNC_QUEUE_KEY = 'wgt_sync_queue';
 let syncQueue = JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY)||'[]');
@@ -484,8 +507,11 @@ function updateSyncBadge(){
 async function flushSyncQueue(){
   if(syncInProgress||!syncQueue.length||!SCRIPT_URL) return;
   syncInProgress=true;updateSyncBadge();
+  const MAX_AGE_MS = 24*60*60*1000; // drop items older than 24 hours
+  const now = Date.now();
   const remaining=[];
   for(const item of syncQueue){
+    if(item.ts && (now - item.ts) > MAX_AGE_MS){ console.warn('Dropping stale sync item:', item); continue; }
     try{await apiPostRaw(item.payload);}catch(e){remaining.push(item);}
   }
   syncQueue=remaining;
@@ -693,7 +719,7 @@ async function initAndLoad(){
 
   showLoading(true);
   try{
-    await apiPost({action:'initSheet'});
+    await apiPostRaw({action:'initSheet'}).catch(e => console.warn('initSheet failed (non-fatal):', e));
     const [g,d]=await Promise.all([apiGet('getGuests'),apiGet('getDrivers')]);
     if(g && g.guests && g.guests.length) allGuests=g.guests.filter(x=>x.deleted!=='yes').map(sanitizeGuest);
     if(d && d.drivers && d.drivers.length) allDrivers=d.drivers;
@@ -775,7 +801,7 @@ function sanitizeGuest(g){
 
 // ── Screen router ─────────────────────────────────────────────
 function screen(n){['dashboard','drivers','guest'].forEach(s=>{document.getElementById('screen-'+s).style.display=s===n?'block':'none';});}
-function showDashboard(){renderDashboard();}
+function showDashboard(){screen('dashboard');renderDashboard();}
 
 // ── Journey helpers ───────────────────────────────────────────
 function journeyType(g){
@@ -975,7 +1001,7 @@ function toggleCompleted(){completedOpen=!completedOpen;renderDashboard();}
 // ── Pooling ───────────────────────────────────────────────────
 function buildPooling(){
   currentRecs=[];
-  const active=allGuests.filter(g=>g.status!=='picked_up'&&g.status!=='car_returned');
+  const active=allGuests.filter(g=>g.status!=='picked_up'&&g.status!=='car_returned'&&g.deleted!=='yes');
   for(let i=0;i<active.length;i++){
     for(let j=i+1;j<active.length;j++){
       const a=active[i],b=active[j];
@@ -1048,7 +1074,7 @@ document.getElementById('pooling-confirm-btn').addEventListener('click',async()=
   showLoading(true);
   try{
     const updated={...tgt,driver_name:sd.name,car_no:sd.car_no,car_type:sd.car,driver_phone:sd.phone||''};
-    await apiPost({action:'updateGuest',data:updated});
+    await apiPost({action:'updateGuest',data:sanitizeDataForSheet(updated)});
     const idx=allGuests.findIndex(g=>g.group_id===tgt.group_id);
     if(idx>=0) allGuests[idx]={...allGuests[idx],...updated};
     saveToCache();
@@ -1061,12 +1087,12 @@ document.getElementById('pooling-confirm-btn').addEventListener('click',async()=
 // ── Guest card ────────────────────────────────────────────────
 function renderCard(g, isCompleted){
   const jt=journeyType(g);const isDep=jt==='departure';
-  const isAirport=g.pickup_location==='Airport';
+  const isAirport=(g.pickup_location||'').toLowerCase().includes('airport');
   const pri=isPriority(g);
 
   // Same-train badge: count how many active guests share this train number
   const sameTrainCount=g.transport_number
-    ?allGuests.filter(x=>x.transport_number===g.transport_number&&x.group_id!==g.group_id&&x.status!=='picked_up'&&x.status!=='car_returned').length
+    ?allGuests.filter(x=>x.transport_number===g.transport_number&&x.group_id!==g.group_id&&x.arrival_date===g.arrival_date&&x.status!=='picked_up'&&x.status!=='car_returned').length
     :0;
   const sameTrainBadge=sameTrainCount>0
     ?`<span class="same-train-badge">🚂 ${sameTrainCount+1} groups on ${esc(g.transport_number)}</span>`:'';
@@ -1431,6 +1457,7 @@ function showGuestForm(id){
   document.getElementById('extraction-result').classList.remove('show');
   document.getElementById('roundtrip-banner').classList.add('hidden');
   populateDriverDropdown();
+  populateStationDropdown();
   if(id){
     const g=allGuests.find(x=>x.group_id===id);
     if(g){populateForm(g);setJourneyType(journeyType(g));}
@@ -1561,6 +1588,7 @@ function checkDuplicate(data){
   if(!data.pnr) return null;
   return allGuests.find(g=>{
     if(g.group_id===data.group_id) return false;
+    if(g.deleted==='yes') return false;   // deleted entries must not block re-adds
     if(!g.pnr) return false;
     return data.pnr.trim().toUpperCase()===g.pnr.trim().toUpperCase();
   })||null;
@@ -1615,6 +1643,8 @@ function checkConflict(data){
 }
 function hasLuggageNotes(n){return n&&LUGGAGE_KW.some(k=>n.toLowerCase().includes(k));}
 function checkCarOpt(data){
+  if(!data.driver_name||!data.car_no||!data.pax) return null;
+  if(hasLuggageNotes(data.notes)) return null;
   const ad=allDrivers.find(d=>(d.car_no||d.car_token)===data.car_no);if(!ad) return null;
   const ac=parseInt(ad.capacity||0);const pax=parseInt(data.pax)||0;
   const smaller=allDrivers.filter(d=>{if(d.assigned==='yes') return false;const c=parseInt(d.capacity||0);return c>=pax&&c<ac;}).sort((a,b)=>parseInt(a.capacity)-parseInt(b.capacity));
@@ -1637,28 +1667,15 @@ async function submitGuestForm(e){
   }
 
   // ── Journey Type Mismatch Check (Final Safety) ────────────────
-  const ori = (data.journey_origin||'').toLowerCase();
-  const des = (data.journey_destination||'').toLowerCase();
-  const pl = (data.pickup_location||'').toLowerCase();
-  
-  const oriIsLocal = matchesLocal(data.journey_origin);
-  const desIsLocal = matchesLocal(data.journey_destination);
-  // Also check if pickup location matches origin (origin = local hub = departure)
-  const plMatchesOri = ori && pl && (ori.includes(pl)||pl.includes(ori));
-  
-  if (data.journey_type === 'arrival') {
-    // Origin is local → should be departure (they're leaving FROM the wedding city)
-    if (oriIsLocal && !desIsLocal) { showJTMismatchModal(data, 'departure'); return; }
-    // Pickup station matches origin → user is picking up from where they depart = likely departure
-    if (plMatchesOri && !desIsLocal) { showJTMismatchModal(data, 'departure'); return; }
-  }
-  if (data.journey_type === 'departure') {
-    // Destination is local → should be arrival (they're coming TO the wedding city)
-    if (desIsLocal && !oriIsLocal) { showJTMismatchModal(data, 'arrival'); return; }
-    // Origin is NOT local but set as departure → they're leaving from an outside city, should be arrival
-    if (!oriIsLocal && !desIsLocal && ori && des) {
-      // Neither matches — can't determine, skip
-    } else if (!oriIsLocal && desIsLocal) { showJTMismatchModal(data, 'arrival'); return; }
+  if(data.journey_origin && data.journey_destination) {
+    const oriIsLocal = matchesLocal(data.journey_origin);
+    const desIsLocal = matchesLocal(data.journey_destination);
+    if (data.journey_type === 'arrival' && oriIsLocal && !desIsLocal) {
+      showJTMismatchModal(data, 'departure'); return;
+    }
+    if (data.journey_type === 'departure' && desIsLocal && !oriIsLocal) {
+      showJTMismatchModal(data, 'arrival'); return;
+    }
   }
 
   const smallerDriver=checkCarOpt(data);
@@ -1703,14 +1720,14 @@ async function proceedSave(data){
       data.dropped_off=ex.dropped_off||'no';data.car_returned=ex.car_returned||'no';
       data.last_refreshed=ex.last_refreshed||'';data.live_status_text=ex.live_status_text||'';
       data.deleted=ex.deleted||'no';
-      await apiPost({action:'updateGuest',data});
+      await apiPost({action:'updateGuest',data:sanitizeDataForSheet(data)});
       const idx=allGuests.findIndex(g=>g.group_id===editingId);
       if(idx>=0) allGuests[idx]={...allGuests[idx],...data};
       syncDriverAssignment(); saveToCache();
       showToast('Guest updated ✓','success');
       showLoading(false);showDashboard();renderDashboard();
     } else {
-      const res=await apiPost({action:'addGuest',data});
+      const res=await apiPost({action:'addGuest',data:sanitizeDataForSheet(data)});
       data.group_id=res.group_id;data.status='active';
       data.dispatched='no';data.driver_arrived='no';data.guest_in_car='no';
       data.dropped_off='no';data.car_returned='no';data.deleted='no';
@@ -1753,32 +1770,42 @@ async function handleFileUpload(event){
     const {b64,mime}=await compressIfNeeded(file);
     if(file.type!=='application/pdf'&&file.size>800*1024) showToast('Image compressed for faster upload','success');
     const prompt=`You are extracting travel ticket data for a wedding in ${WEDDING_CITY}.
-    
-    The wedding hubs are: ${HUBS.join(', ')}.
+    The wedding transport hubs are: ${HUBS.join(', ')}.
 
-    Read the ENTIRE ticket carefully and extract ALL legs.
+    Read the ENTIRE ticket and extract ALL journey legs.
+    Return ONLY a valid JSON object. No markdown, no explanation, no extra text.
 
-    Return ONLY a valid JSON object with NO markdown:
+    JSON structure:
     {
       "legs": [
         {
-          "journey_type": "arrival or departure - arrival means coming TO the wedding city, departure means leaving FROM it",
-          "matched_hub": "The EXACT hub name from the list [${HUBS.join(', ')}] that the guest is using for this leg. If none match, pick the most likely or leave empty.",
-          "transport_type": "Train or Flight",
-          "transport_name": "airline/train name",
-          "transport_number": "flight/train number",
-          "pnr": "PNR for this leg",
-          "journey_origin": "departure city",
-          "journey_destination": "arrival city",
-          "depart_date": "YYYY-MM-DD",
-          "depart_time": "HH:MM 24hr",
-          "arrive_date": "YYYY-MM-DD",
-          "arrive_time": "HH:MM 24hr",
-          "individual_names": "comma separated names",
+          "journey_type": "departure",
+          "matched_hub": "Howrah Junction",
+          "transport_type": "Train",
+          "transport_name": "Netaji Express",
+          "transport_number": "13051",
+          "pnr": "6102913335",
+          "journey_origin": "Howrah",
+          "journey_destination": "Mirzapur",
+          "depart_date": "2026-06-29",
+          "depart_time": "21:55",
+          "arrive_date": "2026-06-30",
+          "arrive_time": "09:08",
+          "individual_names": "Virendra S Binay",
           "pax": 1
         }
       ]
-    }`;
+    }
+
+    Rules:
+    - journey_type: "arrival" = guest coming TO ${WEDDING_CITY}. "departure" = guest leaving FROM ${WEDDING_CITY}.
+    - matched_hub: pick the EXACT string from [${HUBS.join(', ')}] that matches the station on this ticket. Empty string if none match.
+    - journey_origin: actual city/station name from the ticket where journey STARTS (e.g. "Howrah Junction", "New Delhi").
+    - journey_destination: actual city/station name from the ticket where journey ENDS (e.g. "Mirzapur", "Mumbai CST").
+    - depart_date/depart_time: when it leaves origin.
+    - arrive_date/arrive_time: when it arrives at destination (may be next day for overnight trains).
+    - All date fields MUST be YYYY-MM-DD format. All time fields MUST be HH:MM 24-hour format.
+    - pax: number of passengers on this leg (integer).`;
 
     const raw=await callGeminiFile(prompt,b64,mime);
     let parsed={legs:[]};
@@ -2036,6 +2063,7 @@ function openSettings(){
   document.getElementById('settings-hubs').value=HUBS.join('\n');
   document.getElementById('settings-modal').classList.add('open');
 }
+// Exposed for manual use in settings
 async function onCityChange(){
   const city = document.getElementById('settings-wedding-city').value.trim();
   if(!city || city === WEDDING_CITY) return;
@@ -2045,7 +2073,7 @@ async function onCityChange(){
   showLoading(false);
   showToast('Hubs refreshed for '+city, 'success');
 }
-function saveSettings(){
+async function saveSettings(){
   const url=document.getElementById('settings-script-url').value.trim();
   const key=document.getElementById('settings-gemini-key').value.trim();
   const city=document.getElementById('settings-wedding-city').value.trim();
@@ -2054,13 +2082,23 @@ function saveSettings(){
   if(!url||!key||!city){showToast('Fields required','error');return;}
   
   const newHubs = hubsRaw.split('\n').map(s=>s.trim()).filter(Boolean);
+  const cityChanged = city !== WEDDING_CITY;
   
   localStorage.setItem('wgt_script_url',url);
   localStorage.setItem('wgt_gemini_key',key);
   localStorage.setItem('wgt_wedding_city',city);
-  localStorage.setItem('wgt_hubs', JSON.stringify(newHubs));
+  SCRIPT_URL=url;GEMINI_KEY=key;WEDDING_CITY=city;
   
-  SCRIPT_URL=url;GEMINI_KEY=key;WEDDING_CITY=city;HUBS=newHubs;
+  // Only fetch hubs if city changed AND user hasn't manually edited the hub list
+  if(cityChanged && city !== localStorage.getItem('wgt_last_fetched_city')){
+    showLoading(true);
+    await refreshHubs(city);
+    showLoading(false);
+  } else {
+    // Use the manually edited hub list as-is
+    HUBS=newHubs;
+    localStorage.setItem('wgt_hubs', JSON.stringify(HUBS));
+  }
   
   document.getElementById('settings-modal').classList.remove('open');
   showToast('Settings saved','success');
