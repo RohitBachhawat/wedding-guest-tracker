@@ -34,7 +34,7 @@ A high-performance, AI-powered web application designed for wedding coordinators
 6. Copy the **Web App URL**.
 
 ### 2. Frontend Configuration
-1. Open `index_wg.html` in any browser.
+1. Open `index.html` in any browser.
 2. Enter your **Google Apps Script URL** and **Gemini API Key** in the setup screen.
 3. Define your wedding city and logistics hubs (Airports/Stations).
 4. Start tracking!
