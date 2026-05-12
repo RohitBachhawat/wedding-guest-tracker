@@ -567,6 +567,9 @@ let carOptPendingData=null,carOptSmallerDriver=null;
 let dupPendingData=null,dupExistingId=null;
 let deletePendingId=null;
 let jtMismatchPendingData=null;
+
+// Robust deleted check — handles 'yes', 'Yes', 'YES', true, ' yes ' from Sheets
+function isDeleted(g){ return String(g.deleted||'').trim().toLowerCase()==='yes'; }
 // Round trip queue: array of extracted leg objects waiting to be filled
 let rtQueue=[], rtQueueIdx=0;
 // Personal details carried over between round trip legs
@@ -710,7 +713,7 @@ async function initAndLoad(){
     const cachedG = localStorage.getItem(CACHE_KEY_GUESTS);
     const cachedD = localStorage.getItem(CACHE_KEY_DRIVERS);
     if(cachedG && cachedD) {
-      allGuests = JSON.parse(cachedG).map(sanitizeGuest);
+      allGuests = JSON.parse(cachedG).filter(x=>!isDeleted(x)).map(sanitizeGuest);
       allDrivers = JSON.parse(cachedD);
       syncDriverAssignment();
       renderDashboard();
@@ -721,7 +724,7 @@ async function initAndLoad(){
   try{
     await apiPostRaw({action:'initSheet'}).catch(e => console.warn('initSheet failed (non-fatal):', e));
     const [g,d]=await Promise.all([apiGet('getGuests'),apiGet('getDrivers')]);
-    if(g && g.guests && g.guests.length) allGuests=g.guests.filter(x=>x.deleted!=='yes').map(sanitizeGuest);
+    if(g && g.guests && g.guests.length) allGuests=g.guests.filter(x=>!isDeleted(x)).map(sanitizeGuest);
     if(d && d.drivers && d.drivers.length) allDrivers=d.drivers;
     
     syncDriverAssignment();
@@ -934,7 +937,7 @@ function renderDashboard(){
   document.getElementById('active-cards-container').innerHTML=
     active.length?html:`<div class="empty-state"><div class="e-icon">🎊</div><h3>No upcoming guests</h3><p>Tap <strong>+ Add Guest</strong> to get started</p></div>`;
 
-  const done=allGuests.filter(g=>g.status==='picked_up'||g.status==='car_returned');
+  const done=allGuests.filter(g=>(g.status==='picked_up'||g.status==='car_returned')&&!isDeleted(g));
   document.getElementById('completed-cards').innerHTML=done.map(g=>renderCard(g,true)).join('');
   document.getElementById('completed-label').textContent=(completedOpen?'Hide':'Show')+' Completed ('+done.length+')';
   document.getElementById('completed-cards').classList.toggle('open',completedOpen);
@@ -974,7 +977,7 @@ function dismissMultiTrain(){
 }
 
 function filteredGuests(){
-  let list=allGuests.filter(g=>g.status!=='picked_up'&&g.status!=='car_returned'&&g.deleted!=='yes');
+  let list=allGuests.filter(g=>g.status!=='picked_up'&&g.status!=='car_returned'&&!isDeleted(g));
   if(activeTab!=='all') list=list.filter(g=>g.arrival_date===activeTab);
   return list;
 }
@@ -1001,7 +1004,7 @@ function toggleCompleted(){completedOpen=!completedOpen;renderDashboard();}
 // ── Pooling ───────────────────────────────────────────────────
 function buildPooling(){
   currentRecs=[];
-  const active=allGuests.filter(g=>g.status!=='picked_up'&&g.status!=='car_returned'&&g.deleted!=='yes');
+  const active=allGuests.filter(g=>g.status!=='picked_up'&&g.status!=='car_returned'&&!isDeleted(g));
   for(let i=0;i<active.length;i++){
     for(let j=i+1;j<active.length;j++){
       const a=active[i],b=active[j];
@@ -1092,7 +1095,7 @@ function renderCard(g, isCompleted){
 
   // Same-train badge: count how many active guests share this train number
   const sameTrainCount=g.transport_number
-    ?allGuests.filter(x=>x.transport_number===g.transport_number&&x.group_id!==g.group_id&&x.arrival_date===g.arrival_date&&x.status!=='picked_up'&&x.status!=='car_returned').length
+    ?allGuests.filter(x=>x.transport_number===g.transport_number&&x.group_id!==g.group_id&&x.arrival_date===g.arrival_date&&!isDeleted(x)&&x.status!=='picked_up'&&x.status!=='car_returned').length
     :0;
   const sameTrainBadge=sameTrainCount>0
     ?`<span class="same-train-badge">🚂 ${sameTrainCount+1} groups on ${esc(g.transport_number)}</span>`:'';
@@ -1314,7 +1317,7 @@ function renderDrivers(){
   if(assigned.length){
     const cards=assigned.map(d=>{
       const cn=d.car_no||d.car_token||'';
-      const groups=allGuests.filter(g=>g.car_no===cn&&g.status!=='picked_up'&&g.status!=='car_returned');
+      const groups=allGuests.filter(g=>g.car_no===cn&&!isDeleted(g)&&g.status!=='picked_up'&&g.status!=='car_returned');
       return driverCard(d,groups);
     }).join('');
     aSec.innerHTML=`<div class="section-label">✅ Assigned (${assigned.length})</div><div class="driver-cards-grid">${cards}</div>`;
@@ -2034,10 +2037,10 @@ async function callGeminiFile(prompt,b64,mime){
 // ── Summary ───────────────────────────────────────────────────
 function openSummaryModal(){
   const today=new Date().toISOString().slice(0,10);
-  const active=allGuests.filter(g=>g.status!=='picked_up'&&g.status!=='car_returned' && g.deleted!=='yes');
+  const active=allGuests.filter(g=>g.status!=='picked_up'&&g.status!=='car_returned'&&!isDeleted(g));
   const arrivals=active.filter(g=>journeyType(g)==='arrival');
   const deps=active.filter(g=>journeyType(g)==='departure');
-  const done=allGuests.filter(g=>(g.status==='picked_up'||g.status==='car_returned') && g.deleted!=='yes');
+  const done=allGuests.filter(g=>(g.status==='picked_up'||g.status==='car_returned')&&!isDeleted(g));
   const todayAll=active.filter(g=>g.arrival_date===today);
   const tiles=[
     {label:"Today's Guests",     value:todayAll.length,                                    sub:'groups'},
