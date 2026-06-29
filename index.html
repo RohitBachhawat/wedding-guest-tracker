@@ -235,6 +235,7 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
     <div class="header-brand"><span>🪔</span><h1>Wedding Tracker</h1></div>
     <div class="header-actions">
       <button class="btn-icon" onclick="openSummaryModal()" title="Summary">📊</button>
+      <button class="btn-icon" onclick="openCleanupModal()" title="Data Cleanup" id="cleanup-btn" style="display:none">🧹</button>
       <button class="btn btn-secondary btn-sm" onclick="showDrivers()">🚗 Drivers</button>
       <button class="btn btn-primary btn-sm" onclick="showGuestForm()">+ Add Guest</button>
       <button class="btn-icon" onclick="openSettings()" title="Settings">⚙️</button>
@@ -424,12 +425,27 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
 <!-- Duplicate detection modal -->
 <div class="modal-overlay" id="dup-modal">
   <div class="modal">
-    <h3>⚠️ Possible Duplicate Entry</h3>
+    <h3 id="dup-modal-title">⚠️ Duplicate Entry Detected</h3>
     <div class="dup-detail" id="dup-detail"></div>
-    <div class="modal-actions">
+    <div id="dup-actions-soft" class="modal-actions">
       <button class="btn btn-secondary" onclick="closeDupModal()">Cancel</button>
       <button class="btn btn-secondary" id="dup-view-btn">View Existing</button>
-      <button class="btn btn-primary" id="dup-save-anyway">Save as New</button>
+      <button class="btn btn-primary" id="dup-update-btn">Update Existing Instead</button>
+    </div>
+    <div id="dup-actions-hard" class="modal-actions" style="display:none">
+      <button class="btn btn-primary" onclick="closeDupModal()">OK, Go Back</button>
+    </div>
+  </div>
+</div>
+
+<!-- Data Cleanup modal -->
+<div class="modal-overlay" id="cleanup-modal">
+  <div class="modal" style="max-width:560px">
+    <h3>🧹 Data Cleanup</h3>
+    <div id="cleanup-body" style="font-size:13px;color:var(--text-2);line-height:1.8"></div>
+    <div class="modal-actions" id="cleanup-actions">
+      <button class="btn btn-secondary" onclick="closeCleanupModal()">Cancel</button>
+      <button class="btn btn-danger" id="cleanup-confirm-btn">Delete Duplicates</button>
     </div>
   </div>
 </div>
@@ -789,6 +805,17 @@ function sanitizeGuest(g){
     const isoMatch=s.match(/^(\d{4}-\d{2}-\d{2})/);
     if(isoMatch) g.arrival_date=isoMatch[1];
     else if(s.includes('T')) g.arrival_date=s.split('T')[0];
+    else {
+      // Handle DD/MM/YYYY (Indian Sheets locale)
+      const ddmm=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      if(ddmm) g.arrival_date=`${ddmm[3]}-${ddmm[2].padStart(2,'0')}-${ddmm[1].padStart(2,'0')}`;
+      // Handle D-Mon-YYYY (e.g. 29-Jun-2026)
+      else {
+        const monNames={Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'};
+        const dmon=s.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})/);
+        if(dmon&&monNames[dmon[2]]) g.arrival_date=`${dmon[3]}-${monNames[dmon[2]]}-${dmon[1].padStart(2,'0')}`;
+      }
+    }
     if(g.arrival_date&&parseInt(g.arrival_date.slice(0,4))<1900) g.arrival_date='';
   }
   // arrival_time: extract HH:MM
@@ -925,6 +952,7 @@ function _renderDashboardInternal(){
   buildDateTabs();
   buildMultiTrainBanner();
   buildPooling();
+  detectExistingDuplicates(); // auto-surface cleanup button if dupes found
 
   const active=filteredGuests();
   // Sort all active by date+time ascending, priority (no driver+soon) first within same time
@@ -1114,9 +1142,9 @@ function renderCard(g, isCompleted){
   const pri=isPriority(g);
 
   // Same-train badge: count how many active guests share this train number
-  const sameTrainCount=g.transport_number
-    ?allGuests.filter(x=>x.transport_number===g.transport_number&&x.group_id!==g.group_id&&x.arrival_date===g.arrival_date&&!isDeleted(x)&&x.status!=='picked_up'&&x.status!=='car_returned').length
-    :0;
+  const sameTrainCount = g.transport_number && g.transport_number.trim()
+    ? allGuests.filter(x=>x.transport_number===g.transport_number&&x.group_id!==g.group_id&&x.arrival_date===g.arrival_date&&!isDeleted(x)&&x.status!=='picked_up'&&x.status!=='car_returned').length
+    : 0;
   const sameTrainBadge=sameTrainCount>0
     ?`<span class="same-train-badge">🚂 ${sameTrainCount+1} groups on ${esc(g.transport_number)}</span>`:'';
 
@@ -1655,36 +1683,225 @@ function collectForm(){
 }
 function v(id){return document.getElementById(id)?.value||'';}
 
-// ── Duplicate check ────────────────────────────────────────────
+// ── Duplicate detection — multi-signal, foolproof ─────────────
+//
+// Signal 1 (HARD BLOCK): Same PNR, same journey_type, different group_id
+//   → Cannot be a new entry. Must update or cancel.
+// Signal 2 (HARD BLOCK): Same transport_number + same arrival_date + same journey_type + same pax
+//   → Very high confidence same booking (handles PNR missing/typo cases)
+// Signal 3 (SOFT WARN): Same name + same transport_number + same date (PNR may differ due to multi-leg)
+//   → Warn and offer to update existing instead of creating new
+//
+// "Save as New" button is REMOVED. Choices are: Update Existing or Cancel.
+// This prevents the "35 rows for 4 people" problem entirely.
+
+function normPnr(s){ return (s||'').trim().toUpperCase().replace(/[\s\-]/g,''); }
+function normName(s){ return (s||'').trim().toLowerCase().replace(/^(mr|mrs|ms|dr)\.?\s*/,''); }
+function normTransport(s){ return (s||'').trim().toUpperCase().replace(/[\s\-]/g,''); }
+
 function checkDuplicate(data){
-  // Only match on PNR — train numbers repeat daily, only PNR is unique per booking
-  if(!data.pnr) return null;
-  return allGuests.find(g=>{
-    if(g.group_id===data.group_id) return false;
-    if(g.deleted==='yes') return false;   // deleted entries must not block re-adds
-    if(!g.pnr) return false;
-    return data.pnr.trim().toUpperCase()===g.pnr.trim().toUpperCase();
-  })||null;
+  const candidates = allGuests.filter(g=>{
+    if(g.group_id === data.group_id) return false; // editing self
+    if(isDeleted(g)) return false;
+    return true;
+  });
+
+  // Signal 1: PNR exact match (same journey_type = definitely same leg)
+  if(normPnr(data.pnr)){
+    const pnrMatch = candidates.find(g=>
+      normPnr(g.pnr) === normPnr(data.pnr) &&
+      (g.journey_type||'arrival') === (data.journey_type||'arrival')
+    );
+    if(pnrMatch) return {match:pnrMatch, confidence:'hard', reason:`Same PNR (${esc(data.pnr)}) and journey type`};
+  }
+
+  // Signal 2: Same train/flight number + same date + same journey_type + same pax (PNR may be blank/typo)
+  if(normTransport(data.transport_number) && data.arrival_date){
+    const trainMatch = candidates.find(g=>
+      normTransport(g.transport_number) === normTransport(data.transport_number) &&
+      g.arrival_date === data.arrival_date &&
+      (g.journey_type||'arrival') === (data.journey_type||'arrival') &&
+      String(g.pax) === String(data.pax)
+    );
+    if(trainMatch) return {match:trainMatch, confidence:'hard', reason:`Same ${data.transport_type||'transport'} ${esc(data.transport_number)} on ${fmtDate(data.arrival_date)} with same passenger count`};
+  }
+
+  // Signal 3: Same normalised name + same transport + same date (soft — different leg possible)
+  if(normName(data.group_name) && normTransport(data.transport_number) && data.arrival_date){
+    const nameMatch = candidates.find(g=>
+      normName(g.group_name) === normName(data.group_name) &&
+      normTransport(g.transport_number) === normTransport(data.transport_number) &&
+      g.arrival_date === data.arrival_date
+    );
+    if(nameMatch) return {match:nameMatch, confidence:'soft', reason:`Same passenger name and ${data.transport_type||'transport'} on same date`};
+  }
+
+  return null;
 }
 
-function openDupModal(data,existing){
-  dupPendingData=data;dupExistingId=existing.group_id;
-  document.getElementById('dup-detail').innerHTML=
-    `An entry with PNR <strong>${esc(data.pnr)}</strong> already exists: <strong>${esc(existing.group_name)}</strong> · ${fmtDate(existing.arrival_date)} ${fmtAmPm(existing.arrival_time)}.`;
+function openDupModal(data, dupResult){
+  dupPendingData = data;
+  dupExistingId = dupResult.match.group_id;
+  const ex = dupResult.match;
+  const isHard = dupResult.confidence === 'hard';
+
+  document.getElementById('dup-modal-title').textContent = isHard ? '🚫 Duplicate Entry' : '⚠️ Possible Duplicate';
+  document.getElementById('dup-detail').innerHTML =
+    `<strong>${dupResult.reason}.</strong><br><br>` +
+    `Existing entry: <strong>${esc(ex.group_name)}</strong> · ${fmtDate(ex.arrival_date)} ${fmtAmPm(ex.arrival_time)} · ${esc(ex.transport_type||'')} ${esc(ex.transport_number||'')}` +
+    (isHard
+      ? `<br><br>Creating a new entry would cause duplicates. You can <strong>update the existing entry</strong> with any new details (e.g. driver assignment) or cancel.`
+      : `<br><br>This might be the same person on the same journey. Updating the existing entry is recommended.`);
+
+  document.getElementById('dup-actions-soft').style.display = 'flex';
+  document.getElementById('dup-actions-hard').style.display = 'none';
   document.getElementById('dup-modal').classList.add('open');
 }
-function closeDupModal(){document.getElementById('dup-modal').classList.remove('open');dupPendingData=null;dupExistingId=null;}
+
+function closeDupModal(){
+  document.getElementById('dup-modal').classList.remove('open');
+  dupPendingData=null; dupExistingId=null;
+}
 
 document.getElementById('dup-view-btn').addEventListener('click',()=>{
   const savedId=dupExistingId;
-  closeDupModal();showDashboard();
+  closeDupModal(); showDashboard();
   setTimeout(()=>{
     const card=document.getElementById('card-'+savedId);
     if(card){card.scrollIntoView({behavior:'smooth',block:'center'});card.querySelector('.card-expanded')?.classList.add('open');}
   },300);
 });
-document.getElementById('dup-save-anyway').addEventListener('click',async()=>{
-  closeDupModal();if(dupPendingData) await proceedSave(dupPendingData);
+
+// "Update Existing Instead" — merge new form data into the existing entry
+document.getElementById('dup-update-btn').addEventListener('click',async()=>{
+  if(!dupPendingData||!dupExistingId){closeDupModal();return;}
+  const existing = allGuests.find(g=>g.group_id===dupExistingId);
+  if(!existing){closeDupModal();return;}
+  // Merge: keep existing status/history fields, overlay new form data (driver, notes, phone etc)
+  // Only overwrite core travel fields if they are better (non-empty) in the new data
+  const merged = {...existing};
+  const overwriteFields = ['group_name','individual_names','pax','phone_primary','phone_backup',
+    'pickup_location','journey_origin','journey_destination','arrival_date','arrival_time',
+    'transport_type','transport_name','transport_number','pnr',
+    'car_type','car_no','driver_name','driver_phone','notes','journey_type'];
+  overwriteFields.forEach(f=>{
+    if(dupPendingData[f] !== undefined && dupPendingData[f] !== '') merged[f] = dupPendingData[f];
+  });
+  closeDupModal();
+  // Temporarily set editingId so proceedSave does an update, not an insert
+  const prevEditingId = editingId;
+  editingId = dupExistingId;
+  await proceedSave(merged);
+  editingId = prevEditingId;
+});
+
+// ── Auto-dedup on load: detect and surface existing duplicates ─
+// Runs after allGuests is populated. Groups by PNR and by transport+date+pax.
+// Marks duplicates so the cleanup tool can show them.
+let _dupGroups = []; // [{keepId, deleteIds, reason}]
+
+function detectExistingDuplicates(){
+  _dupGroups = [];
+  const active = allGuests.filter(g=>!isDeleted(g));
+
+  // Group by normalised PNR + journey_type
+  const pnrMap = {};
+  active.forEach(g=>{
+    const key = normPnr(g.pnr) + '|' + (g.journey_type||'arrival');
+    if(!normPnr(g.pnr)) return;
+    if(!pnrMap[key]) pnrMap[key]=[];
+    pnrMap[key].push(g);
+  });
+
+  // Group by transport+date+pax+journey_type (catches missing-PNR dupes)
+  const trainMap = {};
+  active.forEach(g=>{
+    const tn = normTransport(g.transport_number);
+    if(!tn) return;
+    const key = tn+'|'+(g.arrival_date||'')+'|'+(g.pax||'')+'|'+(g.journey_type||'arrival');
+    if(!trainMap[key]) trainMap[key]=[];
+    trainMap[key].push(g);
+  });
+
+  const seen = new Set();
+  const addGroup = (entries, reason)=>{
+    if(entries.length < 2) return;
+    // Keep the one with the most data filled in (has driver > has pnr > latest group_id)
+    const scored = entries.map(g=>({g, score:
+      (g.driver_name?10:0)+(g.pnr?5:0)+(g.notes?2:0)+(g.phone_primary?2:0)+
+      (g.car_no?3:0)+(g.live_status_text?1:0)
+    })).sort((a,b)=>b.score-a.score);
+    const keepId = scored[0].g.group_id;
+    const deleteIds = scored.slice(1).map(x=>x.g.group_id);
+    const key = [keepId,...deleteIds].sort().join(',');
+    if(seen.has(key)) return;
+    seen.add(key);
+    _dupGroups.push({keepId, deleteIds, reason,
+      keepEntry: scored[0].g,
+      deleteEntries: scored.slice(1).map(x=>x.g)});
+  };
+
+  Object.values(pnrMap).forEach(entries=>addGroup(entries,`Same PNR (${entries[0].pnr})`));
+  Object.values(trainMap).forEach(entries=>addGroup(entries,`Same ${entries[0].transport_type||'transport'} ${entries[0].transport_number} on ${fmtDate(entries[0].arrival_date)}`));
+
+  // Show/hide cleanup button
+  const btn = document.getElementById('cleanup-btn');
+  if(btn) btn.style.display = _dupGroups.length ? 'inline-flex' : 'none';
+  return _dupGroups;
+}
+
+// ── Cleanup modal ─────────────────────────────────────────────
+function openCleanupModal(){
+  detectExistingDuplicates();
+  const modal = document.getElementById('cleanup-modal');
+  const body = document.getElementById('cleanup-body');
+
+  if(!_dupGroups.length){
+    body.innerHTML = '<p style="color:var(--green);font-weight:600">✅ No duplicates found. Your data is clean!</p>';
+    document.getElementById('cleanup-actions').style.display = 'none';
+    modal.classList.add('open');
+    return;
+  }
+
+  const totalToDelete = _dupGroups.reduce((s,g)=>s+g.deleteIds.length,0);
+  let html = `<p style="margin-bottom:14px">Found <strong>${_dupGroups.length} duplicate group(s)</strong> — <strong>${totalToDelete} entries</strong> will be removed. The entry with the most data (driver, notes, etc.) is kept.</p>`;
+
+  _dupGroups.forEach((grp,i)=>{
+    html += `<div style="background:var(--amber-lt);border:1px solid #f6c752;border-radius:8px;padding:10px 12px;margin-bottom:8px">
+      <div style="font-size:12px;font-weight:700;color:var(--amber);margin-bottom:6px">${esc(grp.reason)}</div>
+      <div style="font-size:12px;color:var(--green);margin-bottom:3px">✅ Keep: <strong>${esc(grp.keepEntry.group_name)}</strong> · ${fmtDate(grp.keepEntry.arrival_date)} · ${esc(grp.keepEntry.pickup_location||'—')}${grp.keepEntry.driver_name?' · 🚗 '+esc(grp.keepEntry.driver_name):''}</div>
+      ${grp.deleteEntries.map(e=>`<div style="font-size:12px;color:var(--red)">🗑️ Remove: <strong>${esc(e.group_name)}</strong> · ${fmtDate(e.arrival_date)} · ${esc(e.pickup_location||'—')} · ID: ${e.group_id}</div>`).join('')}
+    </div>`;
+  });
+
+  body.innerHTML = html;
+  document.getElementById('cleanup-actions').style.display = 'flex';
+  document.getElementById('cleanup-confirm-btn').textContent = `Delete ${totalToDelete} duplicate${totalToDelete>1?'s':''}`;
+  modal.classList.add('open');
+}
+
+function closeCleanupModal(){
+  document.getElementById('cleanup-modal').classList.remove('open');
+}
+
+document.getElementById('cleanup-confirm-btn').addEventListener('click', async()=>{
+  if(!_dupGroups.length) return;
+  showLoading(true);
+  closeCleanupModal();
+  const toDelete = _dupGroups.flatMap(g=>g.deleteIds);
+  let deleted = 0, failed = 0;
+  for(const id of toDelete){
+    try{
+      await apiPost({action:'deleteGuest', group_id:id});
+      allGuests = allGuests.filter(g=>g.group_id!==id);
+      deleted++;
+    }catch(e){ failed++; }
+  }
+  saveToCache();
+  detectExistingDuplicates();
+  renderDashboard();
+  showLoading(false);
+  showToast(`Cleaned up ${deleted} duplicate${deleted>1?'s':''}${failed?` (${failed} failed — retry)`:''}`, deleted?'success':'error');
 });
 
 // ── Conflict & car opt ─────────────────────────────────────────
@@ -1726,9 +1943,9 @@ function checkCarOpt(data){
 
 async function submitGuestForm(e){
   e.preventDefault();const data=collectForm();
-  // Duplicate check
-  const dup=checkDuplicate(data);
-  if(dup){openDupModal(data,dup);return;}
+  // Duplicate check — new multi-signal version
+  const dupResult=checkDuplicate(data);
+  if(dupResult){openDupModal(data,dupResult);return;}
   // Conflict check
   const conflicts=checkConflict(data);
   if(conflicts&&conflicts.length){
