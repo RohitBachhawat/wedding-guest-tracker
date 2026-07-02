@@ -17,7 +17,7 @@ const GUEST_HEADERS = [
   "car_type","car_no","driver_name","driver_phone",
   "notes","status","journey_type","dispatched",
   "driver_arrived","guest_in_car","dropped_off","car_returned",
-  "last_refreshed","live_status_text","deleted"
+  "last_refreshed","live_status_text","deleted","ticket_url"
 ];
 
 const DRIVER_HEADERS = [
@@ -62,6 +62,7 @@ function doPost(e) {
     if (action === "updateGuestStatus") return cors(updateGuestStatus(payload.group_id, payload.field, payload.value));
     if (action === "updateLiveStatus")  return cors(updateLiveStatus(payload.group_id, payload.live_status_text));
     if (action === "deleteGuest")       return cors(deleteGuest(payload.group_id));
+    if (action === "saveTicket")        return cors(saveTicket(payload.group_id, payload.data, payload.mime, payload.name));
     if (action === "initSheet")         return cors(initSheet());
     return cors({ error: "Unknown action" });
   } catch(err) { return cors({ error: err.message }); }
@@ -83,6 +84,13 @@ function initSheet() {
   var lastRow = Math.max(gSheet.getLastRow(), 2);
   gSheet.getRange(2, dateCol, lastRow, 1).setNumberFormat("@STRING@");
   gSheet.getRange(2, timeCol, lastRow, 1).setNumberFormat("@STRING@");
+
+  // Add ticket_url column if missing (safe to run on existing sheets)
+  var headers = gSheet.getRange(1, 1, 1, gSheet.getLastColumn()).getValues()[0];
+  if (headers.indexOf("ticket_url") === -1) {
+    var nextCol = gSheet.getLastColumn() + 1;
+    gSheet.getRange(1, nextCol).setValue("ticket_url").setFontWeight("bold");
+  }
 
   var dSheet = ss.getSheetByName(SHEET_NAME_DRIVERS);
   if (!dSheet) dSheet = ss.insertSheet(SHEET_NAME_DRIVERS);
@@ -141,7 +149,10 @@ function getGuests() {
   var tz    = ss.getSpreadsheetTimeZone();
   var sheet = ss.getSheetByName(SHEET_NAME_GUESTS);
   if (!sheet || sheet.getLastRow() <= 1) return { guests: [] };
-  var rows = sheet.getRange(2, 1, sheet.getLastRow()-1, GUEST_HEADERS.length).getValues();
+  // Read up to max(GUEST_HEADERS.length, lastColumn) to handle sheets with extra columns.
+  // We only map the columns we know about via GUEST_HEADERS — extras are ignored safely.
+  var numCols = Math.max(GUEST_HEADERS.length, sheet.getLastColumn());
+  var rows = sheet.getRange(2, 1, sheet.getLastRow()-1, numCols).getValues();
   var guests = rows
     .filter(function(r){ return r[0] !== ""; })
     .map(function(r){
@@ -182,6 +193,7 @@ function addGuest(data) {
   data.last_refreshed     = "";
   data.live_status_text   = "";
   data.deleted            = "no";
+  data.ticket_url         = data.ticket_url || "";
   var row = sanitizeRow(GUEST_HEADERS.map(function(h){ return data[h] || ""; }));
   sheet.appendRow(row);
   return { success: true, group_id: data.group_id };
@@ -224,6 +236,15 @@ function deleteGuest(group_id) {
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME_GUESTS);
   var rowIndex = findGuestRow(sheet, group_id);
   if (!rowIndex) return { error: "Guest not found" };
+  // Trash any attached Drive ticket file
+  var ticketCol = GUEST_HEADERS.indexOf("ticket_url") + 1;
+  var ticketUrl = sheet.getRange(rowIndex, ticketCol).getValue();
+  if (ticketUrl) {
+    try {
+      var m = ticketUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+      if (m) DriveApp.getFileById(m[1]).setTrashed(true);
+    } catch(e) { /* already gone or no access */ }
+  }
   var colIndex = GUEST_HEADERS.indexOf("deleted") + 1;
   sheet.getRange(rowIndex, colIndex).setValue("yes");
   return { success: true };
@@ -236,4 +257,67 @@ function findGuestRow(sheet, group_id) {
     if (ids[i][0] === group_id) return i + 2;
   }
   return null;
+}
+
+// ── Drive Ticket Storage ──────────────────────────────────────
+// Saves ticket file to a shared Drive folder and stores the URL
+// in the ticket_url column of the guests sheet.
+
+function getTicketFolder() {
+  var props = PropertiesService.getScriptProperties();
+  var folderId = props.getProperty("TICKET_FOLDER_ID");
+  if (folderId) {
+    try { return DriveApp.getFolderById(folderId); } catch(e) { /* folder deleted, recreate */ }
+  }
+  // Create folder in root of My Drive
+  var folder = DriveApp.createFolder("Wedding Ticket Attachments");
+  // Make folder viewable by anyone with link
+  folder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  props.setProperty("TICKET_FOLDER_ID", folder.getId());
+  return folder;
+}
+
+function saveTicket(group_id, base64Data, mimeType, fileName) {
+  if (!group_id || !base64Data || !mimeType) {
+    return { error: "Missing required fields: group_id, data, mime" };
+  }
+
+  try {
+    var folder = getTicketFolder();
+
+    // Decode base64 to blob
+    var decoded = Utilities.base64Decode(base64Data);
+    var blob = Utilities.newBlob(decoded, mimeType, fileName || ("ticket_" + group_id));
+
+    // Delete any existing ticket for this guest (keep Drive clean)
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME_GUESTS);
+    var rowIndex = findGuestRow(sheet, group_id);
+    var ticketCol = GUEST_HEADERS.indexOf("ticket_url") + 1; // declared once, used twice below
+    if (rowIndex) {
+      var existingUrl = sheet.getRange(rowIndex, ticketCol).getValue();
+      if (existingUrl) {
+        try {
+          var match = existingUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+          if (match) DriveApp.getFileById(match[1]).setTrashed(true);
+        } catch(e) { /* old file may already be gone, ignore */ }
+      }
+    }
+
+    // Save new file to Drive folder
+    var file = folder.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+    var fileId = file.getId();
+    var viewUrl = "https://drive.google.com/file/d/" + fileId + "/preview";
+
+    // Persist ticket_url in the Sheet
+    if (rowIndex) {
+      sheet.getRange(rowIndex, ticketCol).setValue(viewUrl);
+    }
+
+    return { success: true, ticket_url: viewUrl, file_id: fileId };
+
+  } catch(err) {
+    return { error: "Drive save failed: " + err.message };
+  }
 }

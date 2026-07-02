@@ -90,6 +90,23 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
 .pooling-card-detail{font-size:13px;color:var(--text-2);margin-bottom:10px;line-height:1.6}
 .pooling-card-actions{display:flex;gap:8px}
 
+/* Multi-train banner */
+.multi-train-banner{display:flex;align-items:flex-start;gap:10px;background:var(--blue-lt,#eef4ff);border:1.5px solid #b3ccf7;border-radius:var(--radius);padding:12px 14px;margin-bottom:12px;font-size:13px;line-height:1.6}
+.mt-icon{flex-shrink:0;font-size:16px;margin-top:1px}
+.mt-body{flex:1;color:var(--text)}
+.mt-dismiss{flex-shrink:0;background:none;border:none;cursor:pointer;font-size:15px;color:var(--text-2);padding:0 2px;line-height:1;margin-top:1px}
+.mt-dismiss:hover{color:var(--text)}
+
+/* Ticket viewer */
+.ticket-section{margin-top:12px;border-top:1px solid var(--border);padding-top:12px}
+.ticket-section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.ticket-section-title{font-size:12px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.4px}
+.ticket-actions{display:flex;gap:6px}
+.ticket-preview{width:100%;border-radius:8px;overflow:hidden;border:1px solid var(--border);background:var(--gray-lt);margin-top:6px}
+.ticket-preview img{width:100%;height:auto;display:block;border-radius:8px}
+.ticket-preview iframe{width:100%;height:420px;border:none;display:block}
+.ticket-badge{font-size:11px;background:var(--green-lt);color:var(--green);border:1px solid var(--green);border-radius:20px;padding:2px 7px;font-weight:600;margin-left:4px}
+
 .cards-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px;align-items:start}
 @media(max-width:900px){.cards-grid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:600px){.cards-grid{grid-template-columns:1fr}}
@@ -838,6 +855,8 @@ function sanitizeGuest(g){
   
   // Performance: Memoize expensive checks
   g._jt = journeyType(g);
+  // Ensure ticket_url is always a string (never undefined)
+  g.ticket_url = g.ticket_url || '';
   return g;
 }
 
@@ -1180,6 +1199,7 @@ function renderCard(g, isCompleted){
       <div class="card-badges">
         ${jBadge}
         <span class="card-pax">👥 ${g.pax||0}</span>
+        ${getTicket(g.group_id)?'<span class="ticket-badge">🎫 Ticket</span>':''}
         ${noDriverBadge}${soonBadge}${sameTrainBadge}
       </div>
       <div class="card-meta">
@@ -1219,9 +1239,11 @@ function renderCard(g, isCompleted){
       <div class="card-actions" onclick="event.stopPropagation()">
         <button class="btn btn-secondary btn-sm" onclick="refreshStatus('${g.group_id}')">🔄 Refresh</button>
         ${cardActions(g)}
+        <button class="btn btn-secondary btn-sm" onclick="openWhatsApp('${g.group_id}')">💬 WhatsApp</button>
         <button class="btn btn-secondary btn-sm" onclick="editGuest('${g.group_id}')">✏️ Edit</button>
         <button class="btn btn-danger btn-sm" onclick="confirmDelete('${g.group_id}','${esc(g.group_name)}')">🗑️ Delete</button>
       </div>
+      ${renderTicketSection(g.group_id)}
     </div>
   </div>`;
 }
@@ -1239,12 +1261,209 @@ function cardActions(g){
       <button class="btn btn-primary btn-sm" onclick="markFinal('${g.group_id}','departure')">🔑 Car Returned → Complete</button>`;
   return `<button class="btn btn-secondary btn-sm" onclick="toggleField('${g.group_id}','dispatched','${g.dispatched||'no'}')">
       ${g.dispatched==='yes'?'🚗 Dispatched ✓':'🚗 Dispatch'}</button>
-    <button class="btn btn-secondary btn-sm" onclick="toggleField('${g.group_id}','guest_in_car','${g.guest_in_car||'no'}')">
-      ${g.guest_in_car==='yes'?'👤 In Car ✓':'👤 In Car'}</button>
+    <!-- guest_in_car hidden: not used currently -->
     <button class="btn btn-primary btn-sm" onclick="toggleField('${g.group_id}','dropped_off','${g.dropped_off||'no'}')">🏁 Dropped Off</button>`;
 }
 
 function toggleCard(id){document.getElementById('exp-'+id)?.classList.toggle('open');}
+
+// ── Ticket storage (Google Drive via backend) ─────────────────
+// ticket_url is stored in the guest record (Sheet column ticket_url).
+// localStorage is used as a temporary cache for the base64 file
+// between upload and save — it is cleared after upload succeeds.
+
+function getTicket(group_id){
+  // Primary: use ticket_url from guest record (Drive)
+  const g = allGuests.find(x=>x.group_id===group_id);
+  if(g && g.ticket_url) return {url: g.ticket_url, type:'url'};
+  // Fallback: check localStorage for a pending/offline ticket
+  try{
+    const cached = JSON.parse(localStorage.getItem('wgt_ticket_'+group_id)||'null');
+    if(cached) return cached;
+  }catch(e){}
+  return null;
+}
+
+function setTicketCache(id, obj){ // temporary local cache only
+  try{ localStorage.setItem('wgt_ticket_'+id, JSON.stringify(obj)); }
+  catch(e){ showToast('Ticket too large to cache locally','error'); }
+}
+function clearTicketCache(id){
+  localStorage.removeItem('wgt_ticket_'+id);
+}
+
+function renderTicketSection(id){
+  const ticket = getTicket(id);
+  if(!ticket){
+    return `<div class="ticket-section" onclick="event.stopPropagation()">
+      <div class="ticket-section-header">
+        <span class="ticket-section-title">🎫 Ticket</span>
+        <div class="ticket-actions">
+          <label class="btn btn-secondary btn-sm" style="cursor:pointer;margin:0">
+            📎 Attach Ticket
+            <input type="file" accept="image/*,application/pdf" style="display:none"
+              onchange="attachTicket('${id}',this)" onclick="event.stopPropagation()">
+          </label>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  // Drive URL ticket (stored in Sheet)
+  if(ticket.type==='url'){
+    return `<div class="ticket-section" onclick="event.stopPropagation()">
+      <div class="ticket-section-header">
+        <span class="ticket-section-title">🎫 Ticket <span style="font-weight:400;text-transform:none;color:var(--green)">✓ Saved to Drive</span></span>
+        <div class="ticket-actions">
+          <a href="${ticket.url.replace('/preview','/view')}" target="_blank" class="btn btn-secondary btn-sm" onclick="event.stopPropagation()">⬡ Full View</a>
+          <label class="btn btn-secondary btn-sm" style="cursor:pointer;margin:0" title="Replace ticket">
+            🔄
+            <input type="file" accept="image/*,application/pdf" style="display:none"
+              onchange="attachTicket('${id}',this)" onclick="event.stopPropagation()">
+          </label>
+          <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();removeTicketAndRefresh('${id}')">🗑️</button>
+        </div>
+      </div>
+      <div class="ticket-preview">
+        <iframe src="${ticket.url}" title="Ticket" onclick="event.stopPropagation()"></iframe>
+      </div>
+    </div>`;
+  }
+
+  // Local cache fallback (base64, offline or pending upload)
+  const isImg = ticket.mime && ticket.mime.startsWith('image/');
+  const src = `data:${ticket.mime};base64,${ticket.data}`;
+  return `<div class="ticket-section" onclick="event.stopPropagation()">
+    <div class="ticket-section-header">
+      <span class="ticket-section-title">🎫 Ticket <span style="font-weight:400;text-transform:none;color:var(--amber)">⏳ Saved locally</span></span>
+      <div class="ticket-actions">
+        <a href="${src}" target="_blank" class="btn btn-secondary btn-sm" onclick="event.stopPropagation()">⬡ Full View</a>
+        <label class="btn btn-secondary btn-sm" style="cursor:pointer;margin:0" title="Replace ticket">
+          🔄
+          <input type="file" accept="image/*,application/pdf" style="display:none"
+            onchange="attachTicket('${id}',this)" onclick="event.stopPropagation()">
+        </label>
+        <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();removeTicketAndRefresh('${id}')">🗑️</button>
+      </div>
+    </div>
+    <div class="ticket-preview">
+      ${isImg
+        ? `<img src="${src}" alt="Ticket" onclick="event.stopPropagation()">`
+        : `<iframe src="${src}" title="Ticket PDF" onclick="event.stopPropagation()"></iframe>`}
+    </div>
+  </div>`;
+}
+
+async function attachTicket(id, input){
+  const file = input.files[0];
+  if(!file) return;
+
+  // Read file as base64
+  const base64 = await new Promise((res,rej)=>{
+    const r = new FileReader();
+    r.onload = e => res(e.target.result.split(',')[1]);
+    r.onerror = () => rej(new Error('Read failed'));
+    r.readAsDataURL(file);
+  });
+
+  showToast('Uploading ticket to Drive…','');
+  showLoading(true);
+
+  try {
+    // IMPORTANT: use apiPostRaw (not apiPost) — base64 payloads must NEVER
+    // enter the offline sync queue as they will blow localStorage quota.
+    const result = await apiPostRaw({
+      action: 'saveTicket',
+      group_id: id,
+      data: base64,
+      mime: file.type,
+      name: file.name
+    });
+
+    if(result.error) throw new Error(result.error);
+
+    // Update the in-memory guest record so getTicket() returns the Drive URL
+    const g = allGuests.find(x=>x.group_id===id);
+    if(g) g.ticket_url = result.ticket_url;
+
+    // Clear any local cache now that Drive has it
+    clearTicketCache(id);
+
+    _refreshTicketUI(id, true);
+    showToast('Ticket saved to Drive ✓','success');
+
+  } catch(err) {
+    // Drive failed — fall back to localStorage so ticket isn't lost
+    console.warn('Drive upload failed, caching locally:', err.message);
+    setTicketCache(id, {data: base64, mime: file.type, name: file.name});
+    _refreshTicketUI(id, true);
+    showToast('Drive unavailable — ticket saved on this device only','error');
+  }
+
+  showLoading(false);
+}
+
+async function removeTicketAndRefresh(id){
+  if(!confirm('Remove attached ticket?')) return;
+  // Clear Drive URL from guest record
+  const g = allGuests.find(x=>x.group_id===id);
+  if(g && g.ticket_url){
+    try{
+      await apiPost({action:'updateGuestStatus', group_id:id, field:'ticket_url', value:''});
+      g.ticket_url = '';
+    }catch(e){ showToast('Could not remove from Drive — try again','error'); return; }
+  }
+  clearTicketCache(id);
+  _refreshTicketUI(id, false);
+  showToast('Ticket removed','success');
+}
+
+function _refreshTicketUI(id, hasTicket){
+  // Re-render ticket section inside expanded card
+  const expEl = document.getElementById('exp-'+id);
+  if(expEl){
+    const existing = expEl.querySelector('.ticket-section');
+    const tmp = document.createElement('div');
+    tmp.innerHTML = renderTicketSection(id);
+    if(existing) existing.replaceWith(tmp.firstChild);
+    else expEl.appendChild(tmp.firstChild);
+  }
+  // Update collapsed card badge
+  const cardEl = document.getElementById('card-'+id);
+  if(cardEl){
+    const badges = cardEl.querySelector('.card-badges');
+    const existingBadge = badges && badges.querySelector('.ticket-badge');
+    if(hasTicket && !existingBadge && badges){
+      const badge = document.createElement('span');
+      badge.className = 'ticket-badge';
+      badge.textContent = '🎫 Ticket';
+      badges.insertBefore(badge, badges.children[2]||null);
+    } else if(!hasTicket && existingBadge){
+      existingBadge.remove();
+    }
+  }
+}
+
+// ── WhatsApp quick message ────────────────────────────────────
+function openWhatsApp(id){
+  const g = allGuests.find(x=>x.group_id===id);
+  if(!g) return;
+  const phone = (g.phone_primary||'').replace(/\D/g,'');
+  if(!phone){ showToast('No phone number on record','error'); return; }
+  const jt = journeyType(g);
+  const when = g.arrival_time ? fmtAmPm(g.arrival_time) : '';
+  const where = g.pickup_location || '';
+  const driver = g.driver_name || '';
+  const driverPhone = g.driver_phone || '';
+  let msg = '';
+  if(jt==='arrival'){
+    msg = `Hi, your car ${driver?`(Driver: ${driver}${driverPhone?`, ${driverPhone}`:''})`:''} is on its way to ${where}${when?` for your arrival at ${when}`:''}. Please let us know once you land/arrive. 🙏`;
+  } else {
+    msg = `Hi, your car ${driver?`(Driver: ${driver}${driverPhone?`, ${driverPhone}`:''})`:''} will be at ${where}${when?` by ${when}`:''}. Please be ready. 🙏`;
+  }
+  const url = `https://wa.me/91${phone}?text=${encodeURIComponent(msg)}`;
+  window.open(url,'_blank');
+}
 function stripClass(g){
   const t=(g.live_status_text||'').toLowerCase();
   if(!g.live_status_text) return 'strip-gray';
@@ -1455,17 +1674,14 @@ function driverCard(driver,groups){
           ${isDep?`
             <button class="toggle-btn${g.dispatched==='yes'?' active-green':''}" onclick="toggleDriverField('${g.group_id}','dispatched','${g.dispatched||'no'}')">
               ${g.dispatched==='yes'?'🚗 Dispatched ✓':'🚗 Dispatch'}</button>
-            <button class="toggle-btn${g.guest_in_car==='yes'?' active-blue':''}" onclick="toggleDriverField('${g.group_id}','guest_in_car','${g.guest_in_car||'no'}')">
-              ${g.guest_in_car==='yes'?'👤 In Car ✓':'👤 In Car'}</button>
+            <!-- guest_in_car hidden: not used currently -->
             <button class="toggle-btn${g.dropped_off==='yes'?' active-purple':''}" onclick="toggleDriverField('${g.group_id}','dropped_off','${g.dropped_off||'no'}')">
               ${g.dropped_off==='yes'?'🏁 Dropped ✓':'🏁 Dropped Off'}</button>
             <button class="toggle-btn${g.car_returned==='yes'?' active-gold':''}" onclick="driverMarkComplete('${g.group_id}')">
               ${g.car_returned==='yes'?'🔑 Returned ✓':'🔑 Car Returned'}</button>
           `:`
-            <button class="toggle-btn${g.driver_arrived==='yes'?' active-green':''}" onclick="toggleDriverField('${g.group_id}','driver_arrived','${g.driver_arrived||'no'}')">
-              ${g.driver_arrived==='yes'?'📍 At Station ✓':'📍 At Station'}</button>
-            <button class="toggle-btn${g.guest_in_car==='yes'?' active-blue':''}" onclick="toggleDriverField('${g.group_id}','guest_in_car','${g.guest_in_car||'no'}')">
-              ${g.guest_in_car==='yes'?'🚗 En Route ✓':'🚗 In Car'}</button>
+            <!-- driver_arrived hidden: not used currently -->
+            <!-- guest_in_car hidden: not used currently -->
           `}
         </div>`;
       }).join('');
@@ -1696,7 +1912,7 @@ function v(id){return document.getElementById(id)?.value||'';}
 // This prevents the "35 rows for 4 people" problem entirely.
 
 function normPnr(s){ return (s||'').trim().toUpperCase().replace(/[\s\-]/g,''); }
-function normName(s){ return (s||'').trim().toLowerCase().replace(/^(mr|mrs|ms|dr)\.?\s*/,''); }
+function normName(s){ return (s||'').trim().toLowerCase().replace(/^(mrs|mr|ms|dr)\.?\s*/,''); }
 function normTransport(s){ return (s||'').trim().toUpperCase().replace(/[\s\-]/g,''); }
 
 function checkDuplicate(data){
@@ -1726,12 +1942,13 @@ function checkDuplicate(data){
     if(trainMatch) return {match:trainMatch, confidence:'hard', reason:`Same ${data.transport_type||'transport'} ${esc(data.transport_number)} on ${fmtDate(data.arrival_date)} with same passenger count`};
   }
 
-  // Signal 3: Same normalised name + same transport + same date (soft — different leg possible)
+  // Signal 3: Same normalised name + same transport + same date + same journey_type (soft — different leg possible)
   if(normName(data.group_name) && normTransport(data.transport_number) && data.arrival_date){
     const nameMatch = candidates.find(g=>
       normName(g.group_name) === normName(data.group_name) &&
       normTransport(g.transport_number) === normTransport(data.transport_number) &&
-      g.arrival_date === data.arrival_date
+      g.arrival_date === data.arrival_date &&
+      (g.journey_type||'arrival') === (data.journey_type||'arrival')
     );
     if(nameMatch) return {match:nameMatch, confidence:'soft', reason:`Same passenger name and ${data.transport_type||'transport'} on same date`};
   }
@@ -2006,10 +2223,14 @@ async function proceedSave(data){
       data.group_id=editingId;
       const ex=allGuests.find(g=>g.group_id===editingId)||{};
       data.status=ex.status||'active';data.dispatched=ex.dispatched||'no';
-      data.driver_arrived=ex.driver_arrived||'no';data.guest_in_car=ex.guest_in_car||'no';
+      // driver_arrived & guest_in_car excluded from flow (commented out)
+      // data.driver_arrived=ex.driver_arrived||'no';data.guest_in_car=ex.guest_in_car||'no';
       data.dropped_off=ex.dropped_off||'no';data.car_returned=ex.car_returned||'no';
       data.last_refreshed=ex.last_refreshed||'';data.live_status_text=ex.live_status_text||'';
       data.deleted=ex.deleted||'no';
+      // CRITICAL: preserve ticket_url — updateGuest rewrites the whole row,
+      // so if ticket_url is missing from the payload it gets blanked in the sheet.
+      data.ticket_url=ex.ticket_url||'';
       await apiPost({action:'updateGuest',data:sanitizeDataForSheet(data)});
       const idx=allGuests.findIndex(g=>g.group_id===editingId);
       if(idx>=0) allGuests[idx]={...allGuests[idx],...data};
@@ -2019,7 +2240,9 @@ async function proceedSave(data){
     } else {
       const res=await apiPost({action:'addGuest',data:sanitizeDataForSheet(data)});
       data.group_id=res.group_id;data.status='active';
-      data.dispatched='no';data.driver_arrived='no';data.guest_in_car='no';
+      data.dispatched='no';
+      // driver_arrived & guest_in_car excluded from flow (commented out)
+      // data.driver_arrived='no';data.guest_in_car='no';
       data.dropped_off='no';data.car_returned='no';data.deleted='no';
       data.live_status_text='';data.last_refreshed='';
       allGuests.push(data);
@@ -2461,42 +2684,42 @@ function loadTestData(){
      pickup_location:'Howrah',journey_origin:'Kolkata',arrival_date:today,arrival_time:'14:00',
      transport_type:'Train',transport_name:'Poorva Express',transport_number:'12303',pnr:'1234567890',
      car_type:'Innova',car_no:'WB02AB1042',driver_name:'Suresh Kumar',driver_phone:'9000000001',
-     notes:'',status:'active',journey_type:'departure',dispatched:'no',driver_arrived:'no',guest_in_car:'no',dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:'',deleted:'no'},
+     notes:'',status:'active',journey_type:'departure',dispatched:'no',/*driver_arrived+guest_in_car excluded*/dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:'',deleted:'no'},
 
     // 13051 Tebhaga Express — today ARRIVAL (Jalpaiguri → Sealdah)
     {group_id:'G002',group_name:'Roy Family',pax:'3',phone_primary:'9876540001',phone_backup:'',
      pickup_location:'Sealdah',journey_origin:'Jalpaiguri',arrival_date:today,arrival_time:'07:15',
      transport_type:'Train',transport_name:'Tebhaga Express',transport_number:'13051',pnr:'2345678901',
      car_type:'Ertiga',car_no:'WB02CD2031',driver_name:'Ramesh Das',driver_phone:'9000000002',
-     notes:'',status:'active',journey_type:'arrival',dispatched:'no',driver_arrived:'no',guest_in_car:'no',dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:'',deleted:'no'},
+     notes:'',status:'active',journey_type:'arrival',dispatched:'no',/*driver_arrived+guest_in_car excluded*/dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:'',deleted:'no'},
 
     // 12274 Duronto Express — today ARRIVAL (New Delhi → Howrah)
     {group_id:'G003',group_name:'Kapoor Siblings',pax:'2',phone_primary:'9876540002',phone_backup:'9876540003',
      pickup_location:'Howrah',journey_origin:'New Delhi',arrival_date:today,arrival_time:'16:30',
      transport_type:'Train',transport_name:'Duronto Express',transport_number:'12274',pnr:'3456789012',
      car_type:'Ertiga',car_no:'WB02CD2031',driver_name:'Ramesh Das',driver_phone:'9000000002',
-     notes:'',status:'active',journey_type:'arrival',dispatched:'no',driver_arrived:'no',guest_in_car:'no',dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:'',deleted:'no'},
+     notes:'',status:'active',journey_type:'arrival',dispatched:'no',/*driver_arrived+guest_in_car excluded*/dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:'',deleted:'no'},
 
     // 12304 Poorva Express — today ARRIVAL (New Delhi → Howrah)
     {group_id:'G004',group_name:'Mehta Family',pax:'5',phone_primary:'9876540004',phone_backup:'',
      pickup_location:'Howrah',journey_origin:'New Delhi',arrival_date:today,arrival_time:'09:45',
      transport_type:'Train',transport_name:'Poorva Express',transport_number:'12304',pnr:'4567890123',
      car_type:'Tempo Traveller',car_no:'WB02EF3099',driver_name:'Bikash Roy',driver_phone:'9000000003',
-     notes:'Elderly couple, needs assistance',status:'active',journey_type:'arrival',dispatched:'no',driver_arrived:'no',guest_in_car:'no',dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:'',deleted:'no'},
+     notes:'Elderly couple, needs assistance',status:'active',journey_type:'arrival',dispatched:'no',/*driver_arrived+guest_in_car excluded*/dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:'',deleted:'no'},
 
     // 12304 Poorva Express — TOMORROW ARRIVAL (New Delhi → Howrah)
     {group_id:'G005',group_name:'Joshi Brothers',pax:'3',phone_primary:'9876540005',phone_backup:'',
      pickup_location:'Howrah',journey_origin:'New Delhi',arrival_date:tom,arrival_time:'09:45',
      transport_type:'Train',transport_name:'Poorva Express',transport_number:'12304',pnr:'5678901234',
      car_type:'',car_no:'',driver_name:'',driver_phone:'',
-     notes:'',status:'active',journey_type:'arrival',dispatched:'no',driver_arrived:'no',guest_in_car:'no',dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:'',deleted:'no'},
+     notes:'',status:'active',journey_type:'arrival',dispatched:'no',/*driver_arrived+guest_in_car excluded*/dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:'',deleted:'no'},
 
     // 18029 Shalimar Express — today ARRIVAL (Okha → Howrah)
     {group_id:'G006',group_name:'Patel Group',pax:'6',phone_primary:'9876540006',phone_backup:'9876540007',
      pickup_location:'Howrah',journey_origin:'Okha',arrival_date:today,arrival_time:'11:30',
      transport_type:'Train',transport_name:'Shalimar Express',transport_number:'18029',pnr:'6789012345',
      car_type:'Tempo Traveller',car_no:'WB02EF3099',driver_name:'Bikash Roy',driver_phone:'9000000003',
-     notes:'6 large bags',status:'active',journey_type:'arrival',dispatched:'yes',driver_arrived:'no',guest_in_car:'no',dropped_off:'no',car_returned:'no',
+     notes:'6 large bags',status:'active',journey_type:'arrival',dispatched:'yes',/*driver_arrived+guest_in_car excluded*/dropped_off:'no',car_returned:'no',
      live_status_text:'Train 18029 is running on time. Currently at Santragachi. ETA Howrah 11:35 AM.',last_refreshed:'2025-01-01 10:00',deleted:'no'},
 
     // 12859 Gitanjali Express — today DEPARTURE (Howrah → Mumbai CST)
@@ -2504,14 +2727,14 @@ function loadTestData(){
      pickup_location:'Howrah',journey_origin:'Kolkata',arrival_date:today,arrival_time:'14:05',
      transport_type:'Train',transport_name:'Gitanjali Express',transport_number:'12859',pnr:'7890123456',
      car_type:'Innova',car_no:'WB02AB1042',driver_name:'Suresh Kumar',driver_phone:'9000000001',
-     notes:'',status:'active',journey_type:'departure',dispatched:'no',driver_arrived:'no',guest_in_car:'no',dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:'',deleted:'no'},
+     notes:'',status:'active',journey_type:'departure',dispatched:'no',/*driver_arrived+guest_in_car excluded*/dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:'',deleted:'no'},
 
     // Completed — picked up
     {group_id:'G008',group_name:'Verma Family',pax:'2',phone_primary:'9876540009',phone_backup:'',
      pickup_location:'Sealdah',journey_origin:'Bhubaneswar',arrival_date:today,arrival_time:'08:00',
      transport_type:'Train',transport_name:'Coromandel Express',transport_number:'12841',pnr:'8901234567',
      car_type:'Ertiga',car_no:'WB02CD2031',driver_name:'Ramesh Das',driver_phone:'9000000002',
-     notes:'',status:'picked_up',journey_type:'arrival',dispatched:'yes',driver_arrived:'yes',guest_in_car:'yes',dropped_off:'no',car_returned:'no',live_status_text:'Arrived on time.',last_refreshed:'',deleted:'no'},
+     notes:'',status:'picked_up',journey_type:'arrival',dispatched:'yes',/*driver_arrived+guest_in_car excluded*/dropped_off:'no',car_returned:'no',live_status_text:'Arrived on time.',last_refreshed:'',deleted:'no'},
   ];
   renderDashboard();
   console.log('✅ Test data loaded — '+allGuests.length+' guests, '+allDrivers.length+' drivers');
