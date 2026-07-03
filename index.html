@@ -467,7 +467,42 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
   </div>
 </div>
 
+<!-- Ticket mismatch warning modal -->
+<!-- FIX (ticket mismatch check): shown when attachTicket() extracts details from a ticket
+     uploaded AFTER the guest was already saved, and one or more of those details (pickup/
+     drop station, date, time, or name) don't match what's currently on the guest record.
+     Purely a warning — the coordinator decides whether to proceed or go fix the record. -->
+<div class="modal-overlay" id="ticket-mismatch-modal">
+  <div class="modal">
+    <h3>⚠️ Ticket Details Don't Match</h3>
+    <p style="font-size:13px;color:var(--text-2);margin-bottom:10px">This ticket's details differ from what's currently saved for this guest:</p>
+    <div class="conflict-detail" id="ticket-mismatch-detail"></div>
+    <p style="font-size:12px;color:var(--text-2);margin-top:10px">You can still attach the ticket as-is, or cancel and correct the guest's details first.</p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="ticket-mismatch-cancel">Cancel</button>
+      <button class="btn btn-danger" id="ticket-mismatch-proceed">Attach Anyway</button>
+    </div>
+  </div>
+</div>
+
+<!-- Sync queue modal -->
+<!-- FIX (pending badge - show list instead of silent retry): lists whatever's queued in
+     localStorage (wgt_sync_queue) waiting to sync to the backend — see openSyncQueueModal()
+     in the script below. Lets you retry all, or remove individual/all stuck items. -->
+<div class="modal-overlay" id="sync-queue-modal">
+  <div class="modal" style="max-width:480px">
+    <h3>🔄 Pending Changes</h3>
+    <div id="sync-queue-body" style="font-size:13px;color:var(--text-2);max-height:320px;overflow-y:auto"></div>
+    <div class="modal-actions" id="sync-queue-actions">
+      <button class="btn btn-secondary" onclick="closeSyncQueueModal()">Close</button>
+      <button class="btn btn-danger" onclick="clearAllSyncQueue()">Clear All</button>
+      <button class="btn btn-primary" onclick="retrySyncQueueFromModal()">Retry Now</button>
+    </div>
+  </div>
+</div>
+
 <!-- Data Cleanup modal -->
+
 <div class="modal-overlay" id="cleanup-modal">
   <div class="modal" style="max-width:560px">
     <h3>🧹 Data Cleanup</h3>
@@ -544,11 +579,81 @@ function updateSyncBadge(){
   let badge=document.getElementById('sync-badge');
   if(!badge){badge=document.createElement('div');badge.id='sync-badge';
     badge.style.cssText='position:fixed;bottom:70px;right:16px;background:var(--amber);color:#000;padding:6px 14px;border-radius:20px;font-size:13px;font-weight:600;z-index:999;cursor:pointer;display:none;box-shadow:0 2px 8px rgba(0,0,0,.3)';
-    badge.onclick=()=>flushSyncQueue();
+    // FIX (pending badge - show list instead of silent retry): clicking used to call
+    // flushSyncQueue() directly with zero visibility into what was queued or why it was
+    // stuck. Now it opens a small modal listing every pending item so you can see exactly
+    // what's waiting, retry them, or remove a stuck one individually — see
+    // openSyncQueueModal() below.
+    badge.onclick=()=>openSyncQueueModal();
     document.body.appendChild(badge);}
   if(syncQueue.length){badge.textContent='🔄 '+syncQueue.length+' pending';badge.style.display='block';}
   else{badge.style.display='none';}
 }
+
+// FIX (pending badge - show list instead of silent retry): turns a queued payload into a
+// short human-readable line for the modal, e.g. "Update guest — Bhawna Bachhawat".
+function describeSyncItem(item){
+  const p = item.payload||{};
+  const action = p.action||'unknown action';
+  const g = p.group_id ? allGuests.find(x=>x.group_id===p.group_id) : null;
+  const name = (p.data && p.data.group_name) || (g && g.group_name) || p.group_id || '';
+  const actionLabel = {
+    addGuest:'Add guest', updateGuest:'Update guest', updateGuestStatus:'Update status',
+    updateLiveStatus:'Update live status', deleteGuest:'Delete guest', saveTicket:'Save ticket'
+  }[action] || action;
+  const when = item.ts ? new Date(item.ts).toLocaleString() : '';
+  return `${actionLabel}${name?' — '+esc(name):''}${when?` <span style="color:var(--text-3,#999)">(${when})</span>`:''}`;
+}
+
+// FIX (pending badge - show list instead of silent retry): renders/opens the modal.
+function openSyncQueueModal(){
+  const modal=document.getElementById('sync-queue-modal');
+  const body=document.getElementById('sync-queue-body');
+  if(!modal||!body) return;
+  renderSyncQueueBody();
+  modal.classList.add('open');
+}
+function renderSyncQueueBody(){
+  const body=document.getElementById('sync-queue-body');
+  if(!body) return;
+  if(!syncQueue.length){
+    body.innerHTML='<p style="color:var(--green);font-weight:600">✅ Nothing pending — all changes are synced.</p>';
+    document.getElementById('sync-queue-actions').style.display='none';
+    return;
+  }
+  document.getElementById('sync-queue-actions').style.display='flex';
+  body.innerHTML = syncQueue.map((item,i)=>`
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;font-size:13px">
+      <span>${describeSyncItem(item)}</span>
+      <button class="btn btn-danger btn-sm" onclick="removeSyncQueueItem(${i})" title="Remove this pending item — it will NOT be retried or saved">🗑️</button>
+    </div>`).join('');
+}
+// FIX (pending badge - stuck items): lets you drop a single item that keeps failing (e.g.
+// a stale/invalid payload) without waiting for the 24h auto-expiry or losing every OTHER
+// pending change too.
+function removeSyncQueueItem(i){
+  if(!confirm('Remove this pending change? It will NOT be saved to the sheet.')) return;
+  syncQueue.splice(i,1);
+  localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(syncQueue));
+  updateSyncBadge();
+  renderSyncQueueBody();
+}
+function closeSyncQueueModal(){
+  document.getElementById('sync-queue-modal').classList.remove('open');
+}
+async function retrySyncQueueFromModal(){
+  await flushSyncQueue();
+  renderSyncQueueBody();
+}
+function clearAllSyncQueue(){
+  if(!syncQueue.length) return;
+  if(!confirm(`Remove all ${syncQueue.length} pending changes? None of them will be saved to the sheet.`)) return;
+  syncQueue=[];
+  localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(syncQueue));
+  updateSyncBadge();
+  renderSyncQueueBody();
+}
+
 async function flushSyncQueue(){
   if(syncInProgress||!syncQueue.length||!SCRIPT_URL) return;
   syncInProgress=true;updateSyncBadge();
@@ -1499,6 +1604,7 @@ async function uploadTicketForGuest(id, base64, mimeType, fileName, {silent}={})
 async function attachTicket(id, input){
   const file = input.files[0];
   if(!file) return;
+  const g = allGuests.find(x=>x.group_id===id);
 
   // Read file as base64
   const base64 = await new Promise((res,rej)=>{
@@ -1510,12 +1616,113 @@ async function attachTicket(id, input){
 
   showLoading(true);
   try {
+    // FIX (ticket mismatch check): a ticket attached AFTER the guest record already exists
+    // might be for the wrong guest, or the guest's record might have a typo/stale value.
+    // Extract this ticket's details the same way the main upload flow does, and diff them
+    // against what's already saved — pickup/drop location (whichever is relevant to this
+    // guest's journey_type), date, and time must match; name is fuzzy-matched at an 80%
+    // similarity threshold since ticket OCR/name spelling often has minor variations
+    // (initials, honorifics, transliteration differences) that shouldn't trigger a false flag.
+    if(g && GEMINI_KEY){
+      try{
+        const {b64:cb64,mime:cmime}=await compressIfNeeded(file);
+        const legs=await extractTicketLegs(cb64,cmime);
+        if(legs.length){
+          const leg=legs.find(l=>l.journey_type===journeyType(g)) || legs[0];
+          const mismatches=compareTicketToGuest(leg,g);
+          if(mismatches.length){
+            showLoading(false);
+            const proceed=await confirmTicketMismatch(mismatches);
+            if(!proceed){ showToast('Ticket not attached','error'); input.value=''; return; }
+            showLoading(true);
+          }
+        }
+      }catch(exErr){
+        // Extraction failing shouldn't block the upload — just skip the check silently.
+        console.warn('Ticket mismatch check skipped (extraction failed):',exErr.message);
+      }
+    }
     await uploadTicketForGuest(id, base64, file.type, file.name);
   } catch(err) {
     showToast('Drive unavailable — ticket saved on this device only','error');
   }
 
   showLoading(false);
+}
+
+// FIX (ticket mismatch check): Levenshtein edit-distance based similarity ratio (0–1).
+// Used for fuzzy name matching so minor OCR/spelling differences don't false-flag.
+function stringSimilarity(a, b){
+  a=(a||'').toLowerCase().trim(); b=(b||'').toLowerCase().trim();
+  if(!a && !b) return 1;
+  if(!a || !b) return 0;
+  const m=a.length, n=b.length;
+  const dp=Array.from({length:m+1},(_,i)=>[i,...Array(n).fill(0)]);
+  for(let j=0;j<=n;j++) dp[0][j]=j;
+  for(let i=1;i<=m;i++){
+    for(let j=1;j<=n;j++){
+      dp[i][j]=a[i-1]===b[j-1] ? dp[i-1][j-1] : 1+Math.min(dp[i-1][j-1],dp[i-1][j],dp[i][j-1]);
+    }
+  }
+  const dist=dp[m][n];
+  return 1 - dist/Math.max(m,n);
+}
+
+// FIX (ticket mismatch check): compares an extracted ticket leg against the guest record
+// it's being attached to. Returns an array of human-readable mismatch strings (empty = OK).
+function compareTicketToGuest(leg, g){
+  const issues=[];
+
+  // Station: pickup_location is the SAME field for both pickup (arrival) and drop
+  // (departure) stations — compare whichever is relevant to this guest's journey_type,
+  // matching how the rest of the app already treats this field (see stationLabel logic).
+  if(leg.pickup_location && g.pickup_location && leg.pickup_location !== g.pickup_location){
+    const label = journeyType(g)==='departure' ? 'Drop station' : 'Pickup station';
+    issues.push(`${label}: ticket says "${leg.pickup_location}", saved as "${g.pickup_location}"`);
+  }
+
+  // Date
+  if(leg.arrival_date && g.arrival_date && leg.arrival_date !== g.arrival_date){
+    issues.push(`Date: ticket says ${fmtDate(leg.arrival_date)}, saved as ${fmtDate(g.arrival_date)}`);
+  }
+
+  // Time
+  if(leg.arrival_time && g.arrival_time && leg.arrival_time !== g.arrival_time){
+    issues.push(`Time: ticket says ${fmtAmPm(leg.arrival_time)}, saved as ${fmtAmPm(g.arrival_time)}`);
+  }
+
+  // Name — 80% similarity threshold (fuzzy match; OCR/spelling variations are common and
+  // shouldn't be treated the same as a genuinely different guest).
+  const ticketName = leg.group_name || (leg.individual_names||'').split(',')[0].trim();
+  if(ticketName && g.group_name){
+    const sim = stringSimilarity(ticketName, g.group_name);
+    if(sim < 0.8){
+      issues.push(`Name: ticket says "${ticketName}", saved as "${g.group_name}" (${Math.round(sim*100)}% match)`);
+    }
+  }
+
+  return issues;
+}
+
+// FIX (ticket mismatch check): promise-based confirm dialog using the ticket-mismatch-modal
+// markup added near the other modals. Resolves true if the user clicks "Attach Anyway",
+// false on Cancel.
+function confirmTicketMismatch(mismatches){
+  return new Promise(resolve=>{
+    const detail=document.getElementById('ticket-mismatch-detail');
+    detail.innerHTML = mismatches.map(m=>`⚠️ ${esc(m)}`).join('<br>');
+    const modal=document.getElementById('ticket-mismatch-modal');
+    const cancelBtn=document.getElementById('ticket-mismatch-cancel');
+    const proceedBtn=document.getElementById('ticket-mismatch-proceed');
+    const cleanup=(result)=>{
+      modal.classList.remove('open');
+      cancelBtn.onclick=null; proceedBtn.onclick=null;
+      resolve(result);
+    };
+    cancelBtn.onclick=()=>cleanup(false);
+    proceedBtn.onclick=()=>cleanup(true);
+    modal.classList.add('open');
+  });
 }
 
 async function removeTicketAndRefresh(id){
@@ -2506,19 +2713,14 @@ async function proceedSave(data){
 }
 
 // ── File upload + Gemini extraction ───────────────────────────
-async function handleFileUpload(event){
-  const file=event.target.files[0];if(!file) return;
-  showLoading(true);
-  document.getElementById('extraction-result').classList.remove('show');
-  document.getElementById('roundtrip-banner').classList.add('hidden');
-  try{
-    const {b64,mime}=await compressIfNeeded(file);
-    if(file.type!=='application/pdf'&&file.size>800*1024) showToast('Image compressed for faster upload','success');
-    // FIX (Issue 1 - auto-save ticket): remember this exact file (already compressed/base64'd)
-    // so proceedSave() can upload it to Drive right after the guest record is created/updated,
-    // without the user having to attach it again from the guest card.
-    pendingTicketFile={b64,mime,name:file.name};
-    const prompt=`You are extracting travel ticket data for a wedding in ${WEDDING_CITY}.
+// FIX (ticket mismatch check): pulled the extraction prompt/call/leg-processing out of
+// handleFileUpload into its own reusable function. attachTicket() (the "attach ticket to
+// an ALREADY-SAVED guest" flow) now calls this too, so a ticket uploaded after the guest
+// record exists can be compared against what's already on file — see
+// compareTicketToGuest() and the mismatch check inside attachTicket() below.
+// Returns {processedLegs} or throws on hard failure (no legs extracted).
+async function extractTicketLegs(b64, mime){
+  const prompt=`You are extracting travel ticket data for a wedding in ${WEDDING_CITY}.
     The wedding transport hubs are: ${HUBS.join(', ')}.
 
     Read the ENTIRE ticket and extract ALL journey legs.
@@ -2556,64 +2758,66 @@ async function handleFileUpload(event){
     - All date fields MUST be YYYY-MM-DD format. All time fields MUST be HH:MM 24-hour format.
     - pax: number of passengers on this leg (integer).`;
 
-    const raw=await callGeminiFile(prompt,b64,mime);
-    let parsed={legs:[]};
-    try{
-      const clean=raw.replace(/```json|```/g,'').trim();
-      const match=clean.match(/\{[\s\S]*\}/);
-      if(match) parsed=JSON.parse(match[0]);
-    }catch(e){console.error('Parse error:',e,raw);}
+  const raw=await callGeminiFile(prompt,b64,mime);
+  let parsed={legs:[]};
+  try{
+    const clean=raw.replace(/```json|```/g,'').trim();
+    const match=clean.match(/\{[\s\S]*\}/);
+    if(match) parsed=JSON.parse(match[0]);
+  }catch(e){console.error('Parse error:',e,raw);}
 
-    console.log('Gemini extraction:',parsed);
+  console.log('Gemini extraction:',parsed);
+  if(!parsed.legs||parsed.legs.length===0) return [];
 
-    if(!parsed.legs||parsed.legs.length===0){
+  return parsed.legs.map(leg=>{
+    let jt = leg.journey_type === 'departure' ? 'departure' : 'arrival';
+    const wc = WEDDING_CITY.toLowerCase();
+    const legOri = (leg.journey_origin||'').toLowerCase();
+    const legDest = (leg.journey_destination||'').toLowerCase();
+    if (wc) {
+      const oriIsLocal = (legOri.includes(wc)||wc.includes(legOri)) || isLocalHub(leg.journey_origin);
+      const destIsLocal = (legDest.includes(wc)||wc.includes(legDest)) || isLocalHub(leg.journey_destination);
+      if (oriIsLocal && !destIsLocal) jt = 'departure';
+      else if (destIsLocal && !oriIsLocal) jt = 'arrival';
+    }
+    const date=jt==='departure'?leg.depart_date:leg.arrive_date;
+    const time=jt==='departure'?leg.depart_time:leg.arrive_time;
+    let station = HUBS.find(h => h === leg.matched_hub);
+    if(!station) {
+      const stationSrc=jt==='departure'?leg.journey_origin:leg.journey_destination;
+      station = mapToStation(stationSrc, leg.transport_type);
+    }
+    const firstName=(leg.individual_names||'').split(',')[0].trim();
+    return {
+      journey_type:jt,transport_type:leg.transport_type||'',
+      transport_name:leg.transport_name||'',transport_number:leg.transport_number||'',
+      pnr:leg.pnr||'',journey_origin:leg.journey_origin||'',
+      journey_destination:leg.journey_destination||'',
+      arrival_date:date||'',arrival_time:time||'',
+      pickup_location:station || (HUBS[0] || ''),
+      individual_names:leg.individual_names||'',
+      pax:leg.pax||1,group_name:firstName||''
+    };
+  });
+}
+
+async function handleFileUpload(event){
+  const file=event.target.files[0];if(!file) return;
+  showLoading(true);
+  document.getElementById('extraction-result').classList.remove('show');
+  document.getElementById('roundtrip-banner').classList.add('hidden');
+  try{
+    const {b64,mime}=await compressIfNeeded(file);
+    if(file.type!=='application/pdf'&&file.size>800*1024) showToast('Image compressed for faster upload','success');
+    // FIX (Issue 1 - auto-save ticket): remember this exact file (already compressed/base64'd)
+    // so proceedSave() can upload it to Drive right after the guest record is created/updated,
+    // without the user having to attach it again from the guest card.
+    pendingTicketFile={b64,mime,name:file.name};
+    const processedLegs=await extractTicketLegs(b64,mime);
+    if(processedLegs.length===0){
       showToast('Could not extract details — please fill in manually','error');
       showLoading(false);return;
     }
-
-    // Determine journey type and data for each leg
-    const processedLegs=parsed.legs.map(leg=>{
-      // Determine journey type: validate/override Gemini's classification using city matching
-      let jt = leg.journey_type === 'departure' ? 'departure' : 'arrival';
-      const wc = WEDDING_CITY.toLowerCase();
-      const legOri = (leg.journey_origin||'').toLowerCase();
-      const legDest = (leg.journey_destination||'').toLowerCase();
-      
-      // Override Gemini if we can infer from city names vs wedding city
-      if (wc) {
-        const oriIsLocal = (legOri.includes(wc)||wc.includes(legOri)) || isLocalHub(leg.journey_origin);
-        const destIsLocal = (legDest.includes(wc)||wc.includes(legDest)) || isLocalHub(leg.journey_destination);
-        if (oriIsLocal && !destIsLocal) jt = 'departure';
-        else if (destIsLocal && !oriIsLocal) jt = 'arrival';
-      }
-
-      // Pick correct date/time based on journey type
-      // For Arrival: use arrive time (when they REACH the wedding city hub)
-      // For Departure: use depart time (when they LEAVE the wedding city hub)
-      const date=jt==='departure'?leg.depart_date:leg.arrive_date;
-      const time=jt==='departure'?leg.depart_time:leg.arrive_time;
-
-      // Use AI matched hub if valid, else fallback to mapping logic
-      let station = HUBS.find(h => h === leg.matched_hub);
-      if(!station) {
-        const stationSrc=jt==='departure'?leg.journey_origin:leg.journey_destination;
-        station = mapToStation(stationSrc, leg.transport_type);
-      }
-      
-      // Auto group name from first passenger
-      const firstName=(leg.individual_names||'').split(',')[0].trim();
-
-      return {
-        journey_type:jt,transport_type:leg.transport_type||'',
-        transport_name:leg.transport_name||'',transport_number:leg.transport_number||'',
-        pnr:leg.pnr||'',journey_origin:leg.journey_origin||'',
-        journey_destination:leg.journey_destination||'',
-        arrival_date:date||'',arrival_time:time||'',
-        pickup_location:station || (HUBS[0] || ''),
-        individual_names:leg.individual_names||'',
-        pax:leg.pax||1,group_name:firstName||''
-      };
-    });
 
     if(processedLegs.length===1){
       // Single leg — fill form directly
