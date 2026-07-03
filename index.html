@@ -544,10 +544,78 @@ function updateSyncBadge(){
   let badge=document.getElementById('sync-badge');
   if(!badge){badge=document.createElement('div');badge.id='sync-badge';
     badge.style.cssText='position:fixed;bottom:70px;right:16px;background:var(--amber);color:#000;padding:6px 14px;border-radius:20px;font-size:13px;font-weight:600;z-index:999;cursor:pointer;display:none;box-shadow:0 2px 8px rgba(0,0,0,.3)';
-    badge.onclick=()=>flushSyncQueue();
+    badge.onclick=()=>openSyncModal();
     document.body.appendChild(badge);}
   if(syncQueue.length){badge.textContent='🔄 '+syncQueue.length+' pending';badge.style.display='block';}
   else{badge.style.display='none';}
+}
+
+function openSyncModal(){
+  // Build or reuse modal
+  let modal=document.getElementById('sync-modal');
+  if(!modal){
+    modal=document.createElement('div');
+    modal.id='sync-modal';
+    modal.className='modal-overlay';
+    modal.innerHTML=`<div class="modal" style="max-width:520px">
+      <h3>🔄 Pending Changes</h3>
+      <p style="font-size:13px;color:var(--text-2);margin-bottom:16px">These changes couldn't be saved while offline. They'll be retried automatically when you're back online, or tap Retry Now.</p>
+      <div id="sync-modal-list" style="font-size:13px;max-height:320px;overflow-y:auto;margin-bottom:4px"></div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="document.getElementById('sync-modal').classList.remove('open')">Close</button>
+        <button class="btn btn-danger btn-sm" onclick="clearSyncQueue()">Clear All</button>
+        <button class="btn btn-primary" onclick="retrySyncQueue()">Retry Now</button>
+      </div>
+    </div>`;
+    document.body.appendChild(modal);
+  }
+
+  // Populate list
+  const actionLabels={
+    addGuest:'Add guest',updateGuest:'Update guest',
+    updateGuestStatus:'Update status',updateLiveStatus:'Update live status',
+    deleteGuest:'Delete guest'
+  };
+  const listEl=document.getElementById('sync-modal-list');
+  if(!syncQueue.length){
+    listEl.innerHTML='<div style="color:var(--green);font-weight:600;padding:8px 0">✅ No pending changes — all synced!</div>';
+  } else {
+    listEl.innerHTML=syncQueue.map((item,i)=>{
+      const action=actionLabels[item.payload?.action]||item.payload?.action||'Unknown action';
+      const name=item.payload?.data?.group_name||item.payload?.group_id||'—';
+      const age=item.ts?Math.round((Date.now()-item.ts)/60000)+'m ago':'unknown age';
+      return `<div style="padding:8px 12px;border-radius:8px;background:var(--gray-lt);margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <div>
+          <div style="font-weight:600;color:var(--text)">${action} — ${esc(name)}</div>
+          <div style="color:var(--text-2);font-size:12px">Queued ${age}</div>
+        </div>
+        <button onclick="removeSyncItem(${i})" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:16px" title="Remove">✕</button>
+      </div>`;
+    }).join('');
+  }
+  modal.classList.add('open');
+}
+
+function removeSyncItem(i){
+  syncQueue.splice(i,1);
+  localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(syncQueue));
+  updateSyncBadge();
+  openSyncModal(); // re-render
+}
+
+function clearSyncQueue(){
+  if(!confirm('Clear all '+syncQueue.length+' pending changes? This cannot be undone.')) return;
+  syncQueue=[];
+  localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(syncQueue));
+  updateSyncBadge();
+  document.getElementById('sync-modal').classList.remove('open');
+  showToast('Pending queue cleared','success');
+}
+
+async function retrySyncQueue(){
+  document.getElementById('sync-modal').classList.remove('open');
+  await flushSyncQueue();
+  if(syncQueue.length) openSyncModal(); // show what's still failing
 }
 async function flushSyncQueue(){
   if(syncInProgress||!syncQueue.length||!SCRIPT_URL) return;
@@ -752,6 +820,13 @@ async function apiGet(a){
 }
 async function apiPost(p){
   if(!SCRIPT_URL) return {};
+  // Test data guard: group IDs G001–G099 are demo/test data and must never
+  // be sent to the backend or queued — the real Sheet has no such rows.
+  const gid = p?.group_id || p?.data?.group_id || '';
+  if(/^G0\d{2}$/.test(gid)){
+    console.warn('apiPost: skipping test data ID', gid);
+    return {success:true, _test:true};
+  }
   try{
     return await apiPostRaw(p);
   }catch(e){
@@ -1318,23 +1393,6 @@ function getTicket(group_id){
     const cached = JSON.parse(localStorage.getItem('wgt_ticket_'+group_id)||'null');
     if(cached) return cached;
   }catch(e){}
-  // Signal 4 (soft — fallback): same normalised name + same primary phone + same journey_type.
-  // FIX (Issue 5 - duplicate entries slipping through): Signals 2 & 3 above both require a
-  // non-empty arrival_date (and transport number) to run, so any existing record saved
-  // before arrival date/time became mandatory — or any record where transport number was
-  // left blank — was invisible to dedup entirely. That's exactly how the "same guest showing
-  // twice, one dated / one NO DATE" cards happened. This signal ignores date/transport and
-  // matches on identity instead (name + phone), so those legacy/incomplete rows still get
-  // flagged. Runs last and stays "soft" since it's intentionally the least specific check.
-  if(normName(data.group_name) && data.phone_primary){
-    const identityMatch = candidates.find(g=>
-      normName(g.group_name) === normName(data.group_name) &&
-      (g.phone_primary||'').replace(/\D/g,'') === (data.phone_primary||'').replace(/\D/g,'') &&
-      (g.journey_type||'arrival') === (data.journey_type||'arrival')
-    );
-    if(identityMatch) return {match:identityMatch, confidence:'soft', reason:`Same passenger name and phone number for the same journey type`};
-  }
-
   return null;
 }
 
@@ -2035,6 +2093,18 @@ function checkDuplicate(data){
       (g.journey_type||'arrival') === (data.journey_type||'arrival')
     );
     if(nameMatch) return {match:nameMatch, confidence:'soft', reason:`Same passenger name and ${data.transport_type||'transport'} on same date`};
+  }
+
+  // Signal 4: Same name + same phone + same journey_type (soft — catches legacy rows
+  // where transport_number or arrival_date was blank, making Signals 2 & 3 invisible.
+  // This is what catches "same guest twice, one with NO DATE".)
+  if(normName(data.group_name) && data.phone_primary){
+    const identityMatch = candidates.find(g=>
+      normName(g.group_name) === normName(data.group_name) &&
+      (g.phone_primary||'').replace(/\D/g,'') === (data.phone_primary||'').replace(/\D/g,'') &&
+      (g.journey_type||'arrival') === (data.journey_type||'arrival')
+    );
+    if(identityMatch) return {match:identityMatch, confidence:'soft', reason:`Same passenger name and phone number for the same journey type`};
   }
 
   return null;
