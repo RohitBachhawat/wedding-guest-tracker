@@ -145,6 +145,17 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
 .card-train-line{font-size:11px;color:var(--text-2);margin-top:2px}
 .card-driver-line{font-size:12px;color:var(--text-2);margin-top:2px;display:flex;align-items:center;gap:4px}
 .card-driver-line.has-driver{color:var(--green);font-weight:500}
+/* FEATURE (trip-stage badge): a single glance-able badge on the COLLAPSED card that
+   answers "is a car assigned? has it left? has the guest been picked up/dropped?"
+   without opening the card. See tripStage() in the script for the state logic. */
+.trip-stage-badge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;display:inline-flex;align-items:center;gap:3px}
+.stage-none{background:#E9E9EC;color:#5B5B66}
+.stage-urgent{background:var(--red-lt);color:var(--red);animation:stagePulse 1.6s ease-in-out infinite}
+.stage-assigned{background:var(--amber-lt);color:var(--amber)}
+.stage-enroute{background:var(--blue-lt);color:var(--blue)}
+.stage-dropped{background:var(--amber-lt);color:var(--amber)}
+.stage-done{background:var(--green-lt);color:var(--green)}
+@keyframes stagePulse{0%,100%{opacity:1}50%{opacity:.55}}
 @media(min-width:601px){.card-train-mobile{display:none}}
 
 .location-badge{font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;text-transform:uppercase;letter-spacing:.4px}
@@ -1217,6 +1228,39 @@ function isPriority(g){
   return diff>=0&&diff<=180;
 }
 
+// FEATURE (trip-stage badge): single source of truth for "where is this pickup/drop right
+// now" — used to render the always-visible badge on the collapsed card (renderCard) so a
+// coordinator scanning the dashboard doesn't have to open every card to see whether a car
+// is assigned, has left, or has completed the job.
+//
+// Arrival flow:  No Driver → Assigned → On the Way → Picked Up
+// Departure flow: No Driver → Assigned → On the Way → Dropped at Station → Complete
+//   (Departure has one more step than arrival because "dropped at the station" and "car
+//   has returned/is free again" are two genuinely different, useful facts for a
+//   coordinator — arrival has no equivalent second step since pickup IS the end state.)
+function tripStage(g){
+  const isDep = journeyType(g)==='departure';
+  let stage;
+  if(isDep){
+    if(g.status==='car_returned')      stage={icon:'✅',label:'Complete',cls:'stage-done'};
+    else if(g.dropped_off==='yes')     stage={icon:'🏁',label:'Dropped at Station',cls:'stage-dropped'};
+    else if(g.dispatched==='yes')      stage={icon:'🚕',label:'On the Way',cls:'stage-enroute'};
+    else if(g.driver_name)             stage={icon:'🚗',label:'Assigned',cls:'stage-assigned'};
+    else                               stage={icon:'⚪',label:'No Driver',cls:'stage-none'};
+  } else {
+    if(g.status==='picked_up')         stage={icon:'✅',label:'Picked Up',cls:'stage-done'};
+    else if(g.dispatched==='yes')      stage={icon:'🚕',label:'On the Way',cls:'stage-enroute'};
+    else if(g.driver_name)             stage={icon:'🚗',label:'Assigned',cls:'stage-assigned'};
+    else                               stage={icon:'⚪',label:'No Driver',cls:'stage-none'};
+  }
+  // Escalate to the urgent/red pulsing variant when there's still no driver AND pickup is
+  // imminent (same "priority" window already used elsewhere for the ⚠️ No Driver logic).
+  if(stage.cls==='stage-none' && isPriority(g)){
+    stage={icon:'⚠️',label:'No Driver',cls:'stage-urgent'};
+  }
+  return stage;
+}
+
 function buildDateTabs(){
   const dates=[...new Set(allGuests.filter(g=>g.status!=='picked_up'&&g.status!=='car_returned'&&g.deleted!=='yes').map(g=>g.arrival_date).filter(Boolean))].sort();
   const today=new Date().toISOString().slice(0,10);
@@ -1328,7 +1372,12 @@ function renderCard(g, isCompleted){
     ?`<span class="same-train-badge">🚂 ${sameTrainCount+1} groups on ${esc(g.transport_number)}</span>`:'';
 
   const jBadge=isDep?'<span class="journey-badge-departure">🛫 Dep</span>':'<span class="journey-badge-arrival">🛬 Arr</span>';
-  const noDriverBadge=pri?'<span class="no-driver-badge">⚠️ No Driver</span>':'';
+  // FEATURE (trip-stage badge): replaces the old noDriverBadge, which only ever appeared
+  // for the urgent "no driver + pickup soon" case and left every OTHER state (assigned but
+  // not dispatched, dispatched but not yet picked up, etc.) invisible on the collapsed
+  // card. stageInfo covers all 4–5 states for both arrival and departure — see tripStage().
+  const stageInfo=tripStage(g);
+  const stageBadge=`<span class="trip-stage-badge ${stageInfo.cls}">${stageInfo.icon} ${esc(stageInfo.label)}</span>`;
   const soonBadge=(()=>{
     if(!g.arrival_date||!g.arrival_time||!g.driver_name) return '';
     const ms=new Date(g.arrival_date+'T'+g.arrival_time+':00').getTime();
@@ -1372,10 +1421,11 @@ function renderCard(g, isCompleted){
         </div>
       </div>
       <div class="card-badges">
+        ${stageBadge}
         ${jBadge}
         <span class="card-pax">👥 ${g.pax||0}</span>
         ${getTicket(g.group_id)?'<span class="ticket-badge">🎫 Ticket</span>':''}
-        ${noDriverBadge}${soonBadge}${sameTrainBadge}
+        ${soonBadge}${sameTrainBadge}
       </div>
       <div class="card-meta">
         <span class="location-badge ${isAirport?'loc-airport':'loc-rail'}">${isDep?'Drop: ':''}${esc(g.pickup_location||'—')}</span>
