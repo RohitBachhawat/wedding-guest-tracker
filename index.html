@@ -25,6 +25,15 @@ body{font-family:var(--font-b);background:var(--cream);color:var(--text);min-hei
 .hidden{display:none!important}
 .btn{display:inline-flex;align-items:center;gap:6px;padding:10px 20px;border-radius:8px;border:none;font-family:var(--font-b);font-size:14px;font-weight:500;cursor:pointer;transition:all .18s ease}
 .btn-primary{background:var(--gold);color:var(--white)}.btn-primary:hover{background:#b07d20}
+/* FIX (Issue 4 - confusing highlight on Picked Up / Car Returned buttons): these two
+   buttons previously reused .btn-primary, whose solid gold fill is the same visual
+   language the app uses elsewhere for "already active / done" states (e.g. active-gold
+   toggle buttons). That made the *action* button look like a *status* badge, i.e. it
+   looked like pickup/return had already happened. .btn-final uses an outlined blue
+   style instead — still visually distinct as the important final action, but doesn't
+   read as "already complete".*/
+.btn-final{background:var(--white);color:var(--blue);border:1.5px solid var(--blue)}
+.btn-final:hover{background:var(--blue-lt)}
 .btn-secondary{background:var(--white);color:var(--text);border:1.5px solid var(--border)}.btn-secondary:hover{background:var(--gray-lt)}
 .btn-danger{background:var(--red-lt);color:var(--red);border:1.5px solid #f5c6c2}.btn-danger:hover{background:#fdd}
 .btn-sm{padding:7px 14px;font-size:13px}
@@ -102,6 +111,9 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
 .ticket-section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
 .ticket-section-title{font-size:12px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.4px}
 .ticket-actions{display:flex;gap:6px}
+/* FIX (Issue 4 - ticket section cleanup): actions row now sits below the preview instead
+   of in the header, so give it its own top margin and let it wrap on narrow cards. */
+.ticket-actions-bottom{margin-top:8px;flex-wrap:wrap}
 .ticket-preview{width:100%;border-radius:8px;overflow:hidden;border:1px solid var(--border);background:var(--gray-lt);margin-top:6px}
 .ticket-preview img{width:100%;height:auto;display:block;border-radius:8px}
 .ticket-preview iframe{width:100%;height:420px;border:none;display:block}
@@ -609,6 +621,12 @@ let jtMismatchPendingData=null;
 function isDeleted(g){ return String(g.deleted||'').trim().toLowerCase()==='yes'; }
 // Round trip queue: array of extracted leg objects waiting to be filled
 let rtQueue=[], rtQueueIdx=0;
+// FIX (Issue 1 - auto-save ticket): holds {b64,mime,name} for the file the user just uploaded
+// and extracted via Gemini, so it can be pushed to Drive automatically once the guest
+// group is actually saved (instead of requiring a separate manual "Attach Ticket" step).
+// Cleared after a successful attach, or whenever the form is reset/cancelled so a stale
+// file never attaches itself to the wrong guest.
+let pendingTicketFile=null;
 // Personal details carried over between round trip legs
 let rtPersonal={};
 
@@ -1186,9 +1204,17 @@ function renderCard(g, isCompleted){
   const timeLabel=isDep?'Departure Time':'Arrival Time';
   const originLabel=isDep?'Departing From':'Coming From';
 
-  return `<div class="guest-card${pri?' priority-high':''}" id="card-${g.group_id}" onclick="toggleCard('${g.group_id}')">
+  // FIX (Issue 3 - card collapsing on inner clicks): previously the ENTIRE card (including
+  // the expanded detail section) had one big onclick="toggleCard(...)" and every clickable
+  // element inside the expanded area had to individually call event.stopPropagation() to
+  // avoid closing the card. That's fragile — plain text like the train number had no such
+  // guard, so trying to select/copy it collapsed the card. Fix: the toggle click-handler now
+  // lives ONLY on .card-body (the always-visible collapsed header/summary). Nothing inside
+  // .card-expanded needs to fight the bubble anymore. Closing when clicking outside the card
+  // entirely is handled by a single document-level listener — see closeCardsOnOutsideClick().
+  return `<div class="guest-card${pri?' priority-high':''}" id="card-${g.group_id}">
     <div class="card-strip ${stripClass(g)}"></div>
-    <div class="card-body">
+    <div class="card-body" onclick="toggleCard('${g.group_id}')">
       <div class="card-header">
         <div class="card-name">${esc(g.group_name)}</div>
         <div class="card-time-block">
@@ -1255,10 +1281,10 @@ function cardActions(g){
   if(jt==='arrival')
     return `<button class="btn btn-secondary btn-sm" onclick="toggleField('${g.group_id}','dispatched','${g.dispatched||'no'}')">
         ${g.dispatched==='yes'?'🚗 Dispatched ✓':'🚗 Dispatch'}</button>
-      <button class="btn btn-primary btn-sm" onclick="markFinal('${g.group_id}','arrival')">✅ Picked Up</button>`;
+      <button class="btn btn-final btn-sm" onclick="markFinal('${g.group_id}','arrival')">✅ Picked Up</button>`;
   if(g.dropped_off==='yes')
     return `<span style="font-size:12px;color:var(--purple);font-weight:500">🏁 Dropped Off</span>
-      <button class="btn btn-primary btn-sm" onclick="markFinal('${g.group_id}','departure')">🔑 Car Returned → Complete</button>`;
+      <button class="btn btn-final btn-sm" onclick="markFinal('${g.group_id}','departure')">🔑 Car Returned → Complete</button>`;
   return `<button class="btn btn-secondary btn-sm" onclick="toggleField('${g.group_id}','dispatched','${g.dispatched||'no'}')">
       ${g.dispatched==='yes'?'🚗 Dispatched ✓':'🚗 Dispatch'}</button>
     <!-- guest_in_car hidden: not used currently -->
@@ -1266,6 +1292,16 @@ function cardActions(g){
 }
 
 function toggleCard(id){document.getElementById('exp-'+id)?.classList.toggle('open');}
+
+// FIX (Issue 3 - card collapsing on inner clicks): clicking OUTSIDE any guest card should
+// still close whichever card is currently open (that's the "click outside" affordance users
+// expect). We can't rely on the old per-card onclick anymore since toggleCard() is now only
+// wired to .card-body, so instead we listen once on the document and check whether the click
+// landed inside a .guest-card at all — if not, close every currently-open .card-expanded.
+document.addEventListener('click', function(evt){
+  if(evt.target.closest('.guest-card')) return; // click was inside some card — let toggleCard/buttons handle it
+  document.querySelectorAll('.card-expanded.open').forEach(el=>el.classList.remove('open'));
+});
 
 // ── Ticket storage (Google Drive via backend) ─────────────────
 // ticket_url is stored in the guest record (Sheet column ticket_url).
@@ -1281,6 +1317,23 @@ function getTicket(group_id){
     const cached = JSON.parse(localStorage.getItem('wgt_ticket_'+group_id)||'null');
     if(cached) return cached;
   }catch(e){}
+  // Signal 4 (soft — fallback): same normalised name + same primary phone + same journey_type.
+  // FIX (Issue 5 - duplicate entries slipping through): Signals 2 & 3 above both require a
+  // non-empty arrival_date (and transport number) to run, so any existing record saved
+  // before arrival date/time became mandatory — or any record where transport number was
+  // left blank — was invisible to dedup entirely. That's exactly how the "same guest showing
+  // twice, one dated / one NO DATE" cards happened. This signal ignores date/transport and
+  // matches on identity instead (name + phone), so those legacy/incomplete rows still get
+  // flagged. Runs last and stays "soft" since it's intentionally the least specific check.
+  if(normName(data.group_name) && data.phone_primary){
+    const identityMatch = candidates.find(g=>
+      normName(g.group_name) === normName(data.group_name) &&
+      (g.phone_primary||'').replace(/\D/g,'') === (data.phone_primary||'').replace(/\D/g,'') &&
+      (g.journey_type||'arrival') === (data.journey_type||'arrival')
+    );
+    if(identityMatch) return {match:identityMatch, confidence:'soft', reason:`Same passenger name and phone number for the same journey type`};
+  }
+
   return null;
 }
 
@@ -1310,48 +1363,101 @@ function renderTicketSection(id){
   }
 
   // Drive URL ticket (stored in Sheet)
+  // FIX (Issue 4 - ticket section cleanup):
+  //  - Removed the redundant "✓ Saved to Drive" text next to the title — the presence of a
+  //    preview/actions row already makes that obvious, and it added visual noise.
+  //  - Moved "Full View" / Replace / Delete out of the header and into a row BELOW the
+  //    preview (ticket-actions-bottom) so the title stays clean and actions read as acting
+  //    ON the ticket shown above them, not competing with the title for space.
+  //  - Added an explicit Download button (separate from "Full View", which just opens the
+  //    Drive preview in a new tab) using Drive's direct-download URL form.
   if(ticket.type==='url'){
+    const downloadUrl = ticket.url.includes('/preview')
+      ? ticket.url.replace('/preview','/view')+'?export=download'
+      : ticket.url;
     return `<div class="ticket-section" onclick="event.stopPropagation()">
       <div class="ticket-section-header">
-        <span class="ticket-section-title">🎫 Ticket <span style="font-weight:400;text-transform:none;color:var(--green)">✓ Saved to Drive</span></span>
-        <div class="ticket-actions">
-          <a href="${ticket.url.replace('/preview','/view')}" target="_blank" class="btn btn-secondary btn-sm" onclick="event.stopPropagation()">⬡ Full View</a>
-          <label class="btn btn-secondary btn-sm" style="cursor:pointer;margin:0" title="Replace ticket">
-            🔄
-            <input type="file" accept="image/*,application/pdf" style="display:none"
-              onchange="attachTicket('${id}',this)" onclick="event.stopPropagation()">
-          </label>
-          <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();removeTicketAndRefresh('${id}')">🗑️</button>
-        </div>
+        <span class="ticket-section-title">🎫 Ticket</span>
       </div>
       <div class="ticket-preview">
         <iframe src="${ticket.url}" title="Ticket" onclick="event.stopPropagation()"></iframe>
       </div>
-    </div>`;
-  }
-
-  // Local cache fallback (base64, offline or pending upload)
-  const isImg = ticket.mime && ticket.mime.startsWith('image/');
-  const src = `data:${ticket.mime};base64,${ticket.data}`;
-  return `<div class="ticket-section" onclick="event.stopPropagation()">
-    <div class="ticket-section-header">
-      <span class="ticket-section-title">🎫 Ticket <span style="font-weight:400;text-transform:none;color:var(--amber)">⏳ Saved locally</span></span>
-      <div class="ticket-actions">
-        <a href="${src}" target="_blank" class="btn btn-secondary btn-sm" onclick="event.stopPropagation()">⬡ Full View</a>
+      <div class="ticket-actions ticket-actions-bottom" onclick="event.stopPropagation()">
+        <a href="${ticket.url.replace('/preview','/view')}" target="_blank" class="btn btn-secondary btn-sm">⬡ Full View</a>
+        <a href="${downloadUrl}" target="_blank" class="btn btn-secondary btn-sm">⬇ Download</a>
         <label class="btn btn-secondary btn-sm" style="cursor:pointer;margin:0" title="Replace ticket">
           🔄
           <input type="file" accept="image/*,application/pdf" style="display:none"
             onchange="attachTicket('${id}',this)" onclick="event.stopPropagation()">
         </label>
-        <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();removeTicketAndRefresh('${id}')">🗑️</button>
+        <button class="btn btn-danger btn-sm" onclick="removeTicketAndRefresh('${id}')">🗑️</button>
       </div>
+    </div>`;
+  }
+
+  // Local cache fallback (base64, offline or pending upload)
+  // FIX (Issue 4 - ticket section cleanup): same restructuring as the Drive branch above —
+  // status text trimmed to just "Saved locally" (kept, since this state genuinely needs a
+  // warning that it hasn't synced to Drive yet), actions moved below the preview, and a
+  // Download button added (base64 data URLs support the `download` attribute directly).
+  const isImg = ticket.mime && ticket.mime.startsWith('image/');
+  const src = `data:${ticket.mime};base64,${ticket.data}`;
+  return `<div class="ticket-section" onclick="event.stopPropagation()">
+    <div class="ticket-section-header">
+      <span class="ticket-section-title">🎫 Ticket <span style="font-weight:400;text-transform:none;color:var(--amber)">⏳ Saved locally</span></span>
     </div>
     <div class="ticket-preview">
       ${isImg
         ? `<img src="${src}" alt="Ticket" onclick="event.stopPropagation()">`
         : `<iframe src="${src}" title="Ticket PDF" onclick="event.stopPropagation()"></iframe>`}
     </div>
+    <div class="ticket-actions ticket-actions-bottom" onclick="event.stopPropagation()">
+      <a href="${src}" target="_blank" class="btn btn-secondary btn-sm">⬡ Full View</a>
+      <a href="${src}" download="${ticket.name||'ticket'}" class="btn btn-secondary btn-sm">⬇ Download</a>
+      <label class="btn btn-secondary btn-sm" style="cursor:pointer;margin:0" title="Replace ticket">
+        🔄
+        <input type="file" accept="image/*,application/pdf" style="display:none"
+          onchange="attachTicket('${id}',this)" onclick="event.stopPropagation()">
+      </label>
+      <button class="btn btn-danger btn-sm" onclick="removeTicketAndRefresh('${id}')">🗑️</button>
+    </div>
   </div>`;
+}
+
+// FIX (Issue 1 - auto-save ticket): shared uploader used both by the manual "Attach Ticket"
+// button (attachTicket, below) and by proceedSave() right after a guest is created/updated
+// from an uploaded file. Pulled out so both paths share identical error handling / fallback.
+async function uploadTicketForGuest(id, base64, mimeType, fileName, {silent}={}){
+  if(!silent) showToast('Uploading ticket to Drive…','');
+  try {
+    // IMPORTANT: use apiPostRaw (not apiPost) — base64 payloads must NEVER
+    // enter the offline sync queue as they will blow localStorage quota.
+    const result = await apiPostRaw({
+      action: 'saveTicket',
+      group_id: id,
+      data: base64,
+      mime: mimeType,
+      name: fileName
+    });
+    if(result.error) throw new Error(result.error);
+
+    // Update the in-memory guest record so getTicket() returns the Drive URL
+    const g = allGuests.find(x=>x.group_id===id);
+    if(g) g.ticket_url = result.ticket_url;
+
+    // Clear any local cache now that Drive has it
+    clearTicketCache(id);
+    _refreshTicketUI(id, true);
+    showToast('Ticket saved to Drive ✓','success');
+    return true;
+  } catch(err) {
+    // Drive failed — fall back to localStorage so ticket isn't lost
+    console.warn('Drive upload failed, caching locally:', err.message);
+    setTicketCache(id, {data: base64, mime: mimeType, name: fileName});
+    _refreshTicketUI(id, true);
+    showToast('Drive unavailable — ticket saved on this device only','error');
+    return false;
+  }
 }
 
 async function attachTicket(id, input){
@@ -1366,37 +1472,10 @@ async function attachTicket(id, input){
     r.readAsDataURL(file);
   });
 
-  showToast('Uploading ticket to Drive…','');
   showLoading(true);
-
   try {
-    // IMPORTANT: use apiPostRaw (not apiPost) — base64 payloads must NEVER
-    // enter the offline sync queue as they will blow localStorage quota.
-    const result = await apiPostRaw({
-      action: 'saveTicket',
-      group_id: id,
-      data: base64,
-      mime: file.type,
-      name: file.name
-    });
-
-    if(result.error) throw new Error(result.error);
-
-    // Update the in-memory guest record so getTicket() returns the Drive URL
-    const g = allGuests.find(x=>x.group_id===id);
-    if(g) g.ticket_url = result.ticket_url;
-
-    // Clear any local cache now that Drive has it
-    clearTicketCache(id);
-
-    _refreshTicketUI(id, true);
-    showToast('Ticket saved to Drive ✓','success');
-
+    await uploadTicketForGuest(id, base64, file.type, file.name);
   } catch(err) {
-    // Drive failed — fall back to localStorage so ticket isn't lost
-    console.warn('Drive upload failed, caching locally:', err.message);
-    setTicketCache(id, {data: base64, mime: file.type, name: file.name});
-    _refreshTicketUI(id, true);
     showToast('Drive unavailable — ticket saved on this device only','error');
   }
 
@@ -1768,6 +1847,10 @@ function populateStationDropdown(){
 function showGuestForm(id){
   editingId=id||null;
   rtQueue=[];rtQueueIdx=0;rtPersonal={};
+  // FIX (Issue 1 - auto-save ticket): opening the form (fresh add, edit, or re-entry)
+  // always starts a clean slate — any previously-uploaded-but-unsaved file must not
+  // silently attach itself to whatever guest gets saved next.
+  pendingTicketFile=null;
   screen('guest');
   document.getElementById('guest-form-title').textContent=id?'Edit Guest Group':'Add Guest Group';
   document.getElementById('form-submit-btn').textContent=id?'Save Changes':'Save Guest Group';
@@ -2158,8 +2241,46 @@ function checkCarOpt(data){
   return smaller.length?smaller[0]:null;
 }
 
+// FIX (Issue 2 - phone validation): strips everything but digits and requires exactly
+// 10 digits (standard Indian mobile number length, no country code expected here since
+// the +91 is just a placeholder in the UI, not part of the stored value). Also rejects
+// obviously-fake numbers like all-zeros or a single digit repeated 10 times, which is
+// the most common typo/placeholder pattern people accidentally submit.
+function isValidPhone(raw){
+  const digits=(raw||'').replace(/\D/g,'');
+  if(digits.length!==10) return false;
+  if(/^0+$/.test(digits)) return false;
+  if(/^(\d)\1{9}$/.test(digits)) return false; // e.g. 9999999999
+  return true;
+}
+
 async function submitGuestForm(e){
   e.preventDefault();const data=collectForm();
+
+  // FIX (Issue 2 - phone validation): primary phone is required elsewhere in the form,
+  // so validate its format here. Backup phone is optional — only validated if the user
+  // actually typed something in it.
+  if(!isValidPhone(data.phone_primary)){
+    showToast('Primary phone must be a valid 10-digit number','error');
+    document.getElementById('f-phone-primary').focus();
+    return;
+  }
+  if(data.phone_backup && !isValidPhone(data.phone_backup)){
+    showToast('Backup phone must be a valid 10-digit number','error');
+    document.getElementById('f-phone-backup').focus();
+    return;
+  }
+
+  // FIX (Issue 5 - mandatory date/time): the date/time inputs already carry the HTML5
+  // `required` attribute, but that only blocks submission for *visible* fields — belt
+  // and braces check here too, since this is exactly how "NO DATE" ghost cards crept in
+  // (an empty arrival_date meant the duplicate-detection signals below never triggered,
+  // because they compare on date/transport-number and silently skip when it's blank).
+  if(!data.arrival_date || !data.arrival_time){
+    showToast('Arrival date and time are required','error');
+    return;
+  }
+
   // Duplicate check — new multi-signal version
   const dupResult=checkDuplicate(data);
   if(dupResult){openDupModal(data,dupResult);return;}
@@ -2235,6 +2356,13 @@ async function proceedSave(data){
       const idx=allGuests.findIndex(g=>g.group_id===editingId);
       if(idx>=0) allGuests[idx]={...allGuests[idx],...data};
       syncDriverAssignment(); saveToCache();
+      // FIX (Issue 1 - auto-save ticket): if the user uploaded a ticket in this same
+      // form session (via the "Upload Ticket / Booking" box at the top), push it to
+      // Drive now that we have a real group_id — no separate "Attach Ticket" click needed.
+      if(pendingTicketFile){
+        const ptf=pendingTicketFile; pendingTicketFile=null;
+        await uploadTicketForGuest(data.group_id, ptf.b64, ptf.mime, ptf.name, {silent:true});
+      }
       showToast('Guest updated ✓','success');
       showLoading(false);showDashboard();renderDashboard();
     } else {
@@ -2247,6 +2375,14 @@ async function proceedSave(data){
       data.live_status_text='';data.last_refreshed='';
       allGuests.push(data);
       syncDriverAssignment(); saveToCache();
+      // FIX (Issue 1 - auto-save ticket): same as above for brand-new guest groups.
+      // For multi-leg round trips the source ticket is only attached to Leg 1 (the first
+      // group_id created) since all legs come from the same uploaded file — attaching it
+      // again per-leg would just duplicate the same Drive file across every leg.
+      if(pendingTicketFile){
+        const ptf=pendingTicketFile; pendingTicketFile=null;
+        await uploadTicketForGuest(data.group_id, ptf.b64, ptf.mime, ptf.name, {silent:true});
+      }
       showToast('Guest added 🎉','success');
       showLoading(false);
       if(rtQueue.length>0&&rtQueueIdx<rtQueue.length){
@@ -2282,6 +2418,10 @@ async function handleFileUpload(event){
   try{
     const {b64,mime}=await compressIfNeeded(file);
     if(file.type!=='application/pdf'&&file.size>800*1024) showToast('Image compressed for faster upload','success');
+    // FIX (Issue 1 - auto-save ticket): remember this exact file (already compressed/base64'd)
+    // so proceedSave() can upload it to Drive right after the guest record is created/updated,
+    // without the user having to attach it again from the guest card.
+    pendingTicketFile={b64,mime,name:file.name};
     const prompt=`You are extracting travel ticket data for a wedding in ${WEDDING_CITY}.
     The wedding transport hubs are: ${HUBS.join(', ')}.
 
