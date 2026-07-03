@@ -56,7 +56,12 @@ label{display:block;font-size:13px;font-weight:500;color:var(--text-2);margin-bo
 
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:5000;padding:20px}
 .modal-overlay.open{display:flex}
-.modal{background:var(--white);border-radius:var(--radius);padding:32px;max-width:460px;width:100%;box-shadow:var(--shadow-lg);max-height:90vh;overflow-y:auto}
+.modal{background:var(--white);border-radius:var(--radius);padding:32px;max-width:460px;width:100%;box-shadow:var(--shadow-lg);max-height:90vh;overflow-y:auto;position:relative}
+/* FIX (Clear All / cross button): dedicated close-X, used on the confirm modal and Pending
+   Changes modal. Positioned top-right, doesn't interfere with modal-actions buttons below. */
+.modal-close-x{position:absolute;top:14px;right:14px;background:none;border:none;font-size:16px;
+  line-height:1;cursor:pointer;color:var(--text-2);padding:4px 6px;border-radius:6px}
+.modal-close-x:hover{background:var(--gray-lt);color:var(--text)}
 .modal h3{font-family:var(--font-h);font-size:20px;margin-bottom:14px}
 .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px;flex-wrap:wrap}
 
@@ -485,12 +490,35 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
   </div>
 </div>
 
+<!-- Generic confirm modal -->
+<!-- FIX (Clear All not working): the app previously used native window.confirm() for
+     several destructive actions (remove ticket, remove/clear pending sync items). On iOS
+     and Android when this app is added to the home screen (standalone/PWA display mode —
+     the normal way a coordinator would use this on the go), window.confirm()/alert()/
+     prompt() are silently blocked by the OS and effectively no-op: the function call
+     returns immediately without ever showing a dialog, so `if(!confirm(...)) return;`
+     always takes the "return" branch and the action never runs. That exactly matches
+     "clicking Clear All does nothing." appConfirm() below replaces confirm() with a real
+     in-app modal that works identically in browser tabs AND standalone/PWA mode. -->
+<div class="modal-overlay" id="app-confirm-modal">
+  <div class="modal" style="max-width:420px">
+    <button class="modal-close-x" onclick="_appConfirmResolve(false)" title="Cancel">✕</button>
+    <h3 id="app-confirm-title">Please confirm</h3>
+    <p id="app-confirm-message" style="font-size:14px;color:var(--text-2);line-height:1.6"></p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="_appConfirmResolve(false)">Cancel</button>
+      <button class="btn btn-danger" onclick="_appConfirmResolve(true)">Confirm</button>
+    </div>
+  </div>
+</div>
+
 <!-- Sync queue modal -->
 <!-- FIX (pending badge - show list instead of silent retry): lists whatever's queued in
      localStorage (wgt_sync_queue) waiting to sync to the backend — see openSyncQueueModal()
      in the script below. Lets you retry all, or remove individual/all stuck items. -->
 <div class="modal-overlay" id="sync-queue-modal">
   <div class="modal" style="max-width:480px">
+    <button class="modal-close-x" onclick="closeSyncQueueModal()" title="Close">✕</button>
     <h3>🔄 Pending Changes</h3>
     <div id="sync-queue-body" style="font-size:13px;color:var(--text-2);max-height:320px;overflow-y:auto"></div>
     <div class="modal-actions" id="sync-queue-actions">
@@ -631,8 +659,9 @@ function renderSyncQueueBody(){
 // FIX (pending badge - stuck items): lets you drop a single item that keeps failing (e.g.
 // a stale/invalid payload) without waiting for the 24h auto-expiry or losing every OTHER
 // pending change too.
-function removeSyncQueueItem(i){
-  if(!confirm('Remove this pending change? It will NOT be saved to the sheet.')) return;
+async function removeSyncQueueItem(i){
+  const ok = await appConfirm('Remove this pending change? It will NOT be saved to the sheet.');
+  if(!ok) return;
   syncQueue.splice(i,1);
   localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(syncQueue));
   updateSyncBadge();
@@ -645,9 +674,10 @@ async function retrySyncQueueFromModal(){
   await flushSyncQueue();
   renderSyncQueueBody();
 }
-function clearAllSyncQueue(){
+async function clearAllSyncQueue(){
   if(!syncQueue.length) return;
-  if(!confirm(`Remove all ${syncQueue.length} pending changes? None of them will be saved to the sheet.`)) return;
+  const ok = await appConfirm(`Remove all ${syncQueue.length} pending changes? None of them will be saved to the sheet.`);
+  if(!ok) return;
   syncQueue=[];
   localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(syncQueue));
   updateSyncBadge();
@@ -1412,6 +1442,42 @@ function cardActions(g){
 
 function toggleCard(id){document.getElementById('exp-'+id)?.classList.toggle('open');}
 
+// FIX (Clear All not working - root cause): native window.confirm()/alert()/prompt() are
+// silently blocked (no-op, return immediately) when this app runs in iOS/Android
+// "Add to Home Screen" standalone mode — which is exactly how a coordinator would use a
+// wedding tracker throughout the day. That made every `if(!confirm(...)) return;` gated
+// action (Clear All, remove single pending item, remove ticket) silently do nothing.
+// appConfirm() is a real in-app modal that works the same everywhere.
+let _appConfirmResolver=null;
+function appConfirm(message, title='Please confirm'){
+  return new Promise(resolve=>{
+    document.getElementById('app-confirm-title').textContent = title;
+    document.getElementById('app-confirm-message').textContent = message;
+    _appConfirmResolver = resolve;
+    document.getElementById('app-confirm-modal').classList.add('open');
+  });
+}
+function _appConfirmResolve(result){
+  document.getElementById('app-confirm-modal').classList.remove('open');
+  if(_appConfirmResolver){ const r=_appConfirmResolver; _appConfirmResolver=null; r(result); }
+}
+
+// FIX (Pending Changes modal - cross button / click outside to close): generic "click on
+// the dimmed backdrop (not the modal card itself) closes it" wiring. Scoped to the modals
+// touched in this round of fixes (Pending Changes, the new confirm dialog, ticket-mismatch)
+// rather than every legacy modal in the app, to avoid changing behavior of flows that
+// weren't reported as broken.
+function wireOverlayOutsideClick(overlayId, onClose){
+  const overlay=document.getElementById(overlayId);
+  if(!overlay) return;
+  overlay.addEventListener('click', (e)=>{ if(e.target===overlay) onClose(); });
+}
+wireOverlayOutsideClick('sync-queue-modal', closeSyncQueueModal);
+wireOverlayOutsideClick('app-confirm-modal', ()=>_appConfirmResolve(false));
+wireOverlayOutsideClick('ticket-mismatch-modal', ()=>{
+  document.getElementById('ticket-mismatch-cancel')?.click();
+});
+
 // FIX (click anywhere opens date/time picker): browsers only open the native date/time
 // picker when you click the small calendar/clock icon on the right edge of the input.
 // Clicking anywhere else in the box just places a text cursor, which looks broken. We use
@@ -1726,7 +1792,8 @@ function confirmTicketMismatch(mismatches){
 }
 
 async function removeTicketAndRefresh(id){
-  if(!confirm('Remove attached ticket?')) return;
+  const ok = await appConfirm('Remove attached ticket?');
+  if(!ok) return;
   // Clear Drive URL from guest record
   const g = allGuests.find(x=>x.group_id===id);
   if(g && g.ticket_url){
