@@ -1096,6 +1096,7 @@ function buildPooling(){
       if(journeyType(a)!==journeyType(b)) continue;
       if(!a.arrival_date||!a.arrival_time||!b.arrival_date||!b.arrival_time) continue;
       if(a.pickup_location!==b.pickup_location) continue;
+      if(a.arrival_date!==b.arrival_date) continue; // must be same date — different days are never poolable
       if(a.driver_name&&b.driver_name&&a.driver_name===b.driver_name) continue;
       const diff=Math.abs(parseTimeMins(a.arrival_time)-parseTimeMins(b.arrival_time));
       if(diff>30) continue;
@@ -1288,7 +1289,7 @@ function cardActions(g){
   return `<button class="btn btn-secondary btn-sm" onclick="toggleField('${g.group_id}','dispatched','${g.dispatched||'no'}')">
       ${g.dispatched==='yes'?'🚗 Dispatched ✓':'🚗 Dispatch'}</button>
     <!-- guest_in_car hidden: not used currently -->
-    <button class="btn btn-final btn-sm" onclick="toggleField('${g.group_id}','dropped_off','${g.dropped_off||'no'}')">🏁 Dropped Off</button>`;
+    <button class="btn btn-primary btn-sm" onclick="toggleField('${g.group_id}','dropped_off','${g.dropped_off||'no'}')">🏁 Dropped Off</button>`;
 }
 
 function toggleCard(id){document.getElementById('exp-'+id)?.classList.toggle('open');}
@@ -1317,6 +1318,23 @@ function getTicket(group_id){
     const cached = JSON.parse(localStorage.getItem('wgt_ticket_'+group_id)||'null');
     if(cached) return cached;
   }catch(e){}
+  // Signal 4 (soft — fallback): same normalised name + same primary phone + same journey_type.
+  // FIX (Issue 5 - duplicate entries slipping through): Signals 2 & 3 above both require a
+  // non-empty arrival_date (and transport number) to run, so any existing record saved
+  // before arrival date/time became mandatory — or any record where transport number was
+  // left blank — was invisible to dedup entirely. That's exactly how the "same guest showing
+  // twice, one dated / one NO DATE" cards happened. This signal ignores date/transport and
+  // matches on identity instead (name + phone), so those legacy/incomplete rows still get
+  // flagged. Runs last and stays "soft" since it's intentionally the least specific check.
+  if(normName(data.group_name) && data.phone_primary){
+    const identityMatch = candidates.find(g=>
+      normName(g.group_name) === normName(data.group_name) &&
+      (g.phone_primary||'').replace(/\D/g,'') === (data.phone_primary||'').replace(/\D/g,'') &&
+      (g.journey_type||'arrival') === (data.journey_type||'arrival')
+    );
+    if(identityMatch) return {match:identityMatch, confidence:'soft', reason:`Same passenger name and phone number for the same journey type`};
+  }
+
   return null;
 }
 
@@ -2017,18 +2035,6 @@ function checkDuplicate(data){
       (g.journey_type||'arrival') === (data.journey_type||'arrival')
     );
     if(nameMatch) return {match:nameMatch, confidence:'soft', reason:`Same passenger name and ${data.transport_type||'transport'} on same date`};
-  }
-
-  // Signal 4: Same name + same phone + same journey_type (soft — catches legacy/incomplete rows
-  // where transport_number or arrival_date was blank, which made Signals 2 & 3 invisible.
-  // This is the fallback that caught the "same guest twice, one with NO DATE" scenario.)
-  if(normName(data.group_name) && data.phone_primary){
-    const identityMatch = candidates.find(g=>
-      normName(g.group_name) === normName(data.group_name) &&
-      (g.phone_primary||'').replace(/\D/g,'') === (data.phone_primary||'').replace(/\D/g,'') &&
-      (g.journey_type||'arrival') === (data.journey_type||'arrival')
-    );
-    if(identityMatch) return {match:identityMatch, confidence:'soft', reason:`Same passenger name and phone number for the same journey type`};
   }
 
   return null;
