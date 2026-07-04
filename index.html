@@ -1308,10 +1308,31 @@ function buildPooling(){
       <div class="pooling-card-actions">
         ${r.sd?`<button class="btn btn-primary btn-sm" onclick="openPoolingConfirm(${i})">Assign ${esc(r.sd.name)}</button>`
               :`<span style="font-size:12px;color:var(--red)">⚠️ No car with ${r.combo}+ capacity</span>`}
+        <button class="btn btn-secondary btn-sm" onclick="jumpToPoolingGuest('${r.a.group_id}')">👁 View</button>
         <button class="btn btn-secondary btn-sm" onclick="document.getElementById('pc-${i}').remove()">Dismiss</button>
       </div>
     </div>`).join('')}
   </div>`;
+}
+
+// FIX (pooling recs point to invisible cards): buildPooling() intentionally scans ALL
+// guests regardless of the currently-selected date tab, since a good pooling match on a
+// different date shouldn't just disappear. But that meant the guest names it references
+// could be completely absent from the visible dashboard with no way to find them — exactly
+// the "why can't I see Bhawna Bachhawat's card/ticket" confusion. This jumps to the correct
+// date tab (or "All Days" as a fallback) and opens/scrolls to the actual card.
+function jumpToPoolingGuest(groupId){
+  const g = allGuests.find(x=>x.group_id===groupId);
+  if(!g) return;
+  activeTab = g.arrival_date || 'all';
+  renderDashboard();
+  setTimeout(()=>{
+    const card=document.getElementById('card-'+groupId);
+    if(card){
+      card.scrollIntoView({behavior:'smooth',block:'center'});
+      card.querySelector('.card-expanded')?.classList.add('open');
+    }
+  }, 150);
 }
 
 function openPoolingConfirm(i){
@@ -2466,10 +2487,17 @@ document.getElementById('dup-update-btn').addEventListener('click',async()=>{
   overwriteFields.forEach(f=>{
     if(dupPendingData[f] !== undefined && dupPendingData[f] !== '') merged[f] = dupPendingData[f];
   });
+  // FIX (Update Existing created a new entry instead): closeDupModal() sets dupExistingId
+  // (and dupPendingData) back to null as part of its cleanup — but the code below used to
+  // call closeDupModal() FIRST and only read dupExistingId AFTER, so it was always reading
+  // null by the time it assigned `editingId = dupExistingId`. That made editingId null,
+  // which sent proceedSave() down the "add new guest" branch instead of "update existing" —
+  // silently creating a duplicate every single time this button was clicked. Fix: capture
+  // the id into a local BEFORE calling closeDupModal(), and use that local afterwards.
+  const targetId = dupExistingId;
   closeDupModal();
-  // Temporarily set editingId so proceedSave does an update, not an insert
   const prevEditingId = editingId;
-  editingId = dupExistingId;
+  editingId = targetId;
   await proceedSave(merged);
   editingId = prevEditingId;
 });
