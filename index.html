@@ -1283,7 +1283,16 @@ function buildPooling(){
       if(!a.arrival_date||!a.arrival_time||!b.arrival_date||!b.arrival_time) continue;
       if(a.pickup_location!==b.pickup_location) continue;
       if(a.driver_name&&b.driver_name&&a.driver_name===b.driver_name) continue;
-      const diff=Math.abs(parseTimeMins(a.arrival_time)-parseTimeMins(b.arrival_time));
+      // FIX (pooling recs ignoring date): previously this only compared time-of-day via
+      // parseTimeMins(), so two guests at the same clock time on DIFFERENT dates (e.g.
+      // 9:45 AM on 5 Jul and 9:45 AM on 6 Jul) were treated as "Gap: 0 min" and recommended
+      // for the same car — a full 24 hours apart. Comparing full date+time timestamps
+      // instead naturally requires the same day (or a realistically small gap across
+      // midnight) rather than just matching the hour/minute.
+      const aMs = new Date(`${a.arrival_date}T${a.arrival_time}:00`).getTime();
+      const bMs = new Date(`${b.arrival_date}T${b.arrival_time}:00`).getTime();
+      if(isNaN(aMs) || isNaN(bMs)) continue;
+      const diff=Math.abs(aMs-bMs)/60000;
       if(diff>30) continue;
       const combo=(parseInt(a.pax)||0)+(parseInt(b.pax)||0);
       let sd=null;
@@ -1302,7 +1311,7 @@ function buildPooling(){
       <div class="pooling-card-detail">
         ${esc(r.a.group_name)}: ${fmtAmPm(r.a.arrival_time)} (${fmtDate(r.a.arrival_date)}) · ${r.a.pax} pax<br>
         ${esc(r.b.group_name)}: ${fmtAmPm(r.b.arrival_time)} (${fmtDate(r.b.arrival_date)}) · ${r.b.pax} pax<br>
-        Combined: <strong>${r.combo} pax</strong> · Gap: <strong>${r.diff} min</strong>
+        Combined: <strong>${r.combo} pax</strong> · Gap: <strong>${Math.round(r.diff)} min</strong>
         ${r.sd?' · '+esc(r.sd.car)+' ('+esc(r.sd.car_no)+')':''}
       </div>
       <div class="pooling-card-actions">
