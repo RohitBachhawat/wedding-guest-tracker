@@ -1996,10 +1996,40 @@ async function refreshStatus(id){
   }
 }
 
+// FEATURE (status change confirmation on time mismatch): the wedding runs on IST regardless
+// of what timezone the coordinator's phone/browser is set to, so we anchor the comparison to
+// IST explicitly (via the +05:30 offset) rather than trusting the device's local time.
+// Returns hours difference (guest's scheduled time minus now); positive = still in the
+// future, negative = already in the past. Returns null if date/time aren't set.
+function hoursDiffFromNowIST(dateStr, timeStr){
+  if(!dateStr || !timeStr) return null;
+  const guestMs = new Date(`${dateStr}T${timeStr}:00+05:30`).getTime();
+  if(isNaN(guestMs)) return null;
+  return (guestMs - Date.now())/3600000;
+}
+
+// FEATURE (status change confirmation on time mismatch): guards against fat-fingering the
+// wrong card — e.g. marking someone "Picked Up" when their train isn't due for another day,
+// or toggling "Dispatched" on a guest whose pickup was 2 days ago. Only interrupts when the
+// scheduled time is more than 6 hours away (past OR future) from the current IST moment;
+// normal in-the-moment status updates (the overwhelming majority) pass through with zero
+// extra friction. Returns true if the change should proceed.
+async function confirmIfTimeMismatch(g){
+  const diff = hoursDiffFromNowIST(g.arrival_date, g.arrival_time);
+  if(diff===null || Math.abs(diff) <= 6) return true;
+  const direction = diff > 0 ? 'in the future' : 'in the past';
+  const hrs = Math.abs(Math.round(diff));
+  const msg = `${esc(g.group_name)}'s scheduled time (${fmtDate(g.arrival_date)} ${fmtAmPm(g.arrival_time)}) is about ${hrs} hours ${direction} compared to the current time. Are you sure you want to change the status?`;
+  return await appConfirm(msg, 'Confirm Status Change');
+}
+
 async function toggleField(id,field,current){
+  const idx=allGuests.findIndex(x=>x.group_id===id);
+  const g = idx>=0 ? allGuests[idx] : null;
+  if(g && !(await confirmIfTimeMismatch(g))) return;
+
   const newVal=current==='yes'?'no':'yes';
   // Optimistic UI
-  const idx=allGuests.findIndex(x=>x.group_id===id);
   if(idx>=0) allGuests[idx][field]=newVal;
   updateCardUI(id); 
   saveToCache();
@@ -2014,9 +2044,12 @@ async function toggleField(id,field,current){
   }
 }
 async function markFinal(id,type){
+  const idx=allGuests.findIndex(x=>x.group_id===id);
+  const g = idx>=0 ? allGuests[idx] : null;
+  if(g && !(await confirmIfTimeMismatch(g))) return;
+
   const value=type==='arrival'?'picked_up':'car_returned';
   // Optimistic UI
-  const idx=allGuests.findIndex(x=>x.group_id===id);
   const oldVal = idx>=0?allGuests[idx].status:'';
   if(idx>=0) allGuests[idx].status=value;
   
@@ -2034,8 +2067,11 @@ async function markFinal(id,type){
   }
 }
 async function markActive(id){
-  // Optimistic UI
   const idx=allGuests.findIndex(x=>x.group_id===id);
+  const g = idx>=0 ? allGuests[idx] : null;
+  if(g && !(await confirmIfTimeMismatch(g))) return;
+
+  // Optimistic UI
   const oldVal = idx>=0?allGuests[idx].status:'';
   if(idx>=0) allGuests[idx].status='active';
   
