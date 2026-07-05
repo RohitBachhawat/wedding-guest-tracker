@@ -206,6 +206,10 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
 .driver-car-no{background:var(--gold-lt);color:var(--gold);font-size:13px;font-weight:700;padding:4px 10px;border-radius:8px;letter-spacing:1px}
 .driver-card.unassigned .driver-car-no{background:var(--amber-lt);color:var(--amber)}
 .driver-card-body{padding:14px 16px;display:flex;flex-direction:column;gap:12px}
+/* FEATURE (assign driver from driver card): compact select+button row, visually separated
+   from the assignment summary above it with a dashed divider. */
+.driver-assign-guest{display:flex;gap:8px;padding:12px 16px;border-top:1px dashed var(--border)}
+.driver-assign-guest select{flex:1;padding:6px 8px;border-radius:6px;border:1px solid var(--border);font-size:13px;background:var(--white);min-width:0}
 .driver-assignment{background:var(--gray-lt);border-radius:8px;padding:10px 12px;font-size:13px}
 .driver-assignment.dep-assignment{background:var(--purple-lt)}
 .da-label{font-size:11px;color:var(--text-2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px}
@@ -523,6 +527,28 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
   </div>
 </div>
 
+<!-- Split Group modal -->
+<!-- FEATURE (assign 2 cars to one large group): if a group's pax count exceeds any single
+     car's capacity (e.g. 11 pax but only 6-seaters available), this splits the group into
+     two separate guest entries with the same journey/ticket details, so each half can be
+     assigned its own driver independently via the inline select or the Drivers screen. -->
+<div class="modal-overlay" id="split-group-modal">
+  <div class="modal" style="max-width:420px">
+    <button class="modal-close-x" onclick="closeSplitGroupModal()" title="Close">✕</button>
+    <h3>✂️ Split Group</h3>
+    <p id="split-group-text" style="font-size:14px;color:var(--text-2);margin-bottom:14px"></p>
+    <div class="form-group">
+      <label>Passengers to move to a second car</label>
+      <input type="number" id="split-group-count" min="1" step="1"/>
+    </div>
+    <p style="font-size:12px;color:var(--text-2)">This creates a second entry with the same ticket/journey details but no driver assigned yet — assign a car to each half separately.</p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeSplitGroupModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmSplitGroup()">Split</button>
+    </div>
+  </div>
+</div>
+
 <!-- Sync queue modal -->
 <!-- FIX (pending badge - show list instead of silent retry): lists whatever's queued in
      localStorage (wgt_sync_queue) waiting to sync to the backend — see openSyncQueueModal()
@@ -742,6 +768,72 @@ function saveToCache() {
 }
 
 // Derive driver assignment status from the active guest list (source of truth)
+// FEATURE (assign 2 cars to one large group): split state + handlers.
+let splitGroupId = null;
+function openSplitGroupModal(id){
+  const g = allGuests.find(x=>x.group_id===id);
+  if(!g) return;
+  const pax = parseInt(g.pax)||1;
+  if(pax<2){ showToast('Need at least 2 pax to split a group','error'); return; }
+  splitGroupId = id;
+  document.getElementById('split-group-text').innerHTML =
+    `<strong>${esc(g.group_name)}</strong> currently has <strong>${pax} pax</strong> on one entry. How many should move to a separate car?`;
+  const input = document.getElementById('split-group-count');
+  input.min = 1; input.max = pax-1; input.value = Math.floor(pax/2);
+  document.getElementById('split-group-modal').classList.add('open');
+}
+function closeSplitGroupModal(){
+  document.getElementById('split-group-modal').classList.remove('open');
+  splitGroupId = null;
+}
+wireOverlayOutsideClick('split-group-modal', closeSplitGroupModal);
+
+async function confirmSplitGroup(){
+  if(!splitGroupId) return;
+  const idx = allGuests.findIndex(x=>x.group_id===splitGroupId);
+  if(idx<0) return;
+  const g = allGuests[idx];
+  const totalPax = parseInt(g.pax)||1;
+  const moveCount = parseInt(document.getElementById('split-group-count').value)||0;
+  if(moveCount<1 || moveCount>=totalPax){
+    showToast('Enter a valid number of passengers to split off','error');
+    return;
+  }
+  const remainCount = totalPax - moveCount;
+
+  showLoading(true);
+  try{
+    // Shrink the original entry's pax. Its existing driver/car (if any) stays as-is — the
+    // coordinator may already have the right-size car for the SMALLER remaining group;
+    // if not, they can reassign it via the inline driver select same as any other guest.
+    const updatedOriginal = {...g, pax: remainCount};
+    await apiPost({action:'updateGuest', data: sanitizeDataForSheet(updatedOriginal)});
+    allGuests[idx] = updatedOriginal;
+
+    // New split-off entry: identical journey/ticket details, but pax is the moved-off count
+    // and driver/car fields are intentionally blank — this half needs its OWN assignment,
+    // it should never silently inherit the original entry's driver.
+    const newGroupData = {...g, pax: moveCount, driver_name:'', driver_phone:'', car_type:'', car_no:'',
+      group_name: g.group_name + ' (Split)'};
+    delete newGroupData.group_id;
+    const res = await apiPost({action:'addGuest', data: sanitizeDataForSheet(newGroupData)});
+    newGroupData.group_id = res.group_id;
+    newGroupData.status='active'; newGroupData.dispatched='no'; newGroupData.dropped_off='no';
+    newGroupData.car_returned='no'; newGroupData.deleted='no'; newGroupData.live_status_text='';
+    newGroupData.last_refreshed='';
+    allGuests.push(newGroupData);
+
+    saveToCache();
+    syncDriverAssignment();
+    closeSplitGroupModal();
+    renderDashboard();
+    showToast(`Split into ${remainCount} + ${moveCount} pax — assign a driver to each`,'success');
+  }catch(e){
+    showToast(e.message||'Split failed. Please retry.','error');
+  }
+  showLoading(false);
+}
+
 function syncDriverAssignment(){
   const activeDriverNames = new Set(
     allGuests
@@ -751,6 +843,97 @@ function syncDriverAssignment(){
   allDrivers.forEach(d => {
     d.assigned = activeDriverNames.has(d.driver_name) ? 'yes' : 'no';
   });
+}
+
+// FEATURE (inline driver assignment on expanded card): lets a coordinator assign/change/
+// remove a guest's driver directly from the card, without opening the full edit form.
+// Reuses the same conflict-check (double-booking within CONFLICT_MINS) and capacity-check
+// logic the guest form already applies on save, via the shared appConfirm() dialog.
+async function assignDriverInline(groupId, selectEl){
+  const idx = allGuests.findIndex(x=>x.group_id===groupId);
+  if(idx<0) return;
+  const g = allGuests[idx];
+  const opt = selectEl.selectedIndex>0 ? selectEl.options[selectEl.selectedIndex] : null;
+
+  const newData = {...g};
+  if(opt && opt.dataset && opt.dataset.name){
+    newData.driver_name = opt.dataset.name;
+    newData.driver_phone = opt.dataset.phone;
+    newData.car_type = opt.dataset.carType;
+    newData.car_no = opt.dataset.carNo;
+  } else {
+    newData.driver_name=''; newData.driver_phone=''; newData.car_type=''; newData.car_no='';
+  }
+
+  if(newData.driver_name){
+    const conflicts = checkConflict(newData);
+    if(conflicts && conflicts.length){
+      const names = conflicts.map(c=>`${c.group_name} (${fmtAmPm(c.arrival_time)})`).join(', ');
+      const ok = await appConfirm(`${newData.driver_name} is already assigned to ${names} around this time. Assign anyway?`,'Driver Conflict');
+      if(!ok){ updateCardUI(groupId); return; } // revert dropdown to actual state
+    }
+    const cap = parseInt(opt.dataset.capacity)||0;
+    const pax = parseInt(g.pax)||0;
+    if(cap>0 && pax>cap){
+      const ok2 = await appConfirm(`This car's capacity (${cap}) is less than the group size (${pax}). Assign anyway? (Tip: use ✂️ Split to divide this group across two cars.)`,'Capacity Warning');
+      if(!ok2){ updateCardUI(groupId); return; }
+    }
+  }
+
+  allGuests[idx] = newData;
+  updateCardUI(groupId);
+  saveToCache();
+  syncDriverAssignment();
+  try{
+    await apiPost({action:'updateGuest', data: sanitizeDataForSheet(newData)});
+    showToast(newData.driver_name?`Assigned ${newData.driver_name}`:'Driver removed','success');
+  }catch(e){
+    allGuests[idx]=g;
+    updateCardUI(groupId);
+    showToast(e.message||'Save failed. Please retry.','error');
+  }
+}
+
+// FEATURE (assign driver from Drivers screen): same logic as assignDriverInline above, but
+// entered from the driver's own card — pick a guest from the dropdown at the bottom of a
+// driver card and assign this driver to them without navigating to that guest at all.
+async function assignDriverToGuestFromCard(driverName, groupId){
+  if(!groupId){ showToast('Pick a guest first','error'); return; }
+  const driver = allDrivers.find(d=>d.driver_name===driverName);
+  if(!driver) return;
+  const idx = allGuests.findIndex(g=>g.group_id===groupId);
+  if(idx<0) return;
+  const g = allGuests[idx];
+  const newData = {...g, driver_name:driver.driver_name, driver_phone:driver.driver_phone,
+    car_type:driver.car_type, car_no:driver.car_no||driver.car_token||''};
+
+  const conflicts = checkConflict(newData);
+  if(conflicts && conflicts.length){
+    const names = conflicts.map(c=>`${c.group_name} (${fmtAmPm(c.arrival_time)})`).join(', ');
+    const ok = await appConfirm(`${driver.driver_name} is already assigned to ${names} around this time. Assign anyway?`,'Driver Conflict');
+    if(!ok) return;
+  }
+  const cap = parseInt(driver.capacity)||0;
+  const pax = parseInt(g.pax)||0;
+  if(cap>0 && pax>cap){
+    const ok2 = await appConfirm(`This car's capacity (${cap}) is less than the group size (${pax}). Assign anyway? (Tip: use ✂️ Split on the guest's card to divide this group across two cars.)`,'Capacity Warning');
+    if(!ok2) return;
+  }
+
+  showLoading(true);
+  allGuests[idx]=newData;
+  saveToCache();
+  syncDriverAssignment();
+  try{
+    await apiPost({action:'updateGuest', data: sanitizeDataForSheet(newData)});
+    showToast(`Assigned ${driver.driver_name} to ${g.group_name}`,'success');
+  }catch(e){
+    allGuests[idx]=g;
+    showToast(e.message||'Save failed. Please retry.','error');
+  }
+  showLoading(false);
+  renderDrivers();
+  renderDashboard();
 }
 
 // ── State ─────────────────────────────────────────────────────
@@ -1475,9 +1658,16 @@ function renderCard(g, isCompleted){
         <div class="detail-item"><div class="d-label">${stationLabel}</div><div class="d-value">${esc(g.pickup_location||'—')}</div></div>
         <div class="detail-item"><div class="d-label">Car</div>
           <div class="d-value">${esc(g.car_type||'—')} · Car No. <strong>${esc(g.car_no||'—')}</strong></div></div>
-        <div class="detail-item"><div class="d-label">Driver</div>
-          <div class="d-value">${esc(g.driver_name||'—')}<br>
-          ${g.driver_phone?`<a href="tel:${g.driver_phone}" onclick="event.stopPropagation()">📞 ${esc(g.driver_phone)}</a>`:''}</div></div>
+        <div class="detail-item" style="grid-column:1/-1">
+          <div class="d-label">Driver</div>
+          <div class="d-value">
+            <select onchange="assignDriverInline('${g.group_id}', this)" onclick="event.stopPropagation()"
+              style="width:100%;padding:6px 8px;border-radius:6px;border:1px solid var(--border);font-size:13px;margin-bottom:4px;background:var(--white)">
+              ${driverOptionsHtml(g.driver_name)}
+            </select>
+            ${g.driver_phone?`<a href="tel:${g.driver_phone}" onclick="event.stopPropagation()">📞 ${esc(g.driver_phone)}</a>`:''}
+          </div>
+        </div>
         <div class="detail-item"><div class="d-label">Guest Phone</div>
           <div class="d-value">${g.phone_primary?`<a href="tel:${g.phone_primary}" onclick="event.stopPropagation()">📞 ${esc(g.phone_primary)}</a>`:'—'}</div></div>
         <div class="detail-item"><div class="d-label">Backup Phone</div>
@@ -1495,6 +1685,7 @@ function renderCard(g, isCompleted){
         <button class="btn btn-secondary btn-sm" onclick="refreshStatus('${g.group_id}')">🔄 Refresh</button>
         ${cardActions(g)}
         <button class="btn btn-secondary btn-sm" onclick="openWhatsApp('${g.group_id}')">💬 WhatsApp</button>
+        ${(parseInt(g.pax)||0)>1?`<button class="btn btn-secondary btn-sm" onclick="openSplitGroupModal('${g.group_id}')" title="Split this group across two cars">✂️ Split</button>`:''}
         <button class="btn btn-secondary btn-sm" onclick="editGuest('${g.group_id}')">✏️ Edit</button>
         <button class="btn btn-danger btn-sm" onclick="confirmDelete('${g.group_id}','${esc(g.group_name)}')">🗑️ Delete</button>
       </div>
@@ -2130,13 +2321,13 @@ function renderDrivers(){
     aSec.innerHTML='';return;
   }
   uSec.innerHTML=unassigned.length
-    ?`<div class="section-label">🔴 Unassigned (${unassigned.length})</div><div class="driver-cards-grid">${unassigned.map(d=>driverCard(d,[])).join('')}</div>`
+    ?`<div class="section-label">🔴 Unassigned (${unassigned.length})</div><div class="driver-cards-grid">${unassigned.map((d,i)=>driverCard(d,[],'u'+i)).join('')}</div>`
     :`<div class="section-label">Unassigned Drivers</div><p style="color:var(--text-2);font-size:13px;margin-bottom:24px">All assigned ✓</p>`;
   if(assigned.length){
-    const cards=assigned.map(d=>{
+    const cards=assigned.map((d,i)=>{
       const cn=d.car_no||d.car_token||'';
       const groups=allGuests.filter(g=>g.car_no===cn&&!isDeleted(g)&&g.status!=='picked_up'&&g.status!=='car_returned');
-      return driverCard(d,groups);
+      return driverCard(d,groups,'a'+i);
     }).join('');
     aSec.innerHTML=`<div class="section-label">✅ Assigned (${assigned.length})</div><div class="driver-cards-grid">${cards}</div>`;
   } else { aSec.innerHTML=''; }
@@ -2151,7 +2342,7 @@ function parseDelayMins(text){
 }
 function fmtDelayBadge(d){if(!d||d<=0) return '';return d<60?'+'+d+'m':`+${Math.floor(d/60)}h${d%60?' '+(d%60)+'m':''}`;}
 
-function driverCard(driver,groups){
+function driverCard(driver,groups,idx){
   const isUnassigned=!groups||groups.length===0;
   const now=new Date();const cn=driver.car_no||driver.car_token||'—';
   const assignmentHtml=isUnassigned
@@ -2205,6 +2396,10 @@ function driverCard(driver,groups){
       </div>
     </div>
     <div class="driver-card-body">${assignmentHtml}</div>
+    <div class="driver-assign-guest">
+      <select id="assign-sel-${idx}">${eligibleGuestOptionsHtml()}</select>
+      <button class="btn btn-primary btn-sm" onclick="assignDriverToGuestFromCard('${esc(driver.driver_name)}', document.getElementById('assign-sel-${idx}').value)">+ Assign</button>
+    </div>
   </div>`;
 }
 
@@ -2298,6 +2493,32 @@ function showGuestForm(id){
   document.getElementById('ticket-file').value='';
 }
 function editGuest(id){showGuestForm(id);}
+
+// FEATURE (inline driver assignment): shared option-builder used by the NEW inline driver
+// select on the expanded guest card (assignDriverInline, below). Mirrors the dataset scheme
+// populateDriverDropdown() uses in the full guest form, so both paths behave identically.
+function driverOptionsHtml(selectedDriverName){
+  let html = `<option value="">— No driver —</option>`;
+  allDrivers.forEach(d=>{
+    const cn = d.car_no||d.car_token||'';
+    const val = d.driver_id||d.driver_name||cn;
+    const isSel = d.driver_name && d.driver_name===selectedDriverName;
+    html += `<option value="${esc(val)}" data-name="${esc(d.driver_name||'')}" data-phone="${esc(d.driver_phone||'')}" data-car-type="${esc(d.car_type||'')}" data-car-no="${esc(cn)}" data-capacity="${esc(d.capacity||'0')}"${isSel?' selected':''}>${esc(d.driver_name||'?')} (${esc(cn)}) · ${esc(d.car_type||'?')} · Cap: ${esc(d.capacity||'?')}</option>`;
+  });
+  return html;
+}
+
+// FEATURE (assign driver from driver card): lists every active, non-deleted guest so a
+// coordinator can assign this driver directly from the Drivers screen instead of having to
+// go find and open that guest's card. Guests who already have a different driver are
+// labelled so reassigning is a deliberate, informed choice rather than an accident.
+function eligibleGuestOptionsHtml(){
+  const eligible = allGuests.filter(g=>g.status!=='picked_up'&&g.status!=='car_returned'&&!isDeleted(g));
+  if(!eligible.length) return `<option value="">— No active guests —</option>`;
+  return `<option value="">— Assign to a guest —</option>` + eligible.map(g=>
+    `<option value="${esc(g.group_id)}">${esc(g.group_name)} · ${esc(g.pax)} pax${g.driver_name?' (currently: '+esc(g.driver_name)+')':''}</option>`
+  ).join('');
+}
 
 function populateDriverDropdown(){
   const sel=document.getElementById('f-driver-select');
