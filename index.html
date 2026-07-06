@@ -3574,75 +3574,195 @@ function loadTestData(){
   allDrivers=[
     {driver_id:'D001',driver_name:'Suresh Kumar', driver_phone:'9000000001',car_type:'Innova',        car_no:'WB02AB1042',capacity:'7', assigned:'yes'},
     {driver_id:'D002',driver_name:'Ramesh Das',   driver_phone:'9000000002',car_type:'Ertiga',         car_no:'WB02CD2031',capacity:'6', assigned:'yes'},
-    {driver_id:'D003',driver_name:'Bikash Roy',   driver_phone:'9000000003',car_type:'Tempo Traveller',car_no:'WB02EF3099',capacity:'12',assigned:'yes'},
-    {driver_id:'D004',driver_name:'Manoj Singh',  driver_phone:'9000000004',car_type:'ScorpioX',        car_no:'WB02GH4011',capacity:'7', assigned:'no'},
+    {driver_id:'D003',driver_name:'Bikash Roy',   driver_phone:'9000000003',car_type:'Tempo Traveller',car_no:'WB02EF3099',capacity:'12',assigned:'no'},
+    {driver_id:'D004',driver_name:'Manoj Singh',  driver_phone:'9000000004',car_type:'ScorpioX',       car_no:'WB02GH4011',capacity:'7', assigned:'no'},
+    {driver_id:'D005',driver_name:'Ajay Verma',   driver_phone:'9000000005',car_type:'Swift Dzire',    car_no:'WB02JK5022',capacity:'4', assigned:'no'},
   ];
-  const today=new Date().toISOString().slice(0,10);
-  const tom=new Date(Date.now()+86400000).toISOString().slice(0,10);
-  const soon=new Date(Date.now()+90*60000);
+
+  const now=new Date();
+  const localDateStr=d=>`${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')}`;
+  const today=localDateStr(now);
+  const tom=localDateStr(new Date(now.getTime()+86400000));
+  const nextWeek=localDateStr(new Date(now.getTime()+7*86400000));
+  // "Soon" (~90 min from now) computed in the SAME local-time convention as `today` above,
+  // so this genuinely lands inside isPriority()'s 3-hour urgent window regardless of what
+  // time of day this test data happens to be loaded.
+  const soon=new Date(now.getTime()+90*60000);
   const soonTime=soon.getHours().toString().padStart(2,'0')+':'+soon.getMinutes().toString().padStart(2,'0');
+
   allGuests=[
-    // 12303 Poorva Express — today DEPARTURE (Kolkata → New Delhi)
-    {group_id:'G001',group_name:'Sharma Family',pax:'4',phone_primary:'9876543210',phone_backup:'9876543211',
-     pickup_location:'Howrah',journey_origin:'Kolkata',arrival_date:today,arrival_time:'14:00',
-     transport_type:'Train',transport_name:'Poorva Express',transport_number:'12303',pnr:'1234567890',
-     car_type:'Innova',car_no:'WB02AB1042',driver_name:'Suresh Kumar',driver_phone:'9000000001',
-     notes:'',status:'active',journey_type:'departure',dispatched:'no',/*driver_arrived+guest_in_car excluded*/dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:'',deleted:'no'},
-
-    // 13051 Tebhaga Express — today ARRIVAL (Jalpaiguri → Sealdah)
-    {group_id:'G002',group_name:'Roy Family',pax:'3',phone_primary:'9876540001',phone_backup:'',
-     pickup_location:'Sealdah',journey_origin:'Jalpaiguri',arrival_date:today,arrival_time:'07:15',
-     transport_type:'Train',transport_name:'Tebhaga Express',transport_number:'13051',pnr:'2345678901',
-     car_type:'Ertiga',car_no:'WB02CD2031',driver_name:'Ramesh Das',driver_phone:'9000000002',
-     notes:'',status:'active',journey_type:'arrival',dispatched:'no',/*driver_arrived+guest_in_car excluded*/dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:'',deleted:'no'},
-
-    // 12274 Duronto Express — today ARRIVAL (New Delhi → Howrah)
-    {group_id:'G003',group_name:'Kapoor Siblings',pax:'2',phone_primary:'9876540002',phone_backup:'9876540003',
-     pickup_location:'Howrah',journey_origin:'New Delhi',arrival_date:today,arrival_time:'16:30',
-     transport_type:'Train',transport_name:'Duronto Express',transport_number:'12274',pnr:'3456789012',
-     car_type:'Ertiga',car_no:'WB02CD2031',driver_name:'Ramesh Das',driver_phone:'9000000002',
-     notes:'',status:'active',journey_type:'arrival',dispatched:'no',/*driver_arrived+guest_in_car excluded*/dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:'',deleted:'no'},
-
-    // 12304 Poorva Express — today ARRIVAL (New Delhi → Howrah)
-    {group_id:'G004',group_name:'Mehta Family',pax:'5',phone_primary:'9876540004',phone_backup:'',
-     pickup_location:'Howrah',journey_origin:'New Delhi',arrival_date:today,arrival_time:'09:45',
-     transport_type:'Train',transport_name:'Poorva Express',transport_number:'12304',pnr:'4567890123',
-     car_type:'Tempo Traveller',car_no:'WB02EF3099',driver_name:'Bikash Roy',driver_phone:'9000000003',
-     notes:'Elderly couple, needs assistance',status:'active',journey_type:'arrival',dispatched:'no',/*driver_arrived+guest_in_car excluded*/dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:'',deleted:'no'},
-
-    // 12304 Poorva Express — TOMORROW ARRIVAL (New Delhi → Howrah)
-    {group_id:'G005',group_name:'Joshi Brothers',pax:'3',phone_primary:'9876540005',phone_backup:'',
-     pickup_location:'Howrah',journey_origin:'New Delhi',arrival_date:tom,arrival_time:'09:45',
-     transport_type:'Train',transport_name:'Poorva Express',transport_number:'12304',pnr:'5678901234',
+    // 1) URGENT, NO DRIVER — arrival ~90 min away, nobody assigned yet.
+    //    Tests: red pulsing "⚠️ No Driver" trip-stage badge, priority-high card border,
+    //    the mandatory-date/time validation (already set here), and status-change time-
+    //    mismatch confirmation (should NOT trigger — this one IS within 6h of now).
+    {group_id:'T101',group_name:'Sen Family',pax:'3',phone_primary:'9830000101',phone_backup:'',
+     pickup_location:'Howrah Junction',journey_origin:'New Delhi',arrival_date:today,arrival_time:soonTime,
+     transport_type:'Train',transport_name:'Rajdhani Express',transport_number:'12301',pnr:'1001001001',
      car_type:'',car_no:'',driver_name:'',driver_phone:'',
-     notes:'',status:'active',journey_type:'arrival',dispatched:'no',/*driver_arrived+guest_in_car excluded*/dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:'',deleted:'no'},
+     notes:'',status:'active',journey_type:'arrival',dispatched:'no',dropped_off:'no',car_returned:'no',
+     live_status_text:'',last_refreshed:'',deleted:'no'},
 
-    // 18029 Shalimar Express — today ARRIVAL (Okha → Howrah)
-    {group_id:'G006',group_name:'Patel Group',pax:'6',phone_primary:'9876540006',phone_backup:'9876540007',
-     pickup_location:'Howrah',journey_origin:'Okha',arrival_date:today,arrival_time:'11:30',
-     transport_type:'Train',transport_name:'Shalimar Express',transport_number:'18029',pnr:'6789012345',
-     car_type:'Tempo Traveller',car_no:'WB02EF3099',driver_name:'Bikash Roy',driver_phone:'9000000003',
-     notes:'6 large bags',status:'active',journey_type:'arrival',dispatched:'yes',/*driver_arrived+guest_in_car excluded*/dropped_off:'no',car_returned:'no',
-     live_status_text:'Train 18029 is running on time. Currently at Santragachi. ETA Howrah 11:35 AM.',last_refreshed:'2025-01-01 10:00',deleted:'no'},
+    // 2) NO DRIVER, NOT URGENT — arrival next week, nobody assigned.
+    //    Tests: grey (non-urgent) "No Driver" badge, contrast against #1's red urgent badge.
+    {group_id:'T102',group_name:'Ghosh Family',pax:'2',phone_primary:'9830000102',phone_backup:'9830000103',
+     pickup_location:'Sealdah Railway Station',journey_origin:'Jalpaiguri',arrival_date:nextWeek,arrival_time:'07:15',
+     transport_type:'Train',transport_name:'Uttar Banga Express',transport_number:'13148',pnr:'1001001002',
+     car_type:'',car_no:'',driver_name:'',driver_phone:'',
+     notes:'',status:'active',journey_type:'arrival',dispatched:'no',dropped_off:'no',car_returned:'no',
+     live_status_text:'',last_refreshed:'',deleted:'no'},
 
-    // 12859 Gitanjali Express — today DEPARTURE (Howrah → Mumbai CST)
-    {group_id:'G007',group_name:'Banerjee Uncle',pax:'2',phone_primary:'9876540008',phone_backup:'',
-     pickup_location:'Howrah',journey_origin:'Kolkata',arrival_date:today,arrival_time:'14:05',
-     transport_type:'Train',transport_name:'Gitanjali Express',transport_number:'12859',pnr:'7890123456',
+    // 3) ASSIGNED, NOT DISPATCHED — driver picked but hasn't left yet.
+    //    Tests: amber "🚗 Assigned" badge, the inline driver-select dropdown on the card
+    //    (change it here to try reassigning), and driver_name matches an UNASSIGNED-in-
+    //    roster driver so you can also test the Drivers screen "Free" badge disappearing.
+    {group_id:'T103',group_name:'Chatterjee Group',pax:'4',phone_primary:'9830000104',phone_backup:'',
+     pickup_location:'Howrah Junction',journey_origin:'Mumbai CST',arrival_date:today,arrival_time:'18:00',
+     transport_type:'Train',transport_name:'Gitanjali Express',transport_number:'12860',pnr:'1001001003',
+     car_type:'ScorpioX',car_no:'WB02GH4011',driver_name:'Manoj Singh',driver_phone:'9000000004',
+     notes:'',status:'active',journey_type:'arrival',dispatched:'no',dropped_off:'no',car_returned:'no',
+     live_status_text:'',last_refreshed:'',deleted:'no'},
+
+    // 4) DISPATCHED, EN ROUTE — also the anchor for CONFLICT testing: try assigning
+    //    Suresh Kumar (already busy here at 09:00 today) to Sen Family (#1, also today) via
+    //    the inline driver select — should trigger the "already assigned around this time"
+    //    confirmation dialog since both fall inside the 120-minute conflict window.
+    //    Tests: blue "🚕 On the Way" badge, conflict-check dialog.
+    {group_id:'T104',group_name:'Sinha Family',pax:'3',phone_primary:'9830000105',phone_backup:'',
+     pickup_location:'Howrah Junction',journey_origin:'New Delhi',arrival_date:today,arrival_time:'09:00',
+     transport_type:'Train',transport_name:'Duronto Express',transport_number:'12274',pnr:'1001001004',
      car_type:'Innova',car_no:'WB02AB1042',driver_name:'Suresh Kumar',driver_phone:'9000000001',
-     notes:'',status:'active',journey_type:'departure',dispatched:'no',/*driver_arrived+guest_in_car excluded*/dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:'',deleted:'no'},
+     notes:'',status:'active',journey_type:'arrival',dispatched:'yes',dropped_off:'no',car_returned:'no',
+     live_status_text:'Train running on time.',last_refreshed:'',deleted:'no'},
 
-    // Completed — picked up
-    {group_id:'G008',group_name:'Verma Family',pax:'2',phone_primary:'9876540009',phone_backup:'',
-     pickup_location:'Sealdah',journey_origin:'Bhubaneswar',arrival_date:today,arrival_time:'08:00',
-     transport_type:'Train',transport_name:'Coromandel Express',transport_number:'12841',pnr:'8901234567',
+    // 5) PICKED UP (arrival, fully complete) — tests: green "✅ Picked Up" badge, this
+    //    guest should disappear from the default active list and only appear under
+    //    "Show Completed", plus the "↩ Mark Active" button to revert it.
+    {group_id:'T105',group_name:'Dutta Siblings',pax:'2',phone_primary:'9830000106',phone_backup:'',
+     pickup_location:'Sealdah Railway Station',journey_origin:'Bhubaneswar',arrival_date:today,arrival_time:'06:30',
+     transport_type:'Train',transport_name:'Coromandel Express',transport_number:'12841',pnr:'1001001005',
      car_type:'Ertiga',car_no:'WB02CD2031',driver_name:'Ramesh Das',driver_phone:'9000000002',
-     notes:'',status:'picked_up',journey_type:'arrival',dispatched:'yes',/*driver_arrived+guest_in_car excluded*/dropped_off:'no',car_returned:'no',live_status_text:'Arrived on time.',last_refreshed:'',deleted:'no'},
+     notes:'',status:'picked_up',journey_type:'arrival',dispatched:'yes',dropped_off:'no',car_returned:'no',
+     live_status_text:'Arrived on time.',last_refreshed:'',deleted:'no'},
+
+    // 6) DEPARTURE — DROPPED AT STATION (car not yet returned/free).
+    //    Tests: amber "🏁 Dropped at Station" badge, the "Car Returned → Complete" button.
+    {group_id:'T106',group_name:'Mallick Family',pax:'2',phone_primary:'9830000107',phone_backup:'',
+     pickup_location:'Howrah Junction',journey_origin:'Kolkata',arrival_date:today,arrival_time:'15:30',
+     transport_type:'Train',transport_name:'Poorva Express',transport_number:'12303',pnr:'1001001006',
+     car_type:'Innova',car_no:'WB02AB1042',driver_name:'Suresh Kumar',driver_phone:'9000000001',
+     notes:'',status:'active',journey_type:'departure',dispatched:'yes',dropped_off:'yes',car_returned:'no',
+     live_status_text:'',last_refreshed:'',deleted:'no'},
+
+    // 7) DEPARTURE — FULLY COMPLETE (car returned/free again).
+    //    Tests: green "✅ Complete" badge, "Show Completed" section, and that this driver's
+    //    car (Ertiga) correctly shows as free again on the Drivers screen even though it's
+    //    also used by #5 above (both are complete, so the car should read as available).
+    {group_id:'T107',group_name:'Bose Family',pax:'3',phone_primary:'9830000108',phone_backup:'',
+     pickup_location:'Sealdah Railway Station',journey_origin:'Kolkata',arrival_date:today,arrival_time:'12:00',
+     transport_type:'Train',transport_name:'Coromandel Express',transport_number:'12842',pnr:'1001001007',
+     car_type:'Ertiga',car_no:'WB02CD2031',driver_name:'Ramesh Das',driver_phone:'9000000002',
+     notes:'',status:'car_returned',journey_type:'departure',dispatched:'yes',dropped_off:'yes',car_returned:'yes',
+     live_status_text:'',last_refreshed:'',deleted:'no'},
+
+    // 8+9) ROUND TRIP — same family, one arrival leg + one departure leg on different dates.
+    //    Tests: confirms checkDuplicate() does NOT falsely flag an arrival+departure pair
+    //    for the same family as duplicates (different journey_type + different dates), and
+    //    general round-trip UX (two separate cards, same phone/name).
+    {group_id:'T108',group_name:'Bachhawat Family',pax:'2',phone_primary:'9830000109',phone_backup:'9830000110',
+     pickup_location:'Sealdah Railway Station',journey_origin:'Jalpaiguri',arrival_date:today,arrival_time:'10:10',
+     transport_type:'Train',transport_name:'Tebhaga Express',transport_number:'13051',pnr:'1001001008',
+     car_type:'',car_no:'',driver_name:'',driver_phone:'',
+     notes:'',status:'active',journey_type:'arrival',dispatched:'no',dropped_off:'no',car_returned:'no',
+     live_status_text:'',last_refreshed:'',deleted:'no'},
+    {group_id:'T109',group_name:'Bachhawat Family',pax:'2',phone_primary:'9830000109',phone_backup:'9830000110',
+     pickup_location:'Howrah Junction',journey_origin:'Kolkata',arrival_date:tom,arrival_time:'21:55',
+     transport_type:'Train',transport_name:'Netaji Express',transport_number:'13051',pnr:'1001001009',
+     car_type:'',car_no:'',driver_name:'',driver_phone:'',
+     notes:'',status:'active',journey_type:'departure',dispatched:'no',dropped_off:'no',car_returned:'no',
+     live_status_text:'',last_refreshed:'',deleted:'no'},
+
+    // 10+11) DUPLICATE PAIR — same name/phone/journey_type; one has NO date/transport at
+    //    all (simulating a legacy/bad-data row). Tests: the 🧹 Data Cleanup tool (should
+    //    detect this via Signal 4 — name+phone+journey_type — since date/transport signals
+    //    can't fire on the blank one), and letting you choose which of the two to keep.
+    {group_id:'T110',group_name:'Iyer Family',pax:'4',phone_primary:'9830000111',phone_backup:'',
+     pickup_location:'Howrah Junction',journey_origin:'Chennai',arrival_date:today,arrival_time:'19:20',
+     transport_type:'Train',transport_name:'Coromandel Express',transport_number:'12842',pnr:'1001001010',
+     car_type:'',car_no:'',driver_name:'',driver_phone:'',
+     notes:'',status:'active',journey_type:'arrival',dispatched:'no',dropped_off:'no',car_returned:'no',
+     live_status_text:'',last_refreshed:'',deleted:'no'},
+    {group_id:'T111',group_name:'Iyer Family',pax:'4',phone_primary:'9830000111',phone_backup:'',
+     pickup_location:'Howrah Junction',journey_origin:'',arrival_date:'',arrival_time:'',
+     transport_type:'',transport_name:'',transport_number:'',pnr:'',
+     car_type:'',car_no:'',driver_name:'',driver_phone:'',
+     notes:'Duplicate — legacy row with no date, for testing Data Cleanup',status:'active',journey_type:'arrival',
+     dispatched:'no',dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:'',deleted:'no'},
+
+    // 12+13) POOLING + MULTI-TRAIN COMBO — same train number, same pickup, 10 min apart,
+    //    no shared driver, combined pax (3+3=6) fits the Ertiga (cap 6). Tests: the Pooling
+    //    Recommendations banner AND the "Multiple families on same transport" banner at the
+    //    same time, plus both banners' "View"/jump-to-card buttons.
+    {group_id:'T112',group_name:'Reddy Family',pax:'3',phone_primary:'9830000112',phone_backup:'',
+     pickup_location:'Howrah Junction',journey_origin:'Hyderabad',arrival_date:tom,arrival_time:'13:00',
+     transport_type:'Train',transport_name:'East Coast Express',transport_number:'18646',pnr:'1001001012',
+     car_type:'',car_no:'',driver_name:'',driver_phone:'',
+     notes:'',status:'active',journey_type:'arrival',dispatched:'no',dropped_off:'no',car_returned:'no',
+     live_status_text:'',last_refreshed:'',deleted:'no'},
+    {group_id:'T113',group_name:'Nair Family',pax:'3',phone_primary:'9830000113',phone_backup:'',
+     pickup_location:'Howrah Junction',journey_origin:'Hyderabad',arrival_date:tom,arrival_time:'13:10',
+     transport_type:'Train',transport_name:'East Coast Express',transport_number:'18646',pnr:'1001001013',
+     car_type:'',car_no:'',driver_name:'',driver_phone:'',
+     notes:'',status:'active',journey_type:'arrival',dispatched:'no',dropped_off:'no',car_returned:'no',
+     live_status_text:'',last_refreshed:'',deleted:'no'},
+
+    // 14) OVER-CAPACITY GROUP — 14 pax, more than even the biggest car (Tempo Traveller,
+    //    cap 12). Tests: capacity-warning confirmation when assigning a driver, and the
+    //    ✂️ Split Group feature (e.g. split into 8 + 6 so two cars can cover it).
+    {group_id:'T114',group_name:'Agarwal Extended Family',pax:'14',phone_primary:'9830000114',phone_backup:'9830000115',
+     pickup_location:'Howrah Junction',journey_origin:'Patna',arrival_date:tom,arrival_time:'16:45',
+     transport_type:'Train',transport_name:'Vikramshila Express',transport_number:'12367',pnr:'1001001014',
+     car_type:'',car_no:'',driver_name:'',driver_phone:'',
+     notes:'Large joint family, lots of luggage',status:'active',journey_type:'arrival',
+     dispatched:'no',dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:'',deleted:'no'},
+
+    // 15) NO DATE / NO TIME SET — simulates a legacy row that predates mandatory date/time.
+    //    Tests: "NO DATE" rendering doesn't crash the dashboard, sits under its own "No
+    //    Date" grouping rather than a date tab, and is still editable/assignable.
+    {group_id:'T115',group_name:'Legacy Entry — Undated Guest',pax:'2',phone_primary:'9830000116',phone_backup:'',
+     pickup_location:'Sealdah Railway Station',journey_origin:'',arrival_date:'',arrival_time:'',
+     transport_type:'',transport_name:'',transport_number:'',pnr:'',
+     car_type:'',car_no:'',driver_name:'',driver_phone:'',
+     notes:'No date on file — needs follow-up with guest',status:'active',journey_type:'arrival',
+     dispatched:'no',dropped_off:'no',car_returned:'no',live_status_text:'',last_refreshed:'',deleted:'no'},
+
+    // 16) TICKET ATTACHED — uses a public placeholder image so the ticket preview, ⬡ Full
+    //    View, ⬇ Download, 🔄 Replace, and 🗑️ Delete controls are all testable without
+    //    needing a real Drive upload first.
+    {group_id:'T116',group_name:'Rao Family',pax:'2',phone_primary:'9830000117',phone_backup:'',
+     pickup_location:'Howrah Junction',journey_origin:'Bengaluru',arrival_date:tom,arrival_time:'11:00',
+     transport_type:'Flight',transport_name:'IndiGo 6E-204',transport_number:'6E204',pnr:'1001001016',
+     car_type:'',car_no:'',driver_name:'',driver_phone:'',
+     notes:'',status:'active',journey_type:'arrival',dispatched:'no',dropped_off:'no',car_returned:'no',
+     live_status_text:'',last_refreshed:'',deleted:'no',
+     ticket_url:'https://placehold.co/500x700/png?text=Sample+Boarding+Pass'},
   ];
+
   renderDashboard();
   console.log('✅ Test data loaded — '+allGuests.length+' guests, '+allDrivers.length+' drivers');
-  console.log('G006 & G007 = Rishab Bachhawat round trip from Cleartrip ticket');
-  console.log('Try: duplicate detection by uploading the Cleartrip PDF again');
+  console.log('%cWhat to test:','font-weight:bold');
+  console.log('1) Sen Family (T101) — urgent, no driver → red pulsing badge');
+  console.log('2) Ghosh Family (T102) — no driver, not urgent → grey badge');
+  console.log('3) Chatterjee Group (T103) — assigned, not dispatched → amber badge; try the inline driver select');
+  console.log('4) Sinha Family (T104) — dispatched → blue badge; try assigning Suresh Kumar to Sen Family (#1) for a CONFLICT dialog');
+  console.log('5) Dutta Siblings (T105) — picked up → check "Show Completed" + Mark Active');
+  console.log('6) Mallick Family (T106) — dropped at station, car not returned yet');
+  console.log('7) Bose Family (T107) — fully complete departure');
+  console.log('8-9) Bachhawat Family (T108/T109) — round trip, same phone, different journey_type/dates');
+  console.log('10-11) Iyer Family (T110/T111) — duplicate pair, one with no date → try 🧹 Data Cleanup');
+  console.log('12-13) Reddy/Nair Family (T112/T113) — same train, close time → Pooling Recs + Multi-train banner');
+  console.log('14) Agarwal Extended Family (T114) — 14 pax → try assigning a driver (capacity warning) then ✂️ Split');
+  console.log('15) Legacy Entry (T115) — no date/time at all → check it renders without breaking the dashboard');
+  console.log('16) Rao Family (T116) — has a ticket attached already → check the ticket section controls');
 }
 </script>
 
