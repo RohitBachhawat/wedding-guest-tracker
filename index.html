@@ -110,6 +110,19 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
 .mt-body{flex:1;color:var(--text)}
 .mt-dismiss{flex-shrink:0;background:none;border:none;cursor:pointer;font-size:15px;color:var(--text-2);padding:0 2px;line-height:1;margin-top:1px}
 .mt-dismiss:hover{color:var(--text)}
+/* FIX (multi-train banner was purely informational): per-group View button + item spacing */
+.mt-item{display:inline-flex;align-items:center;gap:6px}
+.mt-view-btn{background:var(--white);border:1px solid var(--blue);color:var(--blue);border-radius:14px;
+  font-size:11px;font-weight:600;padding:2px 10px;cursor:pointer;line-height:1.4}
+.mt-view-btn:hover{background:var(--blue-lt)}
+/* Brief highlight pulse on cards jumped to from the banner's View button, so it's obvious
+   which cards it was talking about even amid a long list on the same date. */
+.guest-card.mt-highlight{animation:mtHighlightPulse 2.5s ease}
+@keyframes mtHighlightPulse{
+  0%{box-shadow:0 0 0 3px var(--blue)}
+  70%{box-shadow:0 0 0 3px var(--blue)}
+  100%{box-shadow:none}
+}
 
 /* Ticket viewer */
 .ticket-section{margin-top:12px;border-top:1px solid var(--border);padding-top:12px}
@@ -1378,14 +1391,51 @@ function buildMultiTrainBanner(){
   const multi=Object.values(groups).filter(gr=>gr.guests.length>1&&!dismissedMultiTrain.has(gr.num));
   const sec=document.getElementById('multi-train-section');
   if(!multi.length){sec.innerHTML='';return;}
+  // FIX (multi-train banner was purely informational): previously this just displayed
+  // "X groups, Y pax" with no way to act on it — the coordinator had to manually go find
+  // and cross-reference those guests themselves. Each train group now gets its own View
+  // button that jumps to and highlights every guest on that transport, and stores the
+  // group_ids on the button (data attribute) rather than in the onclick string, since a
+  // transport number can appear in several banners and JSON-in-an-attribute is safer than
+  // hand-escaping a comma list into inline JS.
+  multi.forEach((gr,i)=>{ _multiTrainGroups[gr.num] = gr.guests.map(g=>g.group_id); });
   const items=multi.map(gr=>
-    `<strong>${gr.name||gr.num}</strong> ${gr.num} — ${gr.guests.length} groups, ${gr.totalPax} pax`
+    `<span class="mt-item"><strong>${gr.name||gr.num}</strong> ${gr.num} — ${gr.guests.length} groups, ${gr.totalPax} pax
+      <button class="mt-view-btn" onclick="viewMultiTrainGroup('${esc(gr.num)}')">👁 View</button></span>`
   ).join(' &nbsp;·&nbsp; ');
   sec.innerHTML=`<div class="multi-train-banner">
     <span class="mt-icon">ℹ️</span>
     <div class="mt-body">Multiple families on same transport: ${items}</div>
     <button class="mt-dismiss" onclick="dismissMultiTrain()" title="Dismiss">✕</button>
   </div>`;
+}
+
+// FIX (multi-train banner was purely informational): maps transport_number -> group_ids,
+// rebuilt every time buildMultiTrainBanner() runs, so viewMultiTrainGroup() below always has
+// fresh data without needing to re-scan allGuests itself.
+let _multiTrainGroups = {};
+
+// Jumps to the first guest's date tab (so nothing is hidden by date filtering — the same
+// gap fixed for pooling recommendations) and briefly highlights every card on this train.
+function viewMultiTrainGroup(transportNumber){
+  const ids = _multiTrainGroups[transportNumber];
+  if(!ids || !ids.length) return;
+  const first = allGuests.find(g=>g.group_id===ids[0]);
+  if(!first) return;
+  activeTab = first.arrival_date || 'all';
+  renderDashboard();
+  setTimeout(()=>{
+    ids.forEach((id,i)=>{
+      const card=document.getElementById('card-'+id);
+      if(!card) return;
+      // FIX: scrollIntoView failing (unsupported environment, etc) must not prevent the
+      // OTHER cards in this loop from getting highlighted — wrap it so a throw here can't
+      // abort the whole forEach.
+      if(i===0){ try{ card.scrollIntoView({behavior:'smooth',block:'center'}); }catch(e){} }
+      card.classList.add('mt-highlight');
+      setTimeout(()=>card.classList.remove('mt-highlight'), 2500);
+    });
+  }, 150);
 }
 
 function dismissMultiTrain(){
@@ -1521,7 +1571,9 @@ function jumpToPoolingGuest(groupId){
   setTimeout(()=>{
     const card=document.getElementById('card-'+groupId);
     if(card){
-      card.scrollIntoView({behavior:'smooth',block:'center'});
+      // FIX: guard scrollIntoView so a failure here can't prevent the card from actually
+      // being opened (same issue fixed in viewMultiTrainGroup above).
+      try{ card.scrollIntoView({behavior:'smooth',block:'center'}); }catch(e){}
       card.querySelector('.card-expanded')?.classList.add('open');
     }
   }, 150);
