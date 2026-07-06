@@ -826,8 +826,14 @@ async function confirmSplitGroup(){
     // New split-off entry: identical journey/ticket details, but pax is the moved-off count
     // and driver/car fields are intentionally blank — this half needs its OWN assignment,
     // it should never silently inherit the original entry's driver.
+    // FIX (split entries getting flagged as duplicates): PNR is cleared here (rather than
+    // copied along with everything else) because Data Cleanup's "Same PNR" signal is
+    // intentionally NOT name-gated — a shared PNR is normally a strong, legitimate signal
+    // (e.g. one big booking later split per-individual). Without this, splitting a group
+    // would immediately make Data Cleanup treat the two halves as duplicates and suggest
+    // deleting the very entry you just created.
     const newGroupData = {...g, pax: moveCount, driver_name:'', driver_phone:'', car_type:'', car_no:'',
-      group_name: g.group_name + ' (Split)'};
+      pnr:'', group_name: g.group_name + ' (Split)'};
     delete newGroupData.group_id;
     const res = await apiPost({action:'addGuest', data: sanitizeDataForSheet(newGroupData)});
     newGroupData.group_id = res.group_id;
@@ -843,6 +849,53 @@ async function confirmSplitGroup(){
     showToast(`Split into ${remainCount} + ${moveCount} pax — assign a driver to each`,'success');
   }catch(e){
     showToast(e.message||'Split failed. Please retry.','error');
+  }
+  showLoading(false);
+}
+
+// FEATURE (undo an accidental split): finds the original entry a "(Split)" guest came from
+// by matching name (minus the suffix), phone, journey_type, and date/time — the same
+// identity signals used elsewhere in this file (Signal 4 dedup, ticket-mismatch check).
+function findSplitParent(g){
+  if(!g.group_name || !g.group_name.endsWith(' (Split)')) return null;
+  const baseName = g.group_name.slice(0, -' (Split)'.length);
+  return allGuests.find(x=>
+    x.group_id!==g.group_id && !isDeleted(x) &&
+    x.group_name===baseName && x.phone_primary===g.phone_primary &&
+    (x.journey_type||'arrival')===(g.journey_type||'arrival') &&
+    x.arrival_date===g.arrival_date && x.arrival_time===g.arrival_time
+  );
+}
+
+// FEATURE (undo an accidental split): adds this split entry's pax back onto the original
+// and deletes the split entry — the exact reverse of confirmSplitGroup(). One click instead
+// of manually bumping pax and deleting.
+async function mergeSplitBack(groupId){
+  const g = allGuests.find(x=>x.group_id===groupId);
+  if(!g) return;
+  const parent = findSplitParent(g);
+  if(!parent){ showToast('Could not find the original group to merge back into — it may have been renamed or deleted','error'); return; }
+
+  const ok = await appConfirm(`Merge ${g.pax} pax back into "${parent.group_name}" (currently ${parent.pax} pax)? This entry ("${g.group_name}") will be deleted.`,'Merge Split Back');
+  if(!ok) return;
+
+  showLoading(true);
+  try{
+    const updatedParent = {...parent, pax: (parseInt(parent.pax)||0)+(parseInt(g.pax)||0)};
+    await apiPost({action:'updateGuest', data: sanitizeDataForSheet(updatedParent)});
+    const pIdx = allGuests.findIndex(x=>x.group_id===parent.group_id);
+    if(pIdx>=0) allGuests[pIdx]=updatedParent;
+
+    await apiPost({action:'deleteGuest', group_id: g.group_id});
+    const gIdx = allGuests.findIndex(x=>x.group_id===g.group_id);
+    if(gIdx>=0) allGuests[gIdx].deleted='yes';
+
+    saveToCache();
+    syncDriverAssignment();
+    renderDashboard();
+    showToast(`Merged back into ${parent.group_name} (${updatedParent.pax} pax)`,'success');
+  }catch(e){
+    showToast(e.message||'Merge failed. Please retry.','error');
   }
   showLoading(false);
 }
@@ -1738,6 +1791,7 @@ function renderCard(g, isCompleted){
         ${cardActions(g)}
         <button class="btn btn-secondary btn-sm" onclick="openWhatsApp('${g.group_id}')">💬 WhatsApp</button>
         ${(parseInt(g.pax)||0)>1?`<button class="btn btn-secondary btn-sm" onclick="openSplitGroupModal('${g.group_id}')" title="Split this group across two cars">✂️ Split</button>`:''}
+        ${g.group_name&&g.group_name.endsWith(' (Split)')?`<button class="btn btn-secondary btn-sm" onclick="mergeSplitBack('${g.group_id}')" title="Undo split — merge back into the original entry">🔗 Merge Back</button>`:''}
         <button class="btn btn-secondary btn-sm" onclick="editGuest('${g.group_id}')">✏️ Edit</button>
         <button class="btn btn-danger btn-sm" onclick="confirmDelete('${g.group_id}','${esc(g.group_name)}')">🗑️ Delete</button>
       </div>
@@ -2877,8 +2931,34 @@ function detectExistingDuplicates(){
       allEntries: entries});
   };
 
+  // FIX (Data Cleanup flagging two DIFFERENT families as duplicates): the "same transport"
+  // heuristic below exists to catch missing-PNR duplicates (same person entered twice
+  // without a PNR to match on) — but it grouped purely on transport_number+date+pax with NO
+  // identity check at all. Two unrelated families who happen to share a train, date, and
+  // headcount (e.g. "Reddy Family" 3 pax + "Nair Family" 3 pax, same train, same day) were
+  // being flagged for deletion despite having completely different names. This clusters
+  // each transport/date/pax bucket further by NAME SIMILARITY (fuzzy, 80% threshold — same
+  // threshold used for ticket-mismatch checking) before treating anything as a duplicate,
+  // so only entries that are plausibly the SAME person/family ever get grouped together.
+  function clusterByNameSimilarity(entries){
+    const clusters = [];
+    entries.forEach(g=>{
+      const name = normName(g.group_name);
+      let placed = false;
+      for(const c of clusters){
+        if(stringSimilarity(name, normName(c[0].group_name)) >= 0.8){ c.push(g); placed=true; break; }
+      }
+      if(!placed) clusters.push([g]);
+    });
+    return clusters.filter(c=>c.length>1);
+  }
+
   Object.values(pnrMap).forEach(entries=>addGroup(entries,`Same PNR (${entries[0].pnr})`));
-  Object.values(trainMap).forEach(entries=>addGroup(entries,`Same ${entries[0].transport_type||'transport'} ${entries[0].transport_number} on ${fmtDate(entries[0].arrival_date)}`));
+  Object.values(trainMap).forEach(entries=>{
+    clusterByNameSimilarity(entries).forEach(cluster=>{
+      addGroup(cluster, `Same ${cluster[0].transport_type||'transport'} ${cluster[0].transport_number} on ${fmtDate(cluster[0].arrival_date)}`);
+    });
+  });
 
   // Show/hide cleanup button
   const btn = document.getElementById('cleanup-btn');
