@@ -83,6 +83,19 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
 .section-label{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--text-2);font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px}
 .section-label::after{content:'';flex:1;height:1px;background:var(--border)}
 .date-tabs{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
+/* FEATURE (dashboard filters) */
+.filter-bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:20px;padding:10px 12px;
+  background:var(--white);border:1px solid var(--border);border-radius:var(--radius)}
+.filter-group{display:flex;align-items:center;gap:6px}
+.filter-group label{font-size:12px;color:var(--text-2);font-weight:600;white-space:nowrap}
+.filter-bar input[type="number"]{width:64px;padding:5px 8px;border-radius:6px;border:1px solid var(--border);font-size:13px}
+.filter-bar input[type="text"]{width:150px;padding:5px 8px;border-radius:6px;border:1px solid var(--border);font-size:13px}
+.status-chip{padding:4px 11px;border-radius:16px;border:1.5px solid var(--border);background:var(--white);
+  font-size:12px;font-weight:600;cursor:pointer;color:var(--text-2);transition:all .12s}
+.status-chip.active{background:var(--blue);border-color:var(--blue);color:var(--white)}
+.status-chip:hover:not(.active){background:var(--gray-lt)}
+.filter-clear-btn{font-size:12px;color:var(--red);background:none;border:none;cursor:pointer;font-weight:600;padding:4px 8px}
+.filter-clear-btn:hover{text-decoration:underline}
 .date-tab{padding:8px 16px;border-radius:8px;border:1.5px solid var(--border);background:var(--white);font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;color:var(--text-2)}
 .date-tab.active{background:var(--gold);color:var(--white);border-color:var(--gold)}
 .date-tab:hover:not(.active){background:var(--gray-lt)}
@@ -308,6 +321,9 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
     <!-- DASHBOARD -->
     <div id="screen-dashboard">
       <div class="date-tabs" id="date-tabs"></div>
+      <!-- FEATURE (dashboard filters): pax / station / status, in addition to the existing
+           date tabs. See renderFilterBar()/filteredGuests() in the script for the logic. -->
+      <div class="filter-bar" id="filter-bar"></div>
       <div id="multi-train-section"></div>
       <div id="pooling-section"></div>
       <div id="active-cards-container"></div>
@@ -1006,6 +1022,8 @@ async function assignDriverToGuestFromCard(driverName, groupId){
 let SCRIPT_URL='',GEMINI_KEY='',WEDDING_CITY='',HUBS=[];
 let allGuests=[],allDrivers=[];
 let activeTab='all',editingId=null,completedOpen=false;
+// FEATURE (dashboard filters): pax/station/status, independent of the date tabs above.
+let filterMinPax=0, filterStation='', filterStatuses=new Set();
 let pendingSubmitData=null,pendingPooling=null,currentRecs=[];
 let carOptPendingData=null,carOptSmallerDriver=null;
 let dupPendingData=null,dupExistingId=null;
@@ -1389,6 +1407,7 @@ function renderDashboard(){
 function _renderDashboardInternal(){
   screen('dashboard');
   buildDateTabs();
+  renderFilterBar();
   buildMultiTrainBanner();
   buildPooling();
   detectExistingDuplicates(); // auto-surface cleanup button if dupes found
@@ -1424,7 +1443,7 @@ function _renderDashboardInternal(){
   document.getElementById('active-cards-container').innerHTML=
     active.length?html:`<div class="empty-state"><div class="e-icon">🎊</div><h3>No upcoming guests</h3><p>Tap <strong>+ Add Guest</strong> to get started</p></div>`;
 
-  const done=allGuests.filter(g=>(g.status==='picked_up'||g.status==='car_returned')&&!isDeleted(g));
+  const done=allGuests.filter(g=>(g.status==='picked_up'||g.status==='car_returned')&&!isDeleted(g)&&passesPaxStationFilter(g));
   document.getElementById('completed-cards').innerHTML=done.map(g=>renderCard(g,true)).join('');
   document.getElementById('completed-label').textContent=(completedOpen?'Hide':'Show')+' Completed ('+done.length+')';
   document.getElementById('completed-cards').classList.toggle('open',completedOpen);
@@ -1500,9 +1519,75 @@ function dismissMultiTrain(){
   document.getElementById('multi-train-section').innerHTML='';
 }
 
+// FEATURE (dashboard filters): the six possible values come straight from tripStage()'s
+// labels, so this list can never drift out of sync with what's actually shown on cards.
+// Note arrivals finish as "Picked Up" and departures finish as "Complete" — two distinct
+// label strings, not one shared "done" label — so both are listed separately here.
+const FILTER_STATUS_OPTIONS = ['No Driver','Assigned','On the Way','Dropped at Station','Picked Up','Complete'];
+
+function renderFilterBar(){
+  const bar = document.getElementById('filter-bar');
+  if(!bar) return;
+  const anyActive = filterMinPax>0 || filterStation || filterStatuses.size>0;
+  bar.innerHTML = `
+    <div class="filter-group">
+      <label>Min Pax</label>
+      <input type="number" id="filter-pax-input" min="0" step="1" value="${filterMinPax||''}" placeholder="0">
+    </div>
+    <div class="filter-group">
+      <label>Station/Airport</label>
+      <input type="text" id="filter-station-input" value="${esc(filterStation)}" placeholder="e.g. Howrah">
+    </div>
+    <div class="filter-group">
+      <label>Status</label>
+      ${FILTER_STATUS_OPTIONS.map(s=>
+        `<button class="status-chip${filterStatuses.has(s)?' active':''}" onclick="toggleStatusFilter('${esc(s)}')">${esc(s)}</button>`
+      ).join('')}
+    </div>
+    ${anyActive?`<button class="filter-clear-btn" onclick="clearFilters()">✕ Clear filters</button>`:''}
+  `;
+  document.getElementById('filter-pax-input').addEventListener('input', e=>{
+    filterMinPax = parseInt(e.target.value)||0;
+    renderDashboard();
+  });
+  document.getElementById('filter-station-input').addEventListener('input', e=>{
+    filterStation = e.target.value;
+    renderDashboard();
+  });
+}
+function toggleStatusFilter(status){
+  if(filterStatuses.has(status)) filterStatuses.delete(status);
+  else filterStatuses.add(status);
+  renderDashboard();
+}
+function clearFilters(){
+  filterMinPax=0; filterStation=''; filterStatuses=new Set();
+  renderDashboard();
+}
+
+// FEATURE (dashboard filters): shared predicate applied to both the active list
+// (filteredGuests) and the completed list, so pax/station filtering behaves consistently
+// everywhere. Status filtering intentionally does NOT apply here — see filteredGuests().
+function passesPaxStationFilter(g){
+  if(filterMinPax>0 && (parseInt(g.pax)||0) < filterMinPax) return false;
+  if(filterStation && !(g.pickup_location||'').toLowerCase().includes(filterStation.toLowerCase())) return false;
+  return true;
+}
+
 function filteredGuests(){
-  let list=allGuests.filter(g=>g.status!=='picked_up'&&g.status!=='car_returned'&&!isDeleted(g));
+  let list=allGuests.filter(g=>!isDeleted(g));
   if(activeTab!=='all') list=list.filter(g=>g.arrival_date===activeTab);
+  list=list.filter(passesPaxStationFilter);
+  // FEATURE (dashboard filters - status): when one or more status chips are selected, they
+  // fully replace the default "hide completed" behavior — e.g. selecting "Complete" should
+  // actually show completed guests here rather than requiring the separate "Show Completed"
+  // toggle. With no status chips selected, behavior is unchanged from before (completed
+  // guests stay hidden from the main list, still reachable via Show Completed).
+  if(filterStatuses.size){
+    list = list.filter(g=>filterStatuses.has(tripStage(g).label));
+  } else {
+    list = list.filter(g=>g.status!=='picked_up'&&g.status!=='car_returned');
+  }
   return list;
 }
 
