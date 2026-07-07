@@ -3650,7 +3650,21 @@ function showToast(msg,type=''){
 }
 
 // ── Test data ─────────────────────────────────────────────────
-function loadTestData(){
+async function loadTestData(){
+  // FIX ('Sheet error: Guest not found' on test data): loadTestData() previously only
+  // populated the in-memory allGuests array — these guests never actually existed as rows
+  // in the real Google Sheet. Any action that round-trips through the backend by group_id
+  // (Split, Edit, Delete, assigning a driver, marking picked-up, etc.) would then fail with
+  // "Guest not found" the moment it tried to look that id up server-side. This now actually
+  // creates each guest via the real addGuest backend action, so every flow works genuinely
+  // end-to-end — not just the client-side rendering.
+  const proceed = await appConfirm(
+    'This will create 16 real test guest rows in your connected Google Sheet (not just in this browser tab). '+
+    'Use this on a test/staging sheet, not your live wedding data. Continue?',
+    'Load Test Data — Writes to Google Sheet'
+  );
+  if(!proceed){ console.log('Test data load cancelled.'); return; }
+
   allDrivers=[
     {driver_id:'D001',driver_name:'Suresh Kumar', driver_phone:'9000000001',car_type:'Innova',        car_no:'WB02AB1042',capacity:'7', assigned:'yes'},
     {driver_id:'D002',driver_name:'Ramesh Das',   driver_phone:'9000000002',car_type:'Ertiga',         car_no:'WB02CD2031',capacity:'6', assigned:'yes'},
@@ -3658,6 +3672,10 @@ function loadTestData(){
     {driver_id:'D004',driver_name:'Manoj Singh',  driver_phone:'9000000004',car_type:'ScorpioX',       car_no:'WB02GH4011',capacity:'7', assigned:'no'},
     {driver_id:'D005',driver_name:'Ajay Verma',   driver_phone:'9000000005',car_type:'Swift Dzire',    car_no:'WB02JK5022',capacity:'4', assigned:'no'},
   ];
+  // NOTE: there's no backend "addDriver" action in this app — drivers live only in this
+  // in-memory list for test purposes. That's fine: guest records just store driver_name/
+  // driver_phone/car_type/car_no as plain text fields, so they don't need the driver to
+  // "exist" anywhere server-side.
 
   const now=new Date();
   const localDateStr=d=>`${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')}`;
@@ -3670,7 +3688,7 @@ function loadTestData(){
   const soon=new Date(now.getTime()+90*60000);
   const soonTime=soon.getHours().toString().padStart(2,'0')+':'+soon.getMinutes().toString().padStart(2,'0');
 
-  allGuests=[
+  const guestDefs=[
     // 1) URGENT, NO DRIVER — arrival ~90 min away, nobody assigned yet.
     //    Tests: red pulsing "⚠️ No Driver" trip-stage badge, priority-high card border,
     //    the mandatory-date/time validation (already set here), and status-change time-
@@ -3827,22 +3845,51 @@ function loadTestData(){
      ticket_url:'https://placehold.co/500x700/png?text=Sample+Boarding+Pass'},
   ];
 
+  showLoading(true);
+  let created=0, failed=0;
+  for(const def of guestDefs){
+    const refId = def.group_id; // T101.. — kept only for the console summary below
+    const payload = {...def};
+    delete payload.group_id; // let the backend assign the real id
+    try{
+      showToast(`Creating test guest ${created+failed+1}/${guestDefs.length}…`,'');
+      const res = await apiPost({action:'addGuest', data: sanitizeDataForSheet(payload)});
+      const saved = {...def, group_id: res.group_id};
+      allGuests.push(saved);
+      created++;
+    }catch(e){
+      console.warn(`Failed to create test guest "${def.group_name}" (ref ${refId}):`, e.message);
+      failed++;
+    }
+  }
+  showLoading(false);
+
+  saveToCache();
+  syncDriverAssignment();
   renderDashboard();
-  console.log('✅ Test data loaded — '+allGuests.length+' guests, '+allDrivers.length+' drivers');
+
+  if(failed){
+    showToast(`Test data: ${created} created, ${failed} failed — check console`,'error');
+  } else {
+    showToast(`✅ ${created} test guests created in your Sheet`,'success');
+  }
+
+  console.log(`✅ Test data loaded — ${created} guests written to the Sheet (${failed} failed), ${allDrivers.length} local test drivers`);
   console.log('%cWhat to test:','font-weight:bold');
-  console.log('1) Sen Family (T101) — urgent, no driver → red pulsing badge');
-  console.log('2) Ghosh Family (T102) — no driver, not urgent → grey badge');
-  console.log('3) Chatterjee Group (T103) — assigned, not dispatched → amber badge; try the inline driver select');
-  console.log('4) Sinha Family (T104) — dispatched → blue badge; try assigning Suresh Kumar to Sen Family (#1) for a CONFLICT dialog');
-  console.log('5) Dutta Siblings (T105) — picked up → check "Show Completed" + Mark Active');
-  console.log('6) Mallick Family (T106) — dropped at station, car not returned yet');
-  console.log('7) Bose Family (T107) — fully complete departure');
-  console.log('8-9) Bachhawat Family (T108/T109) — round trip, same phone, different journey_type/dates');
-  console.log('10-11) Iyer Family (T110/T111) — duplicate pair, one with no date → try 🧹 Data Cleanup');
-  console.log('12-13) Reddy/Nair Family (T112/T113) — same train, close time → Pooling Recs + Multi-train banner');
-  console.log('14) Agarwal Extended Family (T114) — 14 pax → try assigning a driver (capacity warning) then ✂️ Split');
-  console.log('15) Legacy Entry (T115) — no date/time at all → check it renders without breaking the dashboard');
-  console.log('16) Rao Family (T116) — has a ticket attached already → check the ticket section controls');
+  console.log('1) Sen Family — urgent, no driver → red pulsing badge');
+  console.log('2) Ghosh Family — no driver, not urgent → grey badge');
+  console.log('3) Chatterjee Group — assigned, not dispatched → amber badge; try the inline driver select');
+  console.log('4) Sinha Family — dispatched → blue badge; try assigning Suresh Kumar to Sen Family for a CONFLICT dialog');
+  console.log('5) Dutta Siblings — picked up → check "Show Completed" + Mark Active');
+  console.log('6) Mallick Family — dropped at station, car not returned yet');
+  console.log('7) Bose Family — fully complete departure');
+  console.log('8-9) Bachhawat Family — round trip, same phone, different journey_type/dates');
+  console.log('10-11) Iyer Family — duplicate pair, one with no date → try 🧹 Data Cleanup');
+  console.log('12-13) Reddy/Nair Family — same train, close time → Pooling Recs + Multi-train banner');
+  console.log('14) Agarwal Extended Family — 14 pax → try assigning a driver (capacity warning) then ✂️ Split (now writes for real, so the flow completes end-to-end)');
+  console.log('15) Legacy Entry — no date/time at all → check it renders without breaking the dashboard');
+  console.log('16) Rao Family — has a ticket attached already → check the ticket section controls');
+  console.log('\nTo remove this test data afterward: reload the page without calling loadTestData(), or manually delete these rows from the Sheet (guest names are all unique test names, easy to filter for).');
 }
 </script>
 
