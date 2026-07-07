@@ -83,18 +83,34 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
 .section-label{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--text-2);font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px}
 .section-label::after{content:'';flex:1;height:1px;background:var(--border)}
 .date-tabs{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
-/* FEATURE (dashboard filters) */
-.filter-bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:20px;padding:10px 12px;
-  background:var(--white);border:1px solid var(--border);border-radius:var(--radius)}
-.filter-group{display:flex;align-items:center;gap:6px}
-.filter-group label{font-size:12px;color:var(--text-2);font-weight:600;white-space:nowrap}
-.filter-bar input[type="number"]{width:64px;padding:5px 8px;border-radius:6px;border:1px solid var(--border);font-size:13px}
-.filter-bar input[type="text"]{width:150px;padding:5px 8px;border-radius:6px;border:1px solid var(--border);font-size:13px}
-.status-chip{padding:4px 11px;border-radius:16px;border:1.5px solid var(--border);background:var(--white);
-  font-size:12px;font-weight:600;cursor:pointer;color:var(--text-2);transition:all .12s}
-.status-chip.active{background:var(--blue);border-color:var(--blue);color:var(--white)}
-.status-chip:hover:not(.active){background:var(--gray-lt)}
-.filter-clear-btn{font-size:12px;color:var(--red);background:none;border:none;cursor:pointer;font-weight:600;padding:4px 8px}
+/* FEATURE (dashboard filters): searchable multi-select dropdowns for Pax / Station /
+   Status, matching the "All sources"-style filter UX (button → panel with checkboxes,
+   search box, Clear link). */
+.filter-bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:20px}
+.filter-dropdown{position:relative}
+.filter-dd-btn{display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:8px;
+  border:1.5px solid var(--border);background:var(--white);font-size:13px;font-weight:500;
+  cursor:pointer;color:var(--text-2)}
+.filter-dd-btn.has-selection{border-color:var(--blue);color:var(--blue)}
+.filter-dd-btn:hover{background:var(--gray-lt)}
+.fd-count{background:var(--blue);color:var(--white);border-radius:10px;font-size:11px;
+  font-weight:700;padding:1px 7px;line-height:1.4}
+.fd-caret{font-size:10px;opacity:.6}
+.filter-dd-panel{display:none;position:absolute;top:calc(100% + 6px);left:0;z-index:200;
+  width:240px;background:var(--white);border:1px solid var(--border);border-radius:var(--radius);
+  box-shadow:var(--shadow-lg);overflow:hidden}
+.filter-dd-panel.open{display:block}
+.fd-search{width:100%;box-sizing:border-box;padding:10px 12px;border:none;border-bottom:1px solid var(--border);
+  font-size:13px;outline:none}
+.fd-options{max-height:220px;overflow-y:auto;padding:6px 0}
+.fd-option{display:flex;align-items:center;gap:8px;padding:7px 12px;font-size:13px;cursor:pointer;color:var(--text)}
+.fd-option:hover{background:var(--gray-lt)}
+.fd-option input{margin:0;flex-shrink:0}
+.fd-empty{padding:12px;font-size:12px;color:var(--text-2);text-align:center}
+.fd-footer{border-top:1px solid var(--border);padding:6px 12px}
+.fd-clear{background:none;border:none;color:var(--red);font-size:12px;font-weight:600;cursor:pointer;padding:4px 0}
+.fd-clear:hover{text-decoration:underline}
+.filter-clear-btn{font-size:12px;color:var(--red);background:none;border:none;cursor:pointer;font-weight:600;padding:8px 8px}
 .filter-clear-btn:hover{text-decoration:underline}
 .date-tab{padding:8px 16px;border-radius:8px;border:1.5px solid var(--border);background:var(--white);font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;color:var(--text-2)}
 .date-tab.active{background:var(--gold);color:var(--white);border-color:var(--gold)}
@@ -1022,8 +1038,12 @@ async function assignDriverToGuestFromCard(driverName, groupId){
 let SCRIPT_URL='',GEMINI_KEY='',WEDDING_CITY='',HUBS=[];
 let allGuests=[],allDrivers=[];
 let activeTab='all',editingId=null,completedOpen=false;
-// FEATURE (dashboard filters): pax/station/status, independent of the date tabs above.
-let filterMinPax=0, filterStation='', filterStatuses=new Set();
+// FEATURE (dashboard filters): multi-select Sets for pax/station/status, independent of
+// the date tabs above. Options for pax/station are derived from actual guest data each
+// render (see distinctPaxOptions/distinctStationOptions), not hardcoded.
+let filterPax=new Set(), filterStations=new Set(), filterStatuses=new Set();
+let _openFilterDropdown=null; // 'pax' | 'station' | 'status' | null — only one open at a time
+let _filterSearch={pax:'',station:'',status:''};
 let pendingSubmitData=null,pendingPooling=null,currentRecs=[];
 let carOptPendingData=null,carOptSmallerDriver=null;
 let dupPendingData=null,dupExistingId=null;
@@ -1519,58 +1539,114 @@ function dismissMultiTrain(){
   document.getElementById('multi-train-section').innerHTML='';
 }
 
-// FEATURE (dashboard filters): the six possible values come straight from tripStage()'s
-// labels, so this list can never drift out of sync with what's actually shown on cards.
-// Note arrivals finish as "Picked Up" and departures finish as "Complete" — two distinct
-// label strings, not one shared "done" label — so both are listed separately here.
+// FEATURE (dashboard filters): the six possible status values come straight from
+// tripStage()'s labels, so this list can never drift out of sync with what's actually
+// shown on cards. Note arrivals finish as "Picked Up" and departures finish as "Complete"
+// — two distinct label strings, not one shared "done" label — so both are listed here.
 const FILTER_STATUS_OPTIONS = ['No Driver','Assigned','On the Way','Dropped at Station','Picked Up','Complete'];
+
+// FEATURE (dashboard filters): pax options are pulled from what's actually on file — the
+// dropdown only ever lists pax counts that exist among current guests, not an arbitrary
+// 1-20 range, so every option is guaranteed to actually match something.
+function distinctPaxOptions(){
+  const set=new Set(allGuests.filter(g=>!isDeleted(g)).map(g=>String(parseInt(g.pax)||0)).filter(v=>v!=='0'));
+  return [...set].sort((a,b)=>parseInt(a)-parseInt(b));
+}
+function distinctStationOptions(){
+  const set=new Set(allGuests.filter(g=>!isDeleted(g)&&g.pickup_location).map(g=>g.pickup_location));
+  return [...set].sort();
+}
 
 function renderFilterBar(){
   const bar = document.getElementById('filter-bar');
   if(!bar) return;
-  const anyActive = filterMinPax>0 || filterStation || filterStatuses.size>0;
-  bar.innerHTML = `
-    <div class="filter-group">
-      <label>Min Pax</label>
-      <input type="number" id="filter-pax-input" min="0" step="1" value="${filterMinPax||''}" placeholder="0">
-    </div>
-    <div class="filter-group">
-      <label>Station/Airport</label>
-      <input type="text" id="filter-station-input" value="${esc(filterStation)}" placeholder="e.g. Howrah">
-    </div>
-    <div class="filter-group">
-      <label>Status</label>
-      ${FILTER_STATUS_OPTIONS.map(s=>
-        `<button class="status-chip${filterStatuses.has(s)?' active':''}" onclick="toggleStatusFilter('${esc(s)}')">${esc(s)}</button>`
-      ).join('')}
-    </div>
-    ${anyActive?`<button class="filter-clear-btn" onclick="clearFilters()">✕ Clear filters</button>`:''}
-  `;
-  document.getElementById('filter-pax-input').addEventListener('input', e=>{
-    filterMinPax = parseInt(e.target.value)||0;
-    renderDashboard();
-  });
-  document.getElementById('filter-station-input').addEventListener('input', e=>{
-    filterStation = e.target.value;
-    renderDashboard();
-  });
+  const anyActive = filterPax.size || filterStations.size || filterStatuses.size;
+  const paxOpts = distinctPaxOptions().map(p=>({value:p,label:p+' pax'}));
+  const stationOpts = distinctStationOptions().map(s=>({value:s,label:s}));
+  const statusOpts = FILTER_STATUS_OPTIONS.map(s=>({value:s,label:s}));
+
+  bar.innerHTML =
+    filterDropdownHtml('pax','Pax',paxOpts,filterPax,true) +
+    filterDropdownHtml('station','Station/Airport',stationOpts,filterStations,true) +
+    filterDropdownHtml('status','Status',statusOpts,filterStatuses,false) +
+    (anyActive?`<button class="filter-clear-btn" onclick="clearFilters()">✕ Clear all filters</button>`:'');
 }
-function toggleStatusFilter(status){
-  if(filterStatuses.has(status)) filterStatuses.delete(status);
-  else filterStatuses.add(status);
+
+// FEATURE (dashboard filters): renders one dropdown — button + panel (search box, checkbox
+// list, Clear link) — matching the "All sources"-style multi-select pattern.
+function filterDropdownHtml(key,label,options,selectedSet,showSearch){
+  const count=selectedSet.size;
+  const isOpen=_openFilterDropdown===key;
+  const search=(_filterSearch[key]||'').toLowerCase();
+  const visibleOptions=search?options.filter(o=>o.label.toLowerCase().includes(search)):options;
+  return `<div class="filter-dropdown">
+    <button class="filter-dd-btn${count?' has-selection':''}" onclick="toggleFilterDropdown('${key}')" type="button">
+      ${esc(label)}${count?` <span class="fd-count">${count}</span>`:''} <span class="fd-caret">▾</span>
+    </button>
+    <div class="filter-dd-panel${isOpen?' open':''}" id="fd-panel-${key}">
+      ${showSearch?`<input type="text" class="fd-search" placeholder="Search ${esc(label).toLowerCase()}…" value="${esc(_filterSearch[key]||'')}" oninput="onFilterSearch('${key}',this.value)">`:''}
+      <div class="fd-options">
+        ${visibleOptions.length?visibleOptions.map(o=>`
+          <label class="fd-option">
+            <input type="checkbox" ${selectedSet.has(o.value)?'checked':''} onchange="toggleFilterOption('${key}','${esc(o.value)}')">
+            <span>${esc(o.label)}</span>
+          </label>`).join(''):'<div class="fd-empty">No options</div>'}
+      </div>
+      <div class="fd-footer">
+        <button class="fd-clear" type="button" onclick="clearFilterGroup('${key}')">✕ Clear</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+const _FILTER_SET_MAP = ()=>({pax:filterPax, station:filterStations, status:filterStatuses});
+
+// Opening/closing a dropdown doesn't change which guests are shown, so this only
+// re-renders the filter bar itself — not a full (debounced) dashboard re-render.
+function toggleFilterDropdown(key){
+  _openFilterDropdown = _openFilterDropdown===key ? null : key;
+  renderFilterBar();
+}
+function onFilterSearch(key,val){
+  _filterSearch[key]=val;
+  renderFilterBar();
+  // Re-render replaces the input element, so restore focus + cursor position afterward.
+  setTimeout(()=>{
+    const inp=document.querySelector(`#fd-panel-${key} .fd-search`);
+    if(inp){ inp.focus(); inp.setSelectionRange(val.length,val.length); }
+  },0);
+}
+// A checkbox toggle actually changes which guests should be shown, so this goes through
+// the normal (debounced) renderDashboard() — which also re-renders the filter bar, keeping
+// the panel open since _openFilterDropdown persists independently of that re-render.
+function toggleFilterOption(key,value){
+  const set=_FILTER_SET_MAP()[key];
+  if(!set) return;
+  if(set.has(value)) set.delete(value); else set.add(value);
+  renderDashboard();
+}
+function clearFilterGroup(key){
+  const set=_FILTER_SET_MAP()[key];
+  if(set) set.clear();
   renderDashboard();
 }
 function clearFilters(){
-  filterMinPax=0; filterStation=''; filterStatuses=new Set();
+  filterPax=new Set(); filterStations=new Set(); filterStatuses=new Set();
+  _openFilterDropdown=null;
   renderDashboard();
 }
+// Click anywhere outside an open filter dropdown closes it.
+document.addEventListener('click', function(evt){
+  if(evt.target.closest('.filter-dropdown')) return;
+  if(_openFilterDropdown){ _openFilterDropdown=null; renderFilterBar(); }
+});
 
 // FEATURE (dashboard filters): shared predicate applied to both the active list
 // (filteredGuests) and the completed list, so pax/station filtering behaves consistently
 // everywhere. Status filtering intentionally does NOT apply here — see filteredGuests().
 function passesPaxStationFilter(g){
-  if(filterMinPax>0 && (parseInt(g.pax)||0) < filterMinPax) return false;
-  if(filterStation && !(g.pickup_location||'').toLowerCase().includes(filterStation.toLowerCase())) return false;
+  if(filterPax.size && !filterPax.has(String(parseInt(g.pax)||0))) return false;
+  if(filterStations.size && !filterStations.has(g.pickup_location||'')) return false;
   return true;
 }
 
@@ -1578,10 +1654,10 @@ function filteredGuests(){
   let list=allGuests.filter(g=>!isDeleted(g));
   if(activeTab!=='all') list=list.filter(g=>g.arrival_date===activeTab);
   list=list.filter(passesPaxStationFilter);
-  // FEATURE (dashboard filters - status): when one or more status chips are selected, they
-  // fully replace the default "hide completed" behavior — e.g. selecting "Complete" should
-  // actually show completed guests here rather than requiring the separate "Show Completed"
-  // toggle. With no status chips selected, behavior is unchanged from before (completed
+  // FEATURE (dashboard filters - status): when one or more status options are selected,
+  // they fully replace the default "hide completed" behavior — e.g. selecting "Complete"
+  // should actually show completed guests here rather than requiring the separate "Show
+  // Completed" toggle. With none selected, behavior is unchanged from before (completed
   // guests stay hidden from the main list, still reachable via Show Completed).
   if(filterStatuses.size){
     list = list.filter(g=>filterStatuses.has(tripStage(g).label));
