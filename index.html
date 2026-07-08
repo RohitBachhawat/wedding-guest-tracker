@@ -85,33 +85,50 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
 .date-tabs{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
 /* FEATURE (dashboard filters): searchable multi-select dropdowns for Pax / Station /
    Status, matching the "All sources"-style filter UX (button → panel with checkboxes,
-   search box, Clear link). */
-.filter-bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:20px}
+   search box, Clear link). Wrapped in a card container consistent with the rest of the
+   app's visual language (white card, border, subtle shadow) instead of bare buttons
+   floating on the page background. */
+.filter-bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:20px;
+  padding:10px 14px;background:var(--white);border:1px solid var(--border);
+  border-radius:var(--radius);box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.filter-bar-label{font-size:11px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;
+  color:var(--text-2);margin-right:2px;display:flex;align-items:center;gap:5px}
 .filter-dropdown{position:relative}
-.filter-dd-btn{display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:8px;
-  border:1.5px solid var(--border);background:var(--white);font-size:13px;font-weight:500;
-  cursor:pointer;color:var(--text-2)}
-.filter-dd-btn.has-selection{border-color:var(--blue);color:var(--blue)}
-.filter-dd-btn:hover{background:var(--gray-lt)}
-.fd-count{background:var(--blue);color:var(--white);border-radius:10px;font-size:11px;
-  font-weight:700;padding:1px 7px;line-height:1.4}
-.fd-caret{font-size:10px;opacity:.6}
-.filter-dd-panel{display:none;position:absolute;top:calc(100% + 6px);left:0;z-index:200;
-  width:240px;background:var(--white);border:1px solid var(--border);border-radius:var(--radius);
-  box-shadow:var(--shadow-lg);overflow:hidden}
+.filter-dd-btn{display:flex;align-items:center;gap:7px;padding:8px 14px;border-radius:20px;
+  border:1.5px solid var(--border);background:var(--white);font-size:13px;font-weight:600;
+  cursor:pointer;color:var(--text-2);transition:all .15s}
+.filter-dd-btn .fd-icon{font-size:13px;line-height:1}
+.filter-dd-btn.has-selection{border-color:var(--gold);color:var(--gold);background:var(--gold-lt,#FBF0DC)}
+.filter-dd-btn:hover{background:var(--gray-lt);border-color:var(--gold)}
+.fd-count{background:var(--gold);color:var(--white);border-radius:10px;font-size:11px;
+  font-weight:700;padding:1px 7px;line-height:1.4;min-width:16px;text-align:center}
+.fd-caret{font-size:9px;opacity:.6;transition:transform .15s}
+.filter-dd-btn.open .fd-caret{transform:rotate(180deg)}
+.filter-dd-panel{display:none;position:absolute;top:calc(100% + 8px);left:0;z-index:200;
+  width:260px;max-width:calc(100vw - 32px);background:var(--white);border:1px solid var(--border);
+  border-radius:var(--radius);box-shadow:var(--shadow-lg);overflow:hidden}
 .filter-dd-panel.open{display:block}
-.fd-search{width:100%;box-sizing:border-box;padding:10px 12px;border:none;border-bottom:1px solid var(--border);
-  font-size:13px;outline:none}
-.fd-options{max-height:220px;overflow-y:auto;padding:6px 0}
-.fd-option{display:flex;align-items:center;gap:8px;padding:7px 12px;font-size:13px;cursor:pointer;color:var(--text)}
+.fd-search{width:100%;box-sizing:border-box;padding:11px 14px;border:none;border-bottom:1px solid var(--border);
+  font-size:14px;outline:none;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+.fd-options{max-height:240px;overflow-y:auto;overflow-x:hidden;padding:6px 0}
+/* FIX (broken checkbox/label layout — huge single-word-per-line text + horizontal scroll):
+   flex items default to min-width:auto, so a long label with no explicit shrink/wrap
+   allowance forces the WHOLE row (and therefore the panel) to overflow horizontally rather
+   than wrap the text — that's what produced the giant "No / Driver" stacked single words
+   and the horizontal scrollbar. flex:1 + min-width:0 on the label lets it actually shrink
+   and wrap within the available width like normal text. */
+.fd-option{display:flex;align-items:center;gap:10px;padding:9px 14px;font-size:14px;
+  line-height:1.35;cursor:pointer;color:var(--text);-webkit-text-size-adjust:100%;text-size-adjust:100%}
 .fd-option:hover{background:var(--gray-lt)}
-.fd-option input{margin:0;flex-shrink:0}
-.fd-empty{padding:12px;font-size:12px;color:var(--text-2);text-align:center}
-.fd-footer{border-top:1px solid var(--border);padding:6px 12px}
-.fd-clear{background:none;border:none;color:var(--red);font-size:12px;font-weight:600;cursor:pointer;padding:4px 0}
+.fd-option input{margin:0;flex-shrink:0;width:16px;height:16px}
+.fd-option span{flex:1;min-width:0;overflow-wrap:break-word}
+.fd-empty{padding:14px;font-size:13px;color:var(--text-2);text-align:center}
+.fd-footer{border-top:1px solid var(--border);padding:6px 14px}
+.fd-clear{background:none;border:none;color:var(--red);font-size:12px;font-weight:600;cursor:pointer;padding:5px 0}
 .fd-clear:hover{text-decoration:underline}
-.filter-clear-btn{font-size:12px;color:var(--red);background:none;border:none;cursor:pointer;font-weight:600;padding:8px 8px}
-.filter-clear-btn:hover{text-decoration:underline}
+.filter-clear-btn{font-size:12px;color:var(--red);background:var(--red-lt);border:none;border-radius:16px;
+  cursor:pointer;font-weight:600;padding:8px 14px;margin-left:2px}
+.filter-clear-btn:hover{opacity:.8}
 .date-tab{padding:8px 16px;border-radius:8px;border:1.5px solid var(--border);background:var(--white);font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;color:var(--text-2)}
 .date-tab.active{background:var(--gold);color:var(--white);border-color:var(--gold)}
 .date-tab:hover:not(.active){background:var(--gray-lt)}
@@ -1566,22 +1583,23 @@ function renderFilterBar(){
   const statusOpts = FILTER_STATUS_OPTIONS.map(s=>({value:s,label:s}));
 
   bar.innerHTML =
-    filterDropdownHtml('pax','Pax',paxOpts,filterPax,true) +
-    filterDropdownHtml('station','Station/Airport',stationOpts,filterStations,true) +
-    filterDropdownHtml('status','Status',statusOpts,filterStatuses,false) +
+    `<span class="filter-bar-label">🔎 Filters</span>` +
+    filterDropdownHtml('pax','Pax',paxOpts,filterPax,true,'👥') +
+    filterDropdownHtml('station','Station/Airport',stationOpts,filterStations,true,'📍') +
+    filterDropdownHtml('status','Status',statusOpts,filterStatuses,false,'🏷️') +
     (anyActive?`<button class="filter-clear-btn" onclick="clearFilters()">✕ Clear all filters</button>`:'');
 }
 
 // FEATURE (dashboard filters): renders one dropdown — button + panel (search box, checkbox
 // list, Clear link) — matching the "All sources"-style multi-select pattern.
-function filterDropdownHtml(key,label,options,selectedSet,showSearch){
+function filterDropdownHtml(key,label,options,selectedSet,showSearch,icon){
   const count=selectedSet.size;
   const isOpen=_openFilterDropdown===key;
   const search=(_filterSearch[key]||'').toLowerCase();
   const visibleOptions=search?options.filter(o=>o.label.toLowerCase().includes(search)):options;
   return `<div class="filter-dropdown">
-    <button class="filter-dd-btn${count?' has-selection':''}" onclick="toggleFilterDropdown('${key}')" type="button">
-      ${esc(label)}${count?` <span class="fd-count">${count}</span>`:''} <span class="fd-caret">▾</span>
+    <button class="filter-dd-btn${count?' has-selection':''}${isOpen?' open':''}" onclick="toggleFilterDropdown('${key}')" type="button">
+      <span class="fd-icon">${icon}</span>${esc(label)}${count?` <span class="fd-count">${count}</span>`:''} <span class="fd-caret">▾</span>
     </button>
     <div class="filter-dd-panel${isOpen?' open':''}" id="fd-panel-${key}">
       ${showSearch?`<input type="text" class="fd-search" placeholder="Search ${esc(label).toLowerCase()}…" value="${esc(_filterSearch[key]||'')}" oninput="onFilterSearch('${key}',this.value)">`:''}
