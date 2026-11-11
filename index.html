@@ -44,6 +44,14 @@ label{display:block;font-size:13px;font-weight:500;color:var(--text-2);margin-bo
 .form-group{margin-bottom:16px}
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 @media(max-width:600px){.form-row{grid-template-columns:1fr}}
+@media(max-width:520px){
+  header{padding:0 8px}
+  .header-brand{gap:0}
+  .header-brand h1{display:none}   /* keep only the 🪔 icon so all action buttons fit on phones */
+  .header-actions{gap:4px}
+  .header-actions .btn-icon{width:34px;height:34px;padding:0}
+  .header-actions .btn{padding:7px 8px;font-size:12px;white-space:nowrap}
+}
 
 #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--text);color:var(--white);padding:12px 22px;border-radius:10px;font-size:14px;font-weight:500;z-index:9999;transition:transform .3s ease;pointer-events:none}
 #toast.show{transform:translateX(-50%) translateY(0)}
@@ -55,6 +63,10 @@ label{display:block;font-size:13px;font-weight:500;color:var(--text-2);margin-bo
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
 
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:5000;padding:20px}
+/* The generic confirm dialog can be opened FROM other modals (e.g. removing a pending sync item),
+   so it must stack above every other modal overlay or its Confirm button is unclickable. */
+#app-confirm-modal{z-index:6000}
+
 .modal-overlay.open{display:flex}
 .modal{background:var(--white);border-radius:var(--radius);padding:32px;max-width:460px;width:100%;box-shadow:var(--shadow-lg);max-height:90vh;overflow-y:auto;position:relative}
 /* FIX (Clear All / cross button): dedicated close-X, used on the confirm modal and Pending
@@ -328,12 +340,9 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
   <div class="setup-card">
     <div class="mandala">🪔</div>
     <h1>Wedding Guest Tracker</h1>
-    <p>Enter your credentials to get started. Saved locally on this device.</p>
+    <p>Enter your wedding city to get started. Saved locally on this device.</p>
     <div class="form-group"><label>Wedding City (e.g. Kolkata, Daman)</label><input type="text" id="setup-wedding-city" placeholder="Kolkata"/></div>
-    <div class="form-group"><label>Google Apps Script Web App URL</label><input type="url" id="setup-script-url" placeholder="https://script.google.com/macros/s/…/exec"/></div>
-    <div class="form-group"><label>Gemini API Key</label><input type="password" id="setup-gemini-key" placeholder="AIza…"/></div>
     <button class="btn btn-primary" style="width:100%;justify-content:center;padding:14px" onclick="saveSetup()">🎉 Open Dashboard</button>
-    <div class="setup-help"><strong>Where to get these?</strong> See the README setup guide.</div>
   </div>
 </div>
 
@@ -489,8 +498,6 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
       <textarea id="settings-hubs" rows="5" placeholder="Railway Station A&#10;Airport B"></textarea>
       <div style="font-size:11px;color:var(--text-2);margin-top:4px">These appear in the dropdowns. Changing city will auto-refresh these.</div>
     </div>
-    <div class="form-group"><label>Apps Script Web App URL</label><input type="url" id="settings-script-url"/></div>
-    <div class="form-group"><label>Gemini API Key</label><input type="password" id="settings-gemini-key"/></div>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="document.getElementById('settings-modal').classList.remove('open')">Cancel</button>
       <button class="btn btn-primary" onclick="saveSettings()">Save</button>
@@ -645,7 +652,7 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
 <div class="modal-overlay" id="delete-modal">
   <div class="modal">
     <h3>🗑️ Delete Guest Entry</h3>
-    <p style="font-size:14px;color:var(--text-2);line-height:1.6">Are you sure you want to delete <strong id="delete-guest-name"></strong>? The entry will be hidden from the dashboard but kept in the sheet.</p>
+    <p style="font-size:14px;color:var(--text-2);line-height:1.6">Are you sure you want to delete <strong id="delete-guest-name"></strong>? The entry will be hidden from the dashboard but kept in the sheet. Any attached ticket file will be removed from Drive.</p>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button>
       <button class="btn btn-danger" id="delete-confirm-btn">Yes, Delete</button>
@@ -666,6 +673,11 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
 
 <script>
 // ── Config ────────────────────────────────────────────────────
+// ── Credentials (edit these two lines, then reload) ───────────
+// Paste your Google Apps Script Web App URL and your Gemini API key between the quotes.
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby0rEzOyYPw9ugQbMi4wQdqL2zU39EdJitV_INwAeyG1u_mEpsVUHvOdiWnLnnUbyGx0Q/exec';   // e.g. 'https://script.google.com/macros/s/XXXX/exec'
+const GEMINI_KEY = 'AIzaSyCnxVkUK5mQxwQAoxDKOt2-ekvVWwkKbe8';   // e.g. 'AIza...'
+
 const TRAVEL_MINS   = 90;
 const CONFLICT_MINS = 120;
 const LUGGAGE_KW    = ['luggage','bag','suitcase','baggage','wheelchair','equipment','heavy','lots','bulky','cargo'];
@@ -745,10 +757,13 @@ function renderSyncQueueBody(){
   if(!body) return;
   if(!syncQueue.length){
     body.innerHTML='<p style="color:var(--green);font-weight:600">✅ Nothing pending — all changes are synced.</p>';
-    document.getElementById('sync-queue-actions').style.display='none';
+    // Keep the Close button available; only hide the Retry / Clear All buttons.
+    const acts=document.getElementById('sync-queue-actions');acts.style.display='flex';
+    acts.querySelectorAll('.btn-danger,.btn-primary').forEach(b=>b.style.display='none');
     return;
   }
-  document.getElementById('sync-queue-actions').style.display='flex';
+  const acts=document.getElementById('sync-queue-actions');acts.style.display='flex';
+  acts.querySelectorAll('.btn').forEach(b=>b.style.display='');
   body.innerHTML = syncQueue.map((item,i)=>`
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;font-size:13px">
       <span>${describeSyncItem(item)}</span>
@@ -802,6 +817,10 @@ window.addEventListener('online',()=>{setTimeout(flushSyncQueue,2000);});
 setInterval(()=>{if(navigator.onLine) flushSyncQueue();},60000);
 
 // ── Absolute time helpers ────────────────────────────────────
+// The wedding runs on IST regardless of the device's timezone, so "today" and guest
+// timestamps are anchored to IST (UTC+5:30) instead of UTC / device-local time.
+function todayIST(){ return new Date(Date.now()+5.5*3600000).toISOString().slice(0,10); }
+function guestMs(date,time){ return new Date(`${date}T${time}:00+05:30`).getTime(); }
 function toAbsoluteMs(date,time){
   if(!date||!time) return NaN;
   return new Date(date+'T'+time+':00').getTime();
@@ -828,6 +847,12 @@ function saveToCache() {
     } catch(e) { console.warn('Failed to save to cache:', e); }
   }, 2000);
 }
+
+window.addEventListener('pagehide',()=>{try{
+  localStorage.setItem(CACHE_KEY_GUESTS,JSON.stringify(allGuests));
+  localStorage.setItem(CACHE_KEY_DRIVERS,JSON.stringify(allDrivers));
+  localStorage.setItem(CACHE_KEY_TS,Date.now().toString());
+}catch(e){}});
 
 // Derive driver assignment status from the active guest list (source of truth)
 // FEATURE (assign 2 cars to one large group): split state + handlers.
@@ -869,8 +894,6 @@ async function confirmSplitGroup(){
     // coordinator may already have the right-size car for the SMALLER remaining group;
     // if not, they can reassign it via the inline driver select same as any other guest.
     const updatedOriginal = {...g, pax: remainCount};
-    await apiPost({action:'updateGuest', data: sanitizeDataForSheet(updatedOriginal)});
-    allGuests[idx] = updatedOriginal;
 
     // New split-off entry: identical journey/ticket details, but pax is the moved-off count
     // and driver/car fields are intentionally blank — this half needs its OWN assignment,
@@ -884,7 +907,13 @@ async function confirmSplitGroup(){
     const newGroupData = {...g, pax: moveCount, driver_name:'', driver_phone:'', car_type:'', car_no:'',
       pnr:'', group_name: g.group_name + ' (Split)'};
     delete newGroupData.group_id;
+    // Create the new entry FIRST (it can't be queued offline, so a failure here changes nothing),
+    // and only then shrink the original. Previously the original was shrunk first, so an offline
+    // failure on the second step lost the split-off passengers.
     const res = await apiPost({action:'addGuest', data: sanitizeDataForSheet(newGroupData)});
+    await apiPost({action:'updateGuest', data: sanitizeDataForSheet(updatedOriginal)});
+    const idx2 = allGuests.findIndex(x=>x.group_id===g.group_id);
+    if(idx2>=0) allGuests[idx2] = updatedOriginal;
     newGroupData.group_id = res.group_id;
     newGroupData.status='active'; newGroupData.dispatched='no'; newGroupData.dropped_off='no';
     newGroupData.car_returned='no'; newGroupData.deleted='no'; newGroupData.live_status_text='';
@@ -936,8 +965,7 @@ async function mergeSplitBack(groupId){
     if(pIdx>=0) allGuests[pIdx]=updatedParent;
 
     await apiPost({action:'deleteGuest', group_id: g.group_id});
-    const gIdx = allGuests.findIndex(x=>x.group_id===g.group_id);
-    if(gIdx>=0) allGuests[gIdx].deleted='yes';
+    allGuests = allGuests.filter(x=>x.group_id!==g.group_id);
 
     saveToCache();
     syncDriverAssignment();
@@ -1052,7 +1080,7 @@ async function assignDriverToGuestFromCard(driverName, groupId){
 }
 
 // ── State ─────────────────────────────────────────────────────
-let SCRIPT_URL='',GEMINI_KEY='',WEDDING_CITY='',HUBS=[];
+let WEDDING_CITY='',HUBS=[];
 let allGuests=[],allDrivers=[];
 let activeTab='all',editingId=null,completedOpen=false;
 // FEATURE (dashboard filters): multi-select Sets for pax/station/status, independent of
@@ -1082,18 +1110,16 @@ let pendingTicketFile=null;
 // should be the guest's point of contact for pickup/drop issues. Kept as a single named
 // constant (rather than hardcoded inline in the message string) so it's easy to find and
 // update without hunting through openWhatsApp().
-const COORDINATOR_NAME = 'Rohit';
+const COORDINATOR_NAME = 'Aman';
 const COORDINATOR_PHONE = '9876500000'; // 10-digit, no country code
 // Personal details carried over between round trip legs
 let rtPersonal={};
 
 // ── Boot ──────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded',()=>{
-  SCRIPT_URL=localStorage.getItem('wgt_script_url')||'';
-  GEMINI_KEY=localStorage.getItem('wgt_gemini_key')||'';
   WEDDING_CITY=(localStorage.getItem('wgt_wedding_city')||'').trim();
   HUBS=JSON.parse(localStorage.getItem('wgt_hubs')||'[]');
-  if(SCRIPT_URL&&GEMINI_KEY&&WEDDING_CITY) launchApp();
+  if(WEDDING_CITY) launchApp();
   else {
     document.getElementById('screen-setup').style.display='flex';
     document.getElementById('setup-wedding-city').value=WEDDING_CITY;
@@ -1101,16 +1127,12 @@ window.addEventListener('DOMContentLoaded',()=>{
 });
 
 async function saveSetup(){
-  const url=document.getElementById('setup-script-url').value.trim();
-  const key=document.getElementById('setup-gemini-key').value.trim();
   const city=document.getElementById('setup-wedding-city').value.trim();
-  if(!url||!key||!city){showToast('Please fill all fields','error');return;}
+  if(!city){showToast('Please enter the wedding city','error');return;}
   
   showLoading(true);
-  localStorage.setItem('wgt_script_url',url);
-  localStorage.setItem('wgt_gemini_key',key);
   localStorage.setItem('wgt_wedding_city',city);
-  SCRIPT_URL=url;GEMINI_KEY=key;WEDDING_CITY=city;
+  WEDDING_CITY=city;
 
   // Auto-fetch hubs if none exist or city changed
   if(!HUBS.length || city !== (localStorage.getItem('wgt_last_fetched_city')||'').trim()){
@@ -1140,6 +1162,7 @@ async function refreshHubs(city){
   }
 }
 async function launchApp(){
+  if(!SCRIPT_URL) showToast('Set SCRIPT_URL at the top of index.html to connect to your sheet','error');
   document.getElementById('screen-setup').style.display='none';
   document.getElementById('app').style.display='flex';
   await initAndLoad();
@@ -1207,13 +1230,29 @@ async function apiGet(a){
   if(data&&data.error) throw new Error('Sheet error: '+data.error);
   return data;
 }
+const SYNC_QUEUEABLE=new Set(['updateGuest','updateGuestStatus','updateLiveStatus','deleteGuest']);
 async function apiPost(p){
   if(!SCRIPT_URL) return {};
   try{
     return await apiPostRaw(p);
   }catch(e){
     // Queue for retry if offline or timeout
-    enqueueSyncAction(p);
+    // Only queue network/timeout failures. A server-side rejection (e.g. 'Guest not found')
+    // will fail the same way every retry, so queueing it just leaves a stuck pending badge.
+    //
+    // Offline behaviour:
+    //  - Idempotent edits (status toggles, updates, deletes, live status) are queued AND treated
+    //    as saved locally: we resolve instead of throwing, so the optimistic on-screen change is
+    //    kept and matches what will be written once we're back online. (Previously the screen
+    //    reverted while the queue still applied the change later, so the two disagreed.)
+    //  - addGuest / saveTicket are NEVER queued: a lost reply could otherwise create duplicate
+    //    guests when the queue replays, and addGuest needs the server-issued id anyway. They
+    //    throw so the form stays open and the user can retry.
+    if(!/^Sheet error:/.test(e.message||'') && SYNC_QUEUEABLE.has(p.action)){
+      enqueueSyncAction(p);
+      showToast('You are offline. Change kept on this device and will sync automatically.','');
+      return {queued:true};
+    }
     throw e;
   }
 }
@@ -1240,8 +1279,8 @@ async function initAndLoad(){
     const pData = Promise.all([apiGet('getGuests'),apiGet('getDrivers')]);
     
     const [g,d] = await pData;
-    if(g && g.guests && g.guests.length) allGuests=g.guests.filter(x=>!isDeleted(x)).map(sanitizeGuest);
-    if(d && d.drivers && d.drivers.length) allDrivers=d.drivers;
+    if(g && Array.isArray(g.guests)) allGuests=g.guests.filter(x=>!isDeleted(x)).map(sanitizeGuest);
+    if(d && Array.isArray(d.drivers)) allDrivers=d.drivers;
     
     syncDriverAssignment();
     saveToCache();
@@ -1255,7 +1294,7 @@ async function initAndLoad(){
     if(allGuests.length) {
       showToast('Offline Mode: Showing cached data', 'error');
     } else {
-      showToast(e.message||'Cannot connect. Check your Apps Script URL.','error');
+      showToast(e.message||'Cannot connect. Check SCRIPT_URL at the top of index.html.','error');
     }
   }
   showLoading(false);
@@ -1361,16 +1400,18 @@ function journeyType(g){
   return 'arrival';
 }
 // Extract meaningful words (4+ chars) from a location string, stripping codes like (HWH)
+const LOC_STOPWORDS=new Set(['junction','station','airport','railway','central','terminus','international','domestic','cantt','road','city']);
 function locationWords(str){
   return (str||'').toLowerCase()
     .replace(/\([^)]*\)/g,'')   // remove (HWH), (MZP) etc
     .replace(/[^a-z\s]/g,' ')   // remove non-alpha
     .split(/\s+/)
-    .filter(w=>w.length>=4);    // only words 4+ chars
+    .filter(w=>w.length>=4 && !LOC_STOPWORDS.has(w));    // only words 4+ chars, skipping generic ones like 'junction'
 }
 function hubMatch(str){
   // Full substring check first (fast path)
-  const s=(str||'').toLowerCase();
+  const s=(str||'').toLowerCase().trim();
+  if(s.length<3) return null; // empty/very short strings must never match every hub
   for(const k of HUBS){
     const h=k.toLowerCase();
     if(s.includes(h)||h.includes(s)) return k;
@@ -1411,8 +1452,9 @@ function mapToStation(str, type){
   }
 
   // 3. Fallback: ask Gemini to pick the best match from our list
-  // (Optional, for now just return first or empty)
-  return HUBS[0] || '';
+  // No confident match: leave it blank so the coordinator picks it, instead of silently
+  // pre-filling the first hub in the list (which would often be the wrong station).
+  return '';
 }
 
 // ── Time helpers (string-based, no Date object) ───────────────
@@ -1442,7 +1484,10 @@ function renderDashboard(){
 }
 
 function _renderDashboardInternal(){
-  screen('dashboard');
+  // NOTE: deliberately does NOT call screen('dashboard'). Re-rendering the dashboard in the
+  // background (after assigning a driver from the Drivers screen, when data finishes
+  // loading, after saving Settings...) must not yank the user off whichever screen they're
+  // on. Navigation to the dashboard is done explicitly via showDashboard().
   buildDateTabs();
   renderFilterBar();
   buildMultiTrainBanner();
@@ -1460,7 +1505,7 @@ function _renderDashboardInternal(){
   });
 
   // Group by date for dividers — each date gets its own full-width label + fresh grid
-  const today=new Date().toISOString().slice(0,10);
+  const today=todayIST();
   // Build date → guests map preserving sort order
   const dateMap=new Map();
   active.forEach(g=>{
@@ -1510,7 +1555,7 @@ function buildMultiTrainBanner(){
   multi.forEach((gr,i)=>{ _multiTrainGroups[gr.num] = gr.guests.map(g=>g.group_id); });
   const items=multi.map(gr=>
     `<span class="mt-item"><strong>${gr.name||gr.num}</strong> ${gr.num} — ${gr.guests.length} groups, ${gr.totalPax} pax
-      <button class="mt-view-btn" onclick="viewMultiTrainGroup('${esc(gr.num)}')">👁 View</button></span>`
+      <button class="mt-view-btn" data-num="${esc(gr.num)}" onclick="viewMultiTrainGroup(this.dataset.num)">👁 View</button></span>`
   ).join(' &nbsp;·&nbsp; ');
   sec.innerHTML=`<div class="multi-train-banner">
     <span class="mt-icon">ℹ️</span>
@@ -1606,7 +1651,7 @@ function filterDropdownHtml(key,label,options,selectedSet,showSearch,icon){
       <div class="fd-options">
         ${visibleOptions.length?visibleOptions.map(o=>`
           <label class="fd-option">
-            <input type="checkbox" ${selectedSet.has(o.value)?'checked':''} onchange="toggleFilterOption('${key}','${esc(o.value)}')">
+            <input type="checkbox" ${selectedSet.has(o.value)?'checked':''} data-val="${esc(o.value)}" onchange="toggleFilterOption('${key}',this.dataset.val)">
             <span>${esc(o.label)}</span>
           </label>`).join(''):'<div class="fd-empty">No options</div>'}
       </div>
@@ -1688,7 +1733,7 @@ function filteredGuests(){
 function isPriority(g){
   if(g.driver_name) return false;
   if(!g.arrival_date||!g.arrival_time) return false;
-  const ms=new Date(g.arrival_date+'T'+g.arrival_time+':00').getTime();
+  const ms=guestMs(g.arrival_date,g.arrival_time);
   const diff=(ms-Date.now())/60000;
   return diff>=0&&diff<=180;
 }
@@ -1728,7 +1773,7 @@ function tripStage(g){
 
 function buildDateTabs(){
   const dates=[...new Set(allGuests.filter(g=>g.status!=='picked_up'&&g.status!=='car_returned'&&g.deleted!=='yes').map(g=>g.arrival_date).filter(Boolean))].sort();
-  const today=new Date().toISOString().slice(0,10);
+  const today=todayIST();
   const tabs=[{val:'all',label:'All Days'},...dates.map(d=>({val:d,label:d===today?'Today':fmtDate(d)}))];
   document.getElementById('date-tabs').innerHTML=tabs.map(t=>
     `<button class="date-tab${activeTab===t.val?' active':''}" onclick="setTab('${t.val}')">${t.label}</button>`
@@ -1848,7 +1893,7 @@ document.getElementById('pooling-confirm-btn').addEventListener('click',async()=
     await apiPost({action:'updateGuest',data:sanitizeDataForSheet(updated)});
     const idx=allGuests.findIndex(g=>g.group_id===tgt.group_id);
     if(idx>=0) allGuests[idx]={...allGuests[idx],...updated};
-    saveToCache();
+    syncDriverAssignment();saveToCache();
     closePoolingModal();renderDashboard();
     showToast('Driver assigned to '+tgt.group_name+' ✓','success');
   }catch(e){showToast(e.message||'Save failed. Please retry.','error');}
@@ -1877,7 +1922,7 @@ function renderCard(g, isCompleted){
   const stageBadge=`<span class="trip-stage-badge ${stageInfo.cls}">${stageInfo.icon} ${esc(stageInfo.label)}</span>`;
   const soonBadge=(()=>{
     if(!g.arrival_date||!g.arrival_time||!g.driver_name) return '';
-    const ms=new Date(g.arrival_date+'T'+g.arrival_time+':00').getTime();
+    const ms=guestMs(g.arrival_date,g.arrival_time);
     const mins=(ms-Date.now())/60000;
     return mins>=0&&mins<=180?'<span class="soon-badge">🕐 Soon</span>':'';
   })();
@@ -1961,7 +2006,7 @@ function renderCard(g, isCompleted){
       <div class="live-status-box" id="ls-${g.group_id}">
         <span class="ls-icon">📡</span>
         <div class="ls-text">
-          <div>${g.live_status_text||'No status yet. Tap Refresh to check.'}</div>
+          <div>${g.live_status_text?esc(g.live_status_text):'No status yet. Tap Refresh to check.'}</div>
           ${g.last_refreshed?`<div class="ls-timestamp">Last checked: ${fmtTs(g.last_refreshed)}</div>`:''}
         </div>
       </div>
@@ -1972,7 +2017,7 @@ function renderCard(g, isCompleted){
         ${(parseInt(g.pax)||0)>1?`<button class="btn btn-secondary btn-sm" onclick="openSplitGroupModal('${g.group_id}')" title="Split this group across two cars">✂️ Split</button>`:''}
         ${g.group_name&&g.group_name.endsWith(' (Split)')?`<button class="btn btn-secondary btn-sm" onclick="mergeSplitBack('${g.group_id}')" title="Undo split — merge back into the original entry">🔗 Merge Back</button>`:''}
         <button class="btn btn-secondary btn-sm" onclick="editGuest('${g.group_id}')">✏️ Edit</button>
-        <button class="btn btn-danger btn-sm" onclick="confirmDelete('${g.group_id}','${esc(g.group_name)}')">🗑️ Delete</button>
+        <button class="btn btn-danger btn-sm" onclick="confirmDelete('${g.group_id}')">🗑️ Delete</button>
       </div>
       ${renderTicketSection(g.group_id)}
     </div>
@@ -2574,9 +2619,10 @@ async function markActive(id){
 }
 
 // ── Delete ────────────────────────────────────────────────────
-function confirmDelete(id,name){
+function confirmDelete(id){
+  const gd=allGuests.find(x=>x.group_id===id);
   deletePendingId=id;
-  document.getElementById('delete-guest-name').textContent=name;
+  document.getElementById('delete-guest-name').textContent=gd?gd.group_name:'this guest';
   document.getElementById('delete-modal').classList.add('open');
 }
 function closeDeleteModal(){document.getElementById('delete-modal').classList.remove('open');deletePendingId=null;}
@@ -2683,7 +2729,7 @@ function driverCard(driver,groups,idx){
     <div class="driver-card-body">${assignmentHtml}</div>
     <div class="driver-assign-guest">
       <select id="assign-sel-${idx}">${eligibleGuestOptionsHtml()}</select>
-      <button class="btn btn-primary btn-sm" onclick="assignDriverToGuestFromCard('${esc(driver.driver_name)}', document.getElementById('assign-sel-${idx}').value)">+ Assign</button>
+      <button class="btn btn-primary btn-sm" data-driver="${esc(driver.driver_name)}" onclick="assignDriverToGuestFromCard(this.dataset.driver, document.getElementById('assign-sel-${idx}').value)">+ Assign</button>
     </div>
   </div>`;
 }
@@ -3222,6 +3268,7 @@ document.getElementById('cleanup-confirm-btn').addEventListener('click', async()
       deleted++;
     }catch(e){ failed++; }
   }
+  syncDriverAssignment();
   saveToCache();
   detectExistingDuplicates();
   renderDashboard();
@@ -3250,7 +3297,7 @@ function checkConflict(data){
     if(g.pickup_location !== data.pickup_location) return true;
     
     // If SAME station: arrival+departure back-to-back is OK
-    if(g.journey_type !== data.journey_type) return false;
+    if((g.journey_type||'arrival') !== (data.journey_type||'arrival')) return false;
     
     return true;
   });
@@ -3516,7 +3563,7 @@ async function extractTicketLegs(b64, mime){
       pnr:leg.pnr||'',journey_origin:leg.journey_origin||'',
       journey_destination:leg.journey_destination||'',
       arrival_date:date||'',arrival_time:time||'',
-      pickup_location:station || (HUBS[0] || ''),
+      pickup_location:station || '',
       individual_names:leg.individual_names||'',
       pax:leg.pax||1,group_name:firstName||''
     };
@@ -3541,6 +3588,9 @@ async function handleFileUpload(event){
       showLoading(false);return;
     }
 
+    if(processedLegs.some(l=>!l.pickup_location)){
+      setTimeout(()=>showToast('Could not match the station from the ticket — please pick it from the list','error'),1800);
+    }
     if(processedLegs.length===1){
       // Single leg — fill form directly
       const leg=processedLegs[0];
@@ -3694,7 +3744,7 @@ async function callGeminiFile(prompt,b64,mime){
     console.warn('callGeminiFile primary failed, trying fallback model:',e1.message);
     try{
       const r=await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`,
         {method:'POST',headers:{'Content-Type':'application/json'},body}
       );
       const d=await r.json();
@@ -3708,7 +3758,7 @@ async function callGeminiFile(prompt,b64,mime){
 
 // ── Summary ───────────────────────────────────────────────────
 function openSummaryModal(){
-  const today=new Date().toISOString().slice(0,10);
+  const today=todayIST();
   const active=allGuests.filter(g=>g.status!=='picked_up'&&g.status!=='car_returned'&&!isDeleted(g));
   const arrivals=active.filter(g=>journeyType(g)==='arrival');
   const deps=active.filter(g=>journeyType(g)==='departure');
@@ -3732,8 +3782,6 @@ function openSummaryModal(){
 
 // ── Settings ──────────────────────────────────────────────────
 function openSettings(){
-  document.getElementById('settings-script-url').value=SCRIPT_URL;
-  document.getElementById('settings-gemini-key').value=GEMINI_KEY;
   document.getElementById('settings-wedding-city').value=WEDDING_CITY;
   document.getElementById('settings-hubs').value=HUBS.join('\n');
   document.getElementById('settings-modal').classList.add('open');
@@ -3749,20 +3797,16 @@ async function onCityChange(){
   showToast('Hubs refreshed for '+city, 'success');
 }
 async function saveSettings(){
-  const url=document.getElementById('settings-script-url').value.trim();
-  const key=document.getElementById('settings-gemini-key').value.trim();
   const city=document.getElementById('settings-wedding-city').value.trim();
   const hubsRaw=document.getElementById('settings-hubs').value.trim();
   
-  if(!url||!key||!city){showToast('Fields required','error');return;}
+  if(!city){showToast('City is required','error');return;}
   
   const newHubs = hubsRaw.split('\n').map(s=>s.trim()).filter(Boolean);
   const cityChanged = city !== WEDDING_CITY;
   
-  localStorage.setItem('wgt_script_url',url);
-  localStorage.setItem('wgt_gemini_key',key);
   localStorage.setItem('wgt_wedding_city',city);
-  SCRIPT_URL=url;GEMINI_KEY=key;WEDDING_CITY=city;
+  WEDDING_CITY=city;
   
   // Only fetch hubs if city changed AND differs from last fetched city
   if(cityChanged && city !== (localStorage.getItem('wgt_last_fetched_city')||'').trim()){

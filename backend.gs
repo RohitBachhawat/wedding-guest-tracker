@@ -53,7 +53,7 @@ function doGet(e) {
   } catch(err) { return cors({ error: err.message }); }
 }
 
-function doPost(e) {
+function handlePost(e) {
   try {
     var payload = JSON.parse(e.postData.contents);
     var action  = payload.action;
@@ -66,6 +66,13 @@ function doPost(e) {
     if (action === "initSheet")         return cors(initSheet());
     return cors({ error: "Unknown action" });
   } catch(err) { return cors({ error: err.message }); }
+}
+
+// Serialise all writes so two people tapping at once can't overwrite each other's rows
+function doPost(e) {
+  var lock = LockService.getScriptLock();
+  try { lock.waitLock(20000); } catch (err) { return cors({ error: "Server busy, please retry" }); }
+  try { return handlePost(e); } finally { lock.releaseLock(); }
 }
 
 function initSheet() {
@@ -182,7 +189,7 @@ function getDrivers() {
 function addGuest(data) {
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME_GUESTS);
   if (!sheet) return { error: "Guests sheet not found. Run initSheet first." };
-  data.group_id       = "G" + Date.now();
+  data.group_id       = "G" + Date.now() + Math.floor(Math.random() * 1000);
   data.status         = "active";
   data.journey_type   = data.journey_type || "arrival";
   data.dispatched     = "no";
@@ -214,6 +221,12 @@ function updateGuestStatus(group_id, field, value) {
   if (!rowIndex) return { error: "Guest not found" };
   var colIndex = GUEST_HEADERS.indexOf(field) + 1;
   if (colIndex === 0) return { error: "Field not found: " + field };
+  // Removing a ticket: also trash the Drive file so it doesn't stay behind (publicly viewable by link)
+  if (field === "ticket_url" && !value) {
+    var oldUrl = sheet.getRange(rowIndex, colIndex).getValue();
+    var m = String(oldUrl || "").match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (m) { try { DriveApp.getFileById(m[1]).setTrashed(true); } catch (e) { /* already gone */ } }
+  }
   sheet.getRange(rowIndex, colIndex).setValue(value);
   return { success: true };
 }
@@ -245,6 +258,8 @@ function deleteGuest(group_id) {
       if (m) DriveApp.getFileById(m[1]).setTrashed(true);
     } catch(e) { /* already gone or no access */ }
   }
+  // The Drive file is trashed above, so clear the now-dead link as well
+  sheet.getRange(rowIndex, ticketCol).setValue("");
   var colIndex = GUEST_HEADERS.indexOf("deleted") + 1;
   sheet.getRange(rowIndex, colIndex).setValue("yes");
   return { success: true };
@@ -254,7 +269,7 @@ function findGuestRow(sheet, group_id) {
   if (!sheet || sheet.getLastRow() <= 1) return null;
   var ids = sheet.getRange(2, 1, sheet.getLastRow()-1, 1).getValues();
   for (var i = 0; i < ids.length; i++) {
-    if (ids[i][0] === group_id) return i + 2;
+    if (String(ids[i][0]).trim() === String(group_id).trim()) return i + 2;
   }
   return null;
 }
