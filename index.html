@@ -498,6 +498,11 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
       <textarea id="settings-hubs" rows="5" placeholder="Railway Station A&#10;Airport B"></textarea>
       <div style="font-size:11px;color:var(--text-2);margin-top:4px">These appear in the dropdowns. Changing city will auto-refresh these.</div>
     </div>
+    <div class="form-group">
+      <label>Connection check</label>
+      <button type="button" class="btn btn-secondary" onclick="runConnectionTest()">Test connection</button>
+      <div id="conn-test-result" style="margin-top:8px;font-size:12px;line-height:1.6;color:var(--text-2)"></div>
+    </div>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="document.getElementById('settings-modal').classList.remove('open')">Cancel</button>
       <button class="btn btn-primary" onclick="saveSettings()">Save</button>
@@ -675,8 +680,8 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
 // ── Config ────────────────────────────────────────────────────
 // ── Credentials (edit these two lines, then reload) ───────────
 // Paste your Google Apps Script Web App URL and your Gemini API key between the quotes.
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwS7VzGKiVnGL2Pvo3f1heTgf1XvIRy4jPP3ToeQcaIYkchED47VyAroOrubDc7QzwY_g/exec';   // e.g. 'https://script.google.com/macros/s/XXXX/exec'
-const GEMINI_KEY = 'AIzaSyCnxVkUK5mQxwQAoxDKOt2-ekvVWwkKbe8';   // e.g. 'AIza...'
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwS7VzGKiVnGL2Pvo3f1heTgf1XvIRy4jPP3ToeQcaIYkchED47VyAroOrubDc7QzwY_g/exec';
+const GEMINI_KEY = 'AIzaSyCnxVkUK5mQxwQAoxDKOt2-ekvVWwkKbe8';
 
 const TRAVEL_MINS   = 90;
 const CONFLICT_MINS = 120;
@@ -1158,7 +1163,8 @@ async function refreshHubs(city){
     }
   } catch(e) {
     console.error('Hub fetch failed:', e);
-    showToast('Could not auto-fetch hubs. Please add them in Settings.', 'error');
+    const why = (e instanceof SyntaxError) ? 'Gemini returned an unexpected reply.' : String(e.message||e).slice(0,140);
+    showToast('Could not auto-fetch hubs: '+why+' You can add them in Settings (and use "Test connection" there).', 'error');
   }
 }
 async function launchApp(){
@@ -1211,22 +1217,40 @@ async function fetchWithTimeout(url,options={},timeoutMs=35000){
 }
 
 // CORS-safe POST: use text/plain to avoid OPTIONS preflight on GAS
+// Turn low-level browser errors into something the coordinator can act on.
+function explainBackendError(e){
+  const m=String((e&&e.message)||e||'');
+  if(/^Sheet error:/.test(m)) return m;
+  if(/timed out/i.test(m)) return 'The Apps Script took too long to respond. Try again.';
+  if(/Unexpected token|not valid JSON|JSON/i.test(m)) return 'The Apps Script returned a web page instead of data. Usually the deployment is not set to "Execute as: Me / Who has access: Anyone", it needs re-authorizing (run initSheet once in the Apps Script editor), or SCRIPT_URL is the /dev test URL instead of the /exec URL.';
+  if(/Failed to fetch|NetworkError|Load failed/i.test(m)) return 'Cannot reach the Apps Script. Check your internet, that SCRIPT_URL is the /exec Web App URL, and that access is set to Anyone.';
+  return m;
+}
+async function backendJson(r){
+  try{ return await r.json(); }
+  catch(e){ throw new Error(explainBackendError(e)); }
+}
 async function apiPostRaw(p){
   if(!SCRIPT_URL) return {};
-  const r=await fetchWithTimeout(SCRIPT_URL,{
-    method:'POST',
-    headers:{'Content-Type':'text/plain;charset=utf-8'},
-    body:JSON.stringify(p)
-  });
-  const data=await r.json();
+  let r;
+  try{
+    r=await fetchWithTimeout(SCRIPT_URL,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify(p)
+    });
+  }catch(e){ throw new Error(explainBackendError(e)); }
+  const data=await backendJson(r);
   if(data&&data.error) throw new Error('Sheet error: '+data.error);
   return data;
 }
 
 async function apiGet(a){
   if(!SCRIPT_URL) return {};
-  const r=await fetchWithTimeout(SCRIPT_URL+'?action='+a);
-  const data=await r.json();
+  let r;
+  try{ r=await fetchWithTimeout(SCRIPT_URL+'?action='+a); }
+  catch(e){ throw new Error(explainBackendError(e)); }
+  const data=await backendJson(r);
   if(data&&data.error) throw new Error('Sheet error: '+data.error);
   return data;
 }
@@ -1248,7 +1272,7 @@ async function apiPost(p){
     //  - addGuest / saveTicket are NEVER queued: a lost reply could otherwise create duplicate
     //    guests when the queue replays, and addGuest needs the server-issued id anyway. They
     //    throw so the form stays open and the user can retry.
-    if(!/^Sheet error:/.test(e.message||'') && SYNC_QUEUEABLE.has(p.action)){
+    if(!/^Sheet error:/.test(e.message||'') && SYNC_QUEUEABLE.has(p.action)){ // network / timeout / non-JSON
       enqueueSyncAction(p);
       showToast('You are offline. Change kept on this device and will sync automatically.','');
       return {queued:true};
@@ -1292,7 +1316,7 @@ async function initAndLoad(){
   }catch(e){
     console.error('initAndLoad error:',e);
     if(allGuests.length) {
-      showToast('Offline Mode: Showing cached data', 'error');
+      showToast('Offline Mode: showing cached data. '+(e.message||''), 'error');
     } else {
       showToast(e.message||'Cannot connect. Check SCRIPT_URL at the top of index.html.','error');
     }
@@ -3625,7 +3649,7 @@ async function handleFileUpload(event){
     }
   }catch(err){
     console.error('Extraction error:',err);
-    showToast('Extraction failed — please fill in manually','error');
+    showToast('Extraction failed: '+(err.message||'unknown error')+' — you can still fill in manually','error');
   }
   showLoading(false);
   event.target.value='';
@@ -3706,7 +3730,11 @@ function closeJTMismatchModal(){
 }
 
 // ── Gemini ────────────────────────────────────────────────────
+function requireGeminiKey(){
+  if(!GEMINI_KEY) throw new Error('Gemini API key is not set. Paste it into GEMINI_KEY at the top of index.html.');
+}
 async function callGemini(prompt){
+  requireGeminiKey();
   try{
     const r=await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${GEMINI_KEY}`,
@@ -3720,7 +3748,7 @@ async function callGemini(prompt){
   }catch(e1){
     console.warn('Gemini search fallback:',e1.message);
     const r=await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${GEMINI_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`,
       {method:'POST',headers:{'Content-Type':'application/json'},
        body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})}
     );
@@ -3729,6 +3757,7 @@ async function callGemini(prompt){
   }
 }
 async function callGeminiFile(prompt,b64,mime){
+  requireGeminiKey();
   const body=JSON.stringify({contents:[{parts:[{inline_data:{mime_type:mime,data:b64}},{text:prompt}]}]});
   // First attempt: primary model
   try{
@@ -3751,9 +3780,39 @@ async function callGeminiFile(prompt,b64,mime){
       if(d.error) throw new Error(d.error.message);
       return d.candidates?.[0]?.content?.parts?.[0]?.text||'{}';
     }catch(e2){
-      throw new Error('Extraction failed on all models: '+e2.message);
+      throw new Error('Gemini request failed ('+e2.message+'). Check GEMINI_KEY and that the Gemini API is enabled for it.');
     }
   }
+}
+
+// ── Connection test (Settings) ────────────────────────────────
+async function runConnectionTest(){
+  const out=document.getElementById('conn-test-result');
+  const line=(ok,t)=>`<div>${ok?'✅':'❌'} ${esc(t)}</div>`;
+  out.innerHTML='Testing…';
+  let html='';
+  // 1. Apps Script
+  if(!SCRIPT_URL){ html+=line(false,'SCRIPT_URL is empty. Paste your Web App URL (ending in /exec) at the top of index.html.'); }
+  else{
+    try{
+      const g=await apiGet('getGuests');
+      html+=line(true,'Apps Script reachable ('+((g.guests||[]).length)+' guests in the sheet)');
+    }catch(e){ html+=line(false,'Apps Script: '+explainBackendError(e)); }
+  }
+  // 2. Gemini
+  if(!GEMINI_KEY){ html+=line(false,'GEMINI_KEY is empty. Paste your API key at the top of index.html.'); }
+  else{
+    const tryModel=async(model)=>{
+      const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`,
+        {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:'Reply with the word OK'}]}]})});
+      const d=await r.json(); if(d.error) throw new Error(d.error.message); return true;
+    };
+    for(const model of ['gemini-3.1-flash-lite-preview','gemini-2.5-flash']){
+      try{ await tryModel(model); html+=line(true,'Gemini key works with '+model); }
+      catch(e){ html+=line(false,'Gemini '+model+': '+String(e.message||e).slice(0,160)); }
+    }
+  }
+  out.innerHTML=html;
 }
 
 // ── Summary ───────────────────────────────────────────────────
