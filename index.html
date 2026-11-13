@@ -678,10 +678,10 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
 
 <script>
 // ── Config ────────────────────────────────────────────────────
-// ── Credentials (edit these two lines, then reload) ───────────
-// Paste your Google Apps Script Web App URL and your Gemini API key between the quotes.
+// ── Connection (edit this line, then reload) ──────────────────
+// Paste your Google Apps Script Web App URL between the quotes.
+// (The Gemini API key goes in the Apps Script's private Script properties, NOT in this file.)
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwS7VzGKiVnGL2Pvo3f1heTgf1XvIRy4jPP3ToeQcaIYkchED47VyAroOrubDc7QzwY_g/exec';
-const GEMINI_KEY = 'AIzaSyCnxVkUK5mQxwQAoxDKOt2-ekvVWwkKbe8';
 
 const TRAVEL_MINS   = 90;
 const CONFLICT_MINS = 120;
@@ -2297,7 +2297,7 @@ async function attachTicket(id, input){
     // guest's journey_type), date, and time must match; name is fuzzy-matched at an 80%
     // similarity threshold since ticket OCR/name spelling often has minor variations
     // (initials, honorifics, transliteration differences) that shouldn't trigger a false flag.
-    if(g && GEMINI_KEY){
+    if(g){
       try{
         const {b64:cb64,mime:cmime}=await compressIfNeeded(file);
         const legs=await extractTicketLegs(cb64,cmime);
@@ -3729,58 +3729,42 @@ function closeJTMismatchModal(){
   jtMismatchPendingData = null;
 }
 
-// ── Gemini ────────────────────────────────────────────────────
-function requireGeminiKey(){
-  if(!GEMINI_KEY) throw new Error('Gemini API key is not set. Paste it into GEMINI_KEY at the top of index.html.');
+// ── Gemini (via your Apps Script) ─────────────────────────────
+// The Gemini API key is NOT in this file. It lives in the Apps Script's private "Script
+// properties" (GEMINI_API_KEY) and the Apps Script calls Gemini for us. This keeps the key out
+// of the public GitHub page, where Google's scanners find and disable it ("reported as leaked").
+async function geminiRequest(model, body){
+  if(!SCRIPT_URL) throw new Error('SCRIPT_URL is not set at the top of index.html.');
+  let res;
+  try{ res = await apiPostRaw({action:'gemini', model, body}); }
+  catch(e){ throw new Error(String(e.message||e).replace(/^Sheet error:\s*/,'')); }
+  return res.result;
 }
+function geminiText(d, fallback){ return d?.candidates?.[0]?.content?.parts?.[0]?.text || fallback; }
+
 async function callGemini(prompt){
-  requireGeminiKey();
   try{
-    const r=await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${GEMINI_KEY}`,
-      {method:'POST',headers:{'Content-Type':'application/json'},
-       body:JSON.stringify({contents:[{parts:[{text:prompt}]}],tools:[{google_search:{}}]})}
-    );
-    const d=await r.json();
-    if(d.error) throw new Error(d.error.message);
-    const text=d.candidates?.[0]?.content?.parts?.[0]?.text||'';
-    if(text) return text;throw new Error('Empty');
+    const d=await geminiRequest('gemini-3.1-flash-lite-preview',{contents:[{parts:[{text:prompt}]}],tools:[{google_search:{}}]});
+    const text=geminiText(d,'');
+    if(text) return text; throw new Error('Empty');
   }catch(e1){
     console.warn('Gemini search fallback:',e1.message);
-    const r=await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`,
-      {method:'POST',headers:{'Content-Type':'application/json'},
-       body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})}
-    );
-    const d=await r.json();if(d.error) throw new Error(d.error.message);
-    return d.candidates?.[0]?.content?.parts?.[0]?.text||'No response';
+    const d=await geminiRequest('gemini-2.5-flash',{contents:[{parts:[{text:prompt}]}]});
+    return geminiText(d,'No response');
   }
 }
 async function callGeminiFile(prompt,b64,mime){
-  requireGeminiKey();
-  const body=JSON.stringify({contents:[{parts:[{inline_data:{mime_type:mime,data:b64}},{text:prompt}]}]});
+  const body={contents:[{parts:[{inline_data:{mime_type:mime,data:b64}},{text:prompt}]}]};
   // First attempt: primary model
   try{
-    const r=await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${GEMINI_KEY}`,
-      {method:'POST',headers:{'Content-Type':'application/json'},body}
-    );
-    const d=await r.json();
-    if(d.error) throw new Error(d.error.message);
-    return d.candidates?.[0]?.content?.parts?.[0]?.text||'{}';
+    return geminiText(await geminiRequest('gemini-3.1-flash-lite-preview',body),'{}');
   }catch(e1){
     // Fallback: secondary model
     console.warn('callGeminiFile primary failed, trying fallback model:',e1.message);
     try{
-      const r=await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`,
-        {method:'POST',headers:{'Content-Type':'application/json'},body}
-      );
-      const d=await r.json();
-      if(d.error) throw new Error(d.error.message);
-      return d.candidates?.[0]?.content?.parts?.[0]?.text||'{}';
+      return geminiText(await geminiRequest('gemini-2.5-flash',body),'{}');
     }catch(e2){
-      throw new Error('Gemini request failed ('+e2.message+'). Check GEMINI_KEY and that the Gemini API is enabled for it.');
+      throw new Error('Gemini request failed ('+e2.message+')');
     }
   }
 }
@@ -3792,25 +3776,15 @@ async function runConnectionTest(){
   out.innerHTML='Testing…';
   let html='';
   // 1. Apps Script
-  if(!SCRIPT_URL){ html+=line(false,'SCRIPT_URL is empty. Paste your Web App URL (ending in /exec) at the top of index.html.'); }
-  else{
-    try{
-      const g=await apiGet('getGuests');
-      html+=line(true,'Apps Script reachable ('+((g.guests||[]).length)+' guests in the sheet)');
-    }catch(e){ html+=line(false,'Apps Script: '+explainBackendError(e)); }
-  }
-  // 2. Gemini
-  if(!GEMINI_KEY){ html+=line(false,'GEMINI_KEY is empty. Paste your API key at the top of index.html.'); }
-  else{
-    const tryModel=async(model)=>{
-      const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`,
-        {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:'Reply with the word OK'}]}]})});
-      const d=await r.json(); if(d.error) throw new Error(d.error.message); return true;
-    };
-    for(const model of ['gemini-3.1-flash-lite-preview','gemini-2.5-flash']){
-      try{ await tryModel(model); html+=line(true,'Gemini key works with '+model); }
-      catch(e){ html+=line(false,'Gemini '+model+': '+String(e.message||e).slice(0,160)); }
-    }
+  if(!SCRIPT_URL){ html+=line(false,'SCRIPT_URL is empty. Paste your Web App URL (ending in /exec) at the top of index.html.'); out.innerHTML=html; return; }
+  try{
+    const g=await apiGet('getGuests');
+    html+=line(true,'Apps Script reachable ('+((g.guests||[]).length)+' guests in the sheet)');
+  }catch(e){ html+=line(false,'Apps Script: '+explainBackendError(e)); out.innerHTML=html; return; }
+  // 2. Gemini (called by the Apps Script using the key in its Script properties)
+  for(const model of ['gemini-3.1-flash-lite-preview','gemini-2.5-flash']){
+    try{ await geminiRequest(model,{contents:[{parts:[{text:'Reply with the word OK'}]}]}); html+=line(true,'Gemini works with '+model); }
+    catch(e){ html+=line(false,'Gemini '+model+': '+String(e.message||e).slice(0,200)); }
   }
   out.innerHTML=html;
 }

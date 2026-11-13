@@ -6,6 +6,30 @@
 //   Type: Web App | Execute as: Me | Who has access: Anyone
 // ============================================================
 
+// ── Which spreadsheet to use ──────────────────────────────────
+// Easiest: create this script from INSIDE your Google Sheet (Extensions > Apps Script) and
+// leave SPREADSHEET_ID empty.
+// If you created the script at script.google.com (a standalone project) you MUST paste the
+// Sheet's ID here. It's the long part of the Sheet URL between /d/ and /edit:
+//   https://docs.google.com/spreadsheets/d/  <THIS PART>  /edit
+const SPREADSHEET_ID = "";
+
+function getSS() {
+  var ss = null;
+  if (SPREADSHEET_ID) {
+    ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  } else {
+    ss = SpreadsheetApp.getActiveSpreadsheet();
+  }
+  if (!ss) {
+    throw new Error(
+      "No spreadsheet linked to this script. Either open the script from inside your Google Sheet " +
+      "(Extensions > Apps Script), or paste the Sheet ID into SPREADSHEET_ID at the top of backend.gs and redeploy."
+    );
+  }
+  return ss;
+}
+
 const SHEET_NAME_GUESTS  = "guests";
 const SHEET_NAME_DRIVERS = "drivers";
 
@@ -64,19 +88,48 @@ function handlePost(e) {
     if (action === "deleteGuest")       return cors(deleteGuest(payload.group_id));
     if (action === "saveTicket")        return cors(saveTicket(payload.group_id, payload.data, payload.mime, payload.name));
     if (action === "initSheet")         return cors(initSheet());
+    if (action === "gemini")            return cors(geminiProxy(payload.model, payload.body));
     return cors({ error: "Unknown action" });
   } catch(err) { return cors({ error: err.message }); }
 }
 
 // Serialise all writes so two people tapping at once can't overwrite each other's rows
 function doPost(e) {
+  // Gemini calls can take 10-30s and don't touch the sheet, so they must NOT hold the write lock
+  // (otherwise every other coordinator's save would queue up behind them).
+  try {
+    var peek = JSON.parse(e.postData.contents);
+    if (peek && peek.action === "gemini") return handlePost(e);
+  } catch (err) { /* fall through to the normal path, which reports bad JSON */ }
   var lock = LockService.getScriptLock();
   try { lock.waitLock(20000); } catch (err) { return cors({ error: "Server busy, please retry" }); }
   try { return handlePost(e); } finally { lock.releaseLock(); }
 }
 
+// ── Gemini proxy ──────────────────────────────────────────────
+// The API key is stored in Script properties (Project Settings > Script properties >
+// GEMINI_API_KEY), never in this file or in the public website, so Google can't find it on GitHub.
+function geminiProxy(model, body) {
+  var key = PropertiesService.getScriptProperties().getProperty("GEMINI_API_KEY");
+  if (!key) {
+    return { error: "GEMINI_API_KEY is not set. In Apps Script open Project Settings > Script properties and add GEMINI_API_KEY with your key." };
+  }
+  if (!/^gemini-[a-z0-9.\-]+$/.test(String(model || ""))) return { error: "Invalid Gemini model name" };
+  if (!body) return { error: "Missing Gemini request body" };
+  var resp = UrlFetchApp.fetch(
+    "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent",
+    { method: "post", contentType: "application/json", headers: { "x-goog-api-key": key },
+      payload: JSON.stringify(body), muteHttpExceptions: true }
+  );
+  var json;
+  try { json = JSON.parse(resp.getContentText()); }
+  catch (err) { return { error: "Gemini returned a non-JSON reply (HTTP " + resp.getResponseCode() + ")" }; }
+  if (json.error) return { error: "Gemini error: " + (json.error.message || JSON.stringify(json.error)) };
+  return { success: true, result: json };
+}
+
 function initSheet() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ss = getSS();
   var tz = ss.getSpreadsheetTimeZone();
 
   var gSheet = ss.getSheetByName(SHEET_NAME_GUESTS);
@@ -152,7 +205,7 @@ function formatCell(value, header, tz) {
 }
 
 function getGuests() {
-  var ss    = SpreadsheetApp.getActiveSpreadsheet();
+  var ss    = getSS();
   var tz    = ss.getSpreadsheetTimeZone();
   var sheet = ss.getSheetByName(SHEET_NAME_GUESTS);
   if (!sheet || sheet.getLastRow() <= 1) return { guests: [] };
@@ -171,7 +224,7 @@ function getGuests() {
 }
 
 function getDrivers() {
-  var ss    = SpreadsheetApp.getActiveSpreadsheet();
+  var ss    = getSS();
   var tz    = ss.getSpreadsheetTimeZone();
   var sheet = ss.getSheetByName(SHEET_NAME_DRIVERS);
   if (!sheet || sheet.getLastRow() <= 1) return { drivers: [] };
@@ -187,7 +240,7 @@ function getDrivers() {
 }
 
 function addGuest(data) {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME_GUESTS);
+  var sheet = getSS().getSheetByName(SHEET_NAME_GUESTS);
   if (!sheet) return { error: "Guests sheet not found. Run initSheet first." };
   data.group_id       = "G" + Date.now() + Math.floor(Math.random() * 1000);
   data.status         = "active";
@@ -207,7 +260,7 @@ function addGuest(data) {
 }
 
 function updateGuest(data) {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME_GUESTS);
+  var sheet = getSS().getSheetByName(SHEET_NAME_GUESTS);
   var rowIndex = findGuestRow(sheet, data.group_id);
   if (!rowIndex) return { error: "Guest not found" };
   var row = sanitizeRow(GUEST_HEADERS.map(function(h){ return data[h] !== undefined ? data[h] : ""; }));
@@ -216,7 +269,7 @@ function updateGuest(data) {
 }
 
 function updateGuestStatus(group_id, field, value) {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME_GUESTS);
+  var sheet = getSS().getSheetByName(SHEET_NAME_GUESTS);
   var rowIndex = findGuestRow(sheet, group_id);
   if (!rowIndex) return { error: "Guest not found" };
   var colIndex = GUEST_HEADERS.indexOf(field) + 1;
@@ -232,7 +285,7 @@ function updateGuestStatus(group_id, field, value) {
 }
 
 function updateLiveStatus(group_id, live_status_text) {
-  var ss    = SpreadsheetApp.getActiveSpreadsheet();
+  var ss    = getSS();
   var tz    = ss.getSpreadsheetTimeZone();
   var sheet = ss.getSheetByName(SHEET_NAME_GUESTS);
   var rowIndex = findGuestRow(sheet, group_id);
@@ -246,7 +299,7 @@ function updateLiveStatus(group_id, live_status_text) {
 }
 
 function deleteGuest(group_id) {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME_GUESTS);
+  var sheet = getSS().getSheetByName(SHEET_NAME_GUESTS);
   var rowIndex = findGuestRow(sheet, group_id);
   if (!rowIndex) return { error: "Guest not found" };
   // Trash any attached Drive ticket file
@@ -305,7 +358,7 @@ function saveTicket(group_id, base64Data, mimeType, fileName) {
     var blob = Utilities.newBlob(decoded, mimeType, fileName || ("ticket_" + group_id));
 
     // Delete any existing ticket for this guest (keep Drive clean)
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME_GUESTS);
+    var sheet = getSS().getSheetByName(SHEET_NAME_GUESTS);
     var rowIndex = findGuestRow(sheet, group_id);
     var ticketCol = GUEST_HEADERS.indexOf("ticket_url") + 1; // declared once, used twice below
     if (rowIndex) {
