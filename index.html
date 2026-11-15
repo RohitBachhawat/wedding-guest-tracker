@@ -405,10 +405,10 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
       <input type="hidden" id="f-journey-type" value="arrival"/>
 
       <div class="upload-zone" id="upload-zone-wrapper">
-        <input type="file" accept="image/*,.pdf" id="ticket-file" onchange="handleFileUpload(event)"/>
+        <input type="file" accept="image/*,.pdf" id="ticket-file" multiple onchange="handleFileUpload(event)"/>
         <div class="uz-icon">📄</div>
         <h3>Upload Ticket / Booking</h3>
-        <p>Gemini extracts all legs automatically</p>
+        <p>Gemini extracts all legs automatically. Select several tickets at once to merge them into one group.</p>
       </div>
       <div class="extraction-result" id="extraction-result"></div>
 
@@ -945,7 +945,7 @@ function findSplitParent(g){
   const baseName = g.group_name.slice(0, -' (Split)'.length);
   return allGuests.find(x=>
     x.group_id!==g.group_id && !isDeleted(x) &&
-    x.group_name===baseName && x.phone_primary===g.phone_primary &&
+    x.group_name===baseName && phoneKey(x.phone_primary)===phoneKey(g.phone_primary) &&
     (x.journey_type||'arrival')===(g.journey_type||'arrival') &&
     x.arrival_date===g.arrival_date && x.arrival_time===g.arrival_time
   );
@@ -2063,7 +2063,7 @@ function renderCard(g, isCompleted){
           </div>
         </div>
         <div class="detail-item"><div class="d-label">Guest Phone</div>
-          <div class="d-value">${g.phone_primary?`<a href="tel:${g.phone_primary}" onclick="event.stopPropagation()">📞 ${esc(g.phone_primary)}</a>`:'—'}</div></div>
+          <div class="d-value">${g.phone_primary?`<a href="tel:${telHref(g.phone_primary)}" onclick="event.stopPropagation()">📞 ${esc(g.phone_primary)}</a>`:'—'}</div></div>
         <div class="detail-item"><div class="d-label">Backup Phone</div>
           <div class="d-value">${g.phone_backup?`<a href="tel:${g.phone_backup}" onclick="event.stopPropagation()">📞 ${esc(g.phone_backup)}</a>`:'—'}</div></div>
       </div>
@@ -2491,7 +2491,7 @@ function _refreshTicketUI(id, hasTicket){
 function openWhatsApp(id){
   const g = allGuests.find(x=>x.group_id===id);
   if(!g) return;
-  const phone = (g.phone_primary||'').replace(/\D/g,'');
+  const phone = waNumber(g.phone_primary);
   if(!phone){ showToast('No phone number on record','error'); return; }
   const jt = journeyType(g);
   const when = g.arrival_date && g.arrival_time
@@ -2518,7 +2518,7 @@ function openWhatsApp(id){
   } else {
     msg = `Hi! Your car is arranged to drop you at ${where}${when?` by ${when}`:''}.\n\n${driverBlock}\n\nPlease be ready on time. 🙏${coordinatorLine}`;
   }
-  const url = `https://wa.me/91${phone}?text=${encodeURIComponent(msg)}`;
+  const url = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
   window.open(url,'_blank');
 }
 function stripClass(g){
@@ -3092,7 +3092,7 @@ function checkDuplicate(data){
   if(normName(data.group_name) && data.phone_primary){
     const identityMatch = candidates.find(g=>
       normName(g.group_name) === normName(data.group_name) &&
-      (g.phone_primary||'').replace(/\D/g,'') === (data.phone_primary||'').replace(/\D/g,'') &&
+      phoneKey(g.phone_primary) === phoneKey(data.phone_primary) &&
       (g.journey_type||'arrival') === (data.journey_type||'arrival')
     );
     if(identityMatch) return {match:identityMatch, confidence:'soft', reason:`Same passenger name and phone number for the same journey type`};
@@ -3378,17 +3378,51 @@ function checkCarOpt(data){
   return smaller.length?smaller[0]:null;
 }
 
-// FIX (Issue 2 - phone validation): strips everything but digits and requires exactly
-// 10 digits (standard Indian mobile number length, no country code expected here since
-// the +91 is just a placeholder in the UI, not part of the stored value). Also rejects
-// obviously-fake numbers like all-zeros or a single digit repeated 10 times, which is
-// the most common typo/placeholder pattern people accidentally submit.
-function isValidPhone(raw){
-  const digits=(raw||'').replace(/\D/g,'');
-  if(digits.length!==10) return false;
-  if(/^0+$/.test(digits)) return false;
-  if(/^(\d)\1{9}$/.test(digits)) return false; // e.g. 9999999999
-  return true;
+// Phone numbers. Accepts what people actually type or paste:
+//   9826024252 | +91 98260 24252 | 91-98260-24252 | 098260 24252 | (0091) 98260 24252
+// and returns the clean 10-digit Indian number. A number that starts with "+" and a non-India country
+// code (e.g. +1 415 555 0123) is kept as digits including the country code. Returns null if invalid.
+function normalizePhone(raw){
+  const trimmed=String(raw||'').trim();
+  let d=trimmed.replace(/\D/g,'');
+  if(!d) return null;
+  const hasPlus=trimmed.startsWith('+');
+  let local=null;
+  if(d.length===10) local=d;
+  else if(d.length===11 && d[0]==='0') local=d.slice(1);
+  else if(d.length===12 && d.startsWith('91')) local=d.slice(2);
+  else if(d.length===13 && d.startsWith('091')) local=d.slice(3);
+  else if(d.length===14 && d.startsWith('0091')) local=d.slice(4);
+  if(local){
+    if(/^0+$/.test(local)) return null;
+    if(/^(\d)\1{9}$/.test(local)) return null; // e.g. 9999999999
+    return local;
+  }
+  // Non-Indian international number: only trusted when typed with a leading "+"
+  // (+91 means India: if it did not resolve to a 10-digit number above, it is a typo, not an international number)
+  if(hasPlus && !d.startsWith('91') && !d.startsWith('0') && d.length>=8 && d.length<=15) return d;
+  return null;
+}
+function isValidPhone(raw){ return normalizePhone(raw)!==null; }
+// Comparison key so "+91 98260 24252" and "9826024252" count as the same number
+function phoneKey(raw){
+  const n=normalizePhone(raw);
+  return n!==null ? n : String(raw||'').replace(/\D/g,'');
+}
+// Number for wa.me links (needs country code, digits only)
+function waNumber(raw){
+  const n=normalizePhone(raw);
+  if(n!==null) return n.length===10 ? '91'+n : n;
+  // Already-stored international numbers are plain digits including the country code
+  const d=String(raw||'').replace(/\D/g,'');
+  return (d.length>=11 && d.length<=15 && d[0]!=='0') ? d : '';
+}
+// tel: link: Indian 10-digit numbers dial as-is, stored international numbers need a leading +
+function telHref(raw){
+  const d=String(raw||'').replace(/\D/g,'');
+  const n=normalizePhone(raw);
+  if(n!==null && n.length===10) return n;
+  return d.length>10 ? '+'+d.replace(/^0+/,'') : d;
 }
 
 async function submitGuestForm(e){
@@ -3398,15 +3432,17 @@ async function submitGuestForm(e){
   // so validate its format here. Backup phone is optional — only validated if the user
   // actually typed something in it.
   if(!isValidPhone(data.phone_primary)){
-    showToast('Primary phone must be a valid 10-digit number','error');
+    showToast('Primary phone must be a valid 10-digit number (a +91 prefix and spaces are fine)','error');
     document.getElementById('f-phone-primary').focus();
     return;
   }
+  data.phone_primary=normalizePhone(data.phone_primary);
   if(data.phone_backup && !isValidPhone(data.phone_backup)){
-    showToast('Backup phone must be a valid 10-digit number','error');
+    showToast('Backup phone must be a valid 10-digit number (a +91 prefix and spaces are fine)','error');
     document.getElementById('f-phone-backup').focus();
     return;
   }
+  if(data.phone_backup) data.phone_backup=normalizePhone(data.phone_backup);
 
   // FIX (Issue 5 - mandatory date/time): the date/time inputs already carry the HTML5
   // `required` attribute, but that only blocks submission for *visible* fields — belt
@@ -3635,24 +3671,8 @@ async function extractTicketLegs(b64, mime){
   });
 }
 
-async function handleFileUpload(event){
-  const file=event.target.files[0];if(!file) return;
-  showLoading(true);
-  document.getElementById('extraction-result').classList.remove('show');
-  document.getElementById('roundtrip-banner').classList.add('hidden');
-  try{
-    const {b64,mime}=await compressIfNeeded(file);
-    if(file.type!=='application/pdf'&&file.size>800*1024) showToast('Image compressed for faster upload','success');
-    // FIX (Issue 1 - auto-save ticket): remember this exact file (already compressed/base64'd)
-    // so proceedSave() can upload it to Drive right after the guest record is created/updated,
-    // without the user having to attach it again from the guest card.
-    pendingTicketFile={b64,mime,name:file.name};
-    const processedLegs=await extractTicketLegs(b64,mime);
-    if(processedLegs.length===0){
-      showToast('Could not extract details — please fill in manually','error');
-      showLoading(false);return;
-    }
-
+// Shared by single and multi-ticket upload: put the extracted leg(s) into the form
+function applyExtractedLegs(processedLegs){
     if(processedLegs.some(l=>!l.pickup_location)){
       setTimeout(()=>showToast('Could not match the station from the ticket — please pick it from the list','error'),1800);
     }
@@ -3688,8 +3708,161 @@ async function handleFileUpload(event){
       er.classList.add('show');
       showToast(`${processedLegs.length}-leg ticket detected. Fill Leg 1 and save to continue.`,'success');
     }
+}
+
+async function handleFileUpload(event){
+  const files=[...(event.target.files||[])]; if(!files.length) return;
+  if(files.length>1) return handleMultiTicketUpload(files,event);
+  const file=files[0];
+  showLoading(true);
+  document.getElementById('extraction-result').classList.remove('show');
+  document.getElementById('roundtrip-banner').classList.add('hidden');
+  try{
+    const {b64,mime}=await compressIfNeeded(file);
+    if(file.type!=='application/pdf'&&file.size>800*1024) showToast('Image compressed for faster upload','success');
+    // FIX (Issue 1 - auto-save ticket): remember this exact file (already compressed/base64'd)
+    // so proceedSave() can upload it to Drive right after the guest record is created/updated,
+    // without the user having to attach it again from the guest card.
+    pendingTicketFile={b64,mime,name:file.name};
+    const processedLegs=await extractTicketLegs(b64,mime);
+    if(processedLegs.length===0){
+      showToast('Could not extract details — please fill in manually','error');
+      showLoading(false);return;
+    }
+    applyExtractedLegs(processedLegs);
   }catch(err){
     console.error('Extraction error:',err);
+    showToast('Extraction failed: '+(err.message||'unknown error')+' — you can still fill in manually','error');
+  }
+  showLoading(false);
+  event.target.value='';
+}
+
+// ── Several tickets at once → ONE merged group ────────────────
+const HONORIFICS=/^(mr|mrs|ms|miss|mstr|master|dr|shri|smt|sri|prof)\.?$/i;
+function cleanPassengerName(n){
+  const parts=String(n||'').trim().split(/\s+/).filter(Boolean);
+  while(parts.length>1 && HONORIFICS.test(parts[0])) parts.shift();
+  return parts.join(' ');
+}
+function normTransportNo(n){ return String(n||'').toUpperCase().replace(/[^A-Z0-9]/g,''); }
+// Merge legs that are the SAME journey (same journey type, transport number, date and time)
+// into one leg: names combined, pax added up, PNRs listed. Different journeys stay separate legs.
+function mergeLegs(legs){
+  const groups=new Map();
+  legs.forEach((leg,i)=>{
+    const tn=normTransportNo(leg.transport_number);
+    const key=tn ? [leg.journey_type,tn,leg.arrival_date,leg.arrival_time].join('|') : 'solo-'+i;
+    if(!groups.has(key)) groups.set(key,[]);
+    groups.get(key).push(leg);
+  });
+  const out=[];
+  groups.forEach(list=>{
+    const base={...list[0]};
+    const names=[]; const seen=new Set(); const pnrs=[]; let pax=0;
+    list.forEach(l=>{
+      const mine=String(l.individual_names||'').split(',').map(cleanPassengerName).filter(Boolean);
+      const fresh=mine.filter(n=>!seen.has(n.toLowerCase()));
+      fresh.forEach(n=>{seen.add(n.toLowerCase());names.push(n);});
+      // a ticket that only repeats people we already have (e.g. the same ticket twice) adds nobody
+      if(fresh.length || !mine.length) pax+=parseInt(l.pax)||1;
+      if(l.pnr && !pnrs.includes(l.pnr)) pnrs.push(l.pnr);
+    });
+    base.individual_names=names.join(', ');
+    base.pax=Math.max(pax,names.length)||1;
+    base.pnr=pnrs.join(' / ');
+    const surnames=names.map(n=>n.split(' ').slice(-1)[0].toLowerCase());
+    if(names.length>1 && surnames.every(x=>x===surnames[0]) && surnames[0]){
+      const sn=names[0].split(' ').slice(-1)[0];
+      base.group_name=sn.charAt(0).toUpperCase()+sn.slice(1)+' Family';
+    } else if(names.length>1){
+      base.group_name=names.join(' + ');
+    } else if(names.length===1){
+      base.group_name=names[0];
+    }
+    out.push(base);
+  });
+  out.sort((a,b)=>String(a.arrival_date+a.arrival_time).localeCompare(String(b.arrival_date+b.arrival_time)));
+  return out;
+}
+
+function loadPdfLib(){
+  if(window.PDFLib) return Promise.resolve();
+  return new Promise((res,rej)=>{
+    const sc=document.createElement('script');
+    sc.src='https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js';
+    sc.onload=res; sc.onerror=()=>rej(new Error('Could not load the PDF tool'));
+    document.head.appendChild(sc);
+  });
+}
+function b64ToBytes(b64){ const bin=atob(b64); const u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i); return u; }
+function imageToJpegBytes(b64,mime){
+  return new Promise((res,rej)=>{
+    const img=new Image();
+    img.onload=()=>{ const c=document.createElement('canvas'); c.width=img.width; c.height=img.height;
+      c.getContext('2d').drawImage(img,0,0); res(b64ToBytes(c.toDataURL('image/jpeg',0.9).split(',')[1])); };
+    img.onerror=()=>rej(new Error('Could not read an image ticket'));
+    img.src='data:'+mime+';base64,'+b64;
+  });
+}
+// Combine PDFs and images into ONE PDF so the guest card keeps a single ticket link
+async function combineTicketFiles(files){
+  await loadPdfLib();
+  const {PDFDocument}=window.PDFLib;
+  const doc=await PDFDocument.create();
+  for(const f of files){
+    if(f.mime==='application/pdf'){
+      const src=await PDFDocument.load(b64ToBytes(f.b64),{ignoreEncryption:true});
+      const pages=await doc.copyPages(src,src.getPageIndices());
+      pages.forEach(pg=>doc.addPage(pg));
+    }else{
+      let img;
+      if(f.mime==='image/png') img=await doc.embedPng(b64ToBytes(f.b64));
+      else if(f.mime==='image/jpeg'||f.mime==='image/jpg') img=await doc.embedJpg(b64ToBytes(f.b64));
+      else img=await doc.embedJpg(await imageToJpegBytes(f.b64,f.mime));
+      const W=595,H=842,m=24,scale=Math.min((W-2*m)/img.width,(H-2*m)/img.height,1);
+      const w=img.width*scale,h=img.height*scale;
+      const page=doc.addPage([W,H]);
+      page.drawImage(img,{x:(W-w)/2,y:H-m-h,width:w,height:h});
+    }
+  }
+  return await doc.saveAsBase64();
+}
+
+async function handleMultiTicketUpload(files,event){
+  showLoading(true);
+  document.getElementById('extraction-result').classList.remove('show');
+  document.getElementById('roundtrip-banner').classList.add('hidden');
+  try{
+    const prepared=[];
+    for(const f of files){ const {b64,mime}=await compressIfNeeded(f); prepared.push({b64,mime,name:f.name}); }
+    const results=await Promise.allSettled(prepared.map(f=>extractTicketLegs(f.b64,f.mime)));
+    const all=[]; const failed=[];
+    results.forEach((r,i)=>{
+      if(r.status==='fulfilled' && r.value.length) r.value.forEach(l=>all.push(l));
+      else failed.push(prepared[i].name+(r.status==='rejected'?' ('+(r.reason&&r.reason.message||'error')+')':''));
+    });
+    if(!all.length){
+      showToast('Could not extract details from any ticket'+(failed[0]&&failed[0].includes('(')?': '+failed[0]:'')+' — please fill in manually','error');
+      showLoading(false); event.target.value=''; return;
+    }
+    const merged=mergeLegs(all);
+    // One combined PDF so the guest card shows a single ticket
+    try{
+      pendingTicketFile={b64:await combineTicketFiles(prepared),mime:'application/pdf',name:'Combined tickets.pdf'};
+    }catch(e){
+      console.warn('Ticket merge failed:',e);
+      pendingTicketFile={...prepared[0]};
+      setTimeout(()=>showToast('Could not combine the files into one PDF, so only the first ticket will be attached ('+(e.message||'error')+')','error'),2500);
+    }
+    applyExtractedLegs(merged);
+    const er=document.getElementById('extraction-result');
+    const first=merged[0];
+    er.textContent=`✅ ${files.length} tickets read and merged into ${merged.length===1?'1 group':merged.length+' journeys'}: ${first.group_name||'guest'} · ${first.pax} pax · ${first.transport_type} ${first.transport_number}`+(failed.length?` · ⚠️ could not read: ${failed.join(', ')}`:'');
+    er.classList.add('show');
+    showToast(`${files.length} tickets merged — please verify the names and pax`,'success');
+  }catch(err){
+    console.error('Multi-ticket error:',err);
     showToast('Extraction failed: '+(err.message||'unknown error')+' — you can still fill in manually','error');
   }
   showLoading(false);
@@ -3778,7 +3951,11 @@ async function geminiRequest(model, body){
   if(!SCRIPT_URL) throw new Error('SCRIPT_URL is not set at the top of index.html.');
   let res;
   try{ res = await apiPostRaw({action:'gemini', model, body}); }
-  catch(e){ throw new Error(String(e.message||e).replace(/^Sheet error:\s*/,'')); }
+  catch(e){
+    const m=String(e.message||e).replace(/^Sheet error:\s*/,'');
+    if(/^Unknown action/i.test(m)) throw new Error('Your deployed Apps Script is out of date (it does not know the Gemini action). Paste the latest backend.gs into Apps Script, then Deploy > Manage deployments > pencil > Version: New version > Deploy. Open <SCRIPT_URL>?action=ping in a browser to check the deployed version.');
+    throw new Error(m);
+  }
   return res.result;
 }
 function geminiText(d, fallback){ return d?.candidates?.[0]?.content?.parts?.[0]?.text || fallback; }
@@ -3822,6 +3999,16 @@ async function runConnectionTest(){
     const g=await apiGet('getGuests');
     html+=line(true,'Apps Script reachable ('+((g.guests||[]).length)+' guests in the sheet)');
   }catch(e){ html+=line(false,'Apps Script: '+explainBackendError(e)); out.innerHTML=html; return; }
+  // 1b. Is the DEPLOYED script the latest version, and is the Gemini key set?
+  try{
+    const pg=await apiGet('ping');
+    html+=line(true,'Apps Script version '+pg.version+(pg.spreadsheet?' (sheet: '+pg.spreadsheet+')':''));
+    if(pg.spreadsheetError) html+=line(false,'Spreadsheet: '+pg.spreadsheetError);
+    if(!pg.geminiKeySet){ html+=line(false,'GEMINI_API_KEY is not set in Apps Script > Project Settings > Script properties.'); out.innerHTML=html; return; }
+  }catch(e){
+    html+=line(false,'The deployed Apps Script is an OLD version (no "ping"). Paste the latest backend.gs, then Deploy > Manage deployments > pencil > Version: New version > Deploy, and make sure SCRIPT_URL is that deployment\'s /exec URL.');
+    out.innerHTML=html; return;
+  }
   // 2. Gemini (called by the Apps Script using the key in its Script properties)
   for(const model of ['gemini-3.1-flash-lite-preview','gemini-2.5-flash']){
     try{ await geminiRequest(model,{contents:[{parts:[{text:'Reply with the word OK'}]}]}); html+=line(true,'Gemini works with '+model); }
