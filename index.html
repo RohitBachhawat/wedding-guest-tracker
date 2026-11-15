@@ -1133,6 +1133,9 @@ const DEFAULT_KOLKATA_HUBS=[
   'Shalimar Railway Station',
   'Netaji Subhas Chandra Bose International Airport (CCU)'
 ];
+// New visitors go straight to the dashboard (no setup screen). City defaults to this; it can still
+// be changed any time in Settings.
+const DEFAULT_CITY='Kolkata';
 function applyDefaultHubsIfNeeded(){
   if(HUBS.length) return false;
   if(!/kolkata|calcutta/i.test(WEDDING_CITY||'')) return false;
@@ -1142,6 +1145,7 @@ function applyDefaultHubsIfNeeded(){
 }
 window.addEventListener('DOMContentLoaded',()=>{
   WEDDING_CITY=(localStorage.getItem('wgt_wedding_city')||'').trim();
+  if(!WEDDING_CITY){ WEDDING_CITY=DEFAULT_CITY; localStorage.setItem('wgt_wedding_city',DEFAULT_CITY); }
   HUBS=JSON.parse(localStorage.getItem('wgt_hubs')||'[]');
   applyDefaultHubsIfNeeded();
   if(WEDDING_CITY) launchApp();
