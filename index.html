@@ -497,6 +497,7 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
       <label>Transport Hubs (One per line)</label>
       <textarea id="settings-hubs" rows="5" placeholder="Railway Station A&#10;Airport B"></textarea>
       <div style="font-size:11px;color:var(--text-2);margin-top:4px">These appear in the dropdowns. Changing city will auto-refresh these.</div>
+      <button type="button" class="btn btn-secondary" style="margin-top:8px" onclick="fetchHubsNow()">Fetch hubs now</button>
     </div>
     <div class="form-group">
       <label>Connection check</label>
@@ -681,7 +682,7 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
 // ── Connection (edit this line, then reload) ──────────────────
 // Paste your Google Apps Script Web App URL between the quotes.
 // (The Gemini API key goes in the Apps Script's private Script properties, NOT in this file.)
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby7Sv3rELYsQOYBZXC_UIjtMVY2HgruNb46Glllr7wjo0WGhZQhwnyZSqZISC-RL13NxQ/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwS7VzGKiVnGL2Pvo3f1heTgf1XvIRy4jPP3ToeQcaIYkchED47VyAroOrubDc7QzwY_g/exec';
 
 const TRAVEL_MINS   = 90;
 const CONFLICT_MINS = 120;
@@ -1121,9 +1122,28 @@ const COORDINATOR_PHONE = '9876500000'; // 10-digit, no country code
 let rtPersonal={};
 
 // ── Boot ──────────────────────────────────────────────────────
+// Built-in hubs for a Kolkata wedding. Used whenever the saved hub list is empty (for example if the
+// Gemini lookup failed or was never set up), so the Pickup/Drop Station dropdown always works.
+// You can still edit the list any time in Settings.
+const DEFAULT_KOLKATA_HUBS=[
+  'Howrah Junction',
+  'Sealdah Railway Station',
+  'Kolkata Chitpur Terminal',
+  'Santragachi Junction',
+  'Shalimar Railway Station',
+  'Netaji Subhas Chandra Bose International Airport (CCU)'
+];
+function applyDefaultHubsIfNeeded(){
+  if(HUBS.length) return false;
+  if(!/kolkata|calcutta/i.test(WEDDING_CITY||'')) return false;
+  HUBS=DEFAULT_KOLKATA_HUBS.slice();
+  localStorage.setItem('wgt_hubs',JSON.stringify(HUBS));
+  return true;
+}
 window.addEventListener('DOMContentLoaded',()=>{
   WEDDING_CITY=(localStorage.getItem('wgt_wedding_city')||'').trim();
   HUBS=JSON.parse(localStorage.getItem('wgt_hubs')||'[]');
+  applyDefaultHubsIfNeeded();
   if(WEDDING_CITY) launchApp();
   else {
     document.getElementById('screen-setup').style.display='flex';
@@ -1160,11 +1180,25 @@ async function refreshHubs(city){
       HUBS = list;
       localStorage.setItem('wgt_hubs', JSON.stringify(HUBS));
       localStorage.setItem('wgt_last_fetched_city', city);
+      return true;
     }
+    return false;
   } catch(e) {
     console.error('Hub fetch failed:', e);
     const why = (e instanceof SyntaxError) ? 'Gemini returned an unexpected reply.' : String(e.message||e).slice(0,140);
     showToast('Could not auto-fetch hubs: '+why+' You can add them in Settings (and use "Test connection" there).', 'error');
+    return false;
+  }
+}
+// Settings button: fetch the hub list for the city on demand (no page reload needed)
+async function fetchHubsNow(){
+  const city=document.getElementById('settings-wedding-city').value.trim();
+  if(!city){ showToast('Enter the wedding city first','error'); return; }
+  showToast('Asking Gemini for hubs in '+city+'…');
+  const ok=await refreshHubs(city);
+  if(ok){
+    document.getElementById('settings-hubs').value=HUBS.join('\n');
+    showToast('Found '+HUBS.length+' hubs. Edit the list if needed, then Save.');
   }
 }
 async function launchApp(){
@@ -1172,6 +1206,13 @@ async function launchApp(){
   document.getElementById('screen-setup').style.display='none';
   document.getElementById('app').style.display='flex';
   await initAndLoad();
+  // If the hub list is empty (e.g. the first lookup failed while Gemini wasn't set up yet),
+  // try again on every load instead of leaving the station dropdown empty.
+  if(!HUBS.length && SCRIPT_URL && WEDDING_CITY){
+    await refreshHubs(WEDDING_CITY);
+    applyDefaultHubsIfNeeded();   // Gemini unavailable? fall back to the built-in Kolkata list
+    renderDashboard();
+  }
 }
 
 // ── API ───────────────────────────────────────────────────────
