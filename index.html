@@ -3964,31 +3964,43 @@ async function geminiRequest(model, body){
 }
 function geminiText(d, fallback){ return d?.candidates?.[0]?.content?.parts?.[0]?.text || fallback; }
 
+// Models to try, in order. Google retires/restricts older models for newer accounts ("no longer
+// available to new users"), so if one is unavailable we automatically fall through to the next.
+// Update this list if Google releases a newer Flash model.
+const GEMINI_MODELS=['gemini-3.8-flash','gemini-3.7-flash','gemini-3.5-flash-lite'];
+
 async function callGemini(prompt){
-  try{
-    const d=await geminiRequest('gemini-3.1-flash-lite-preview',{contents:[{parts:[{text:prompt}]}],tools:[{google_search:{}}]});
-    const text=geminiText(d,'');
-    if(text) return text; throw new Error('Empty');
-  }catch(e1){
-    console.warn('Gemini search fallback:',e1.message);
-    const d=await geminiRequest('gemini-2.5-flash',{contents:[{parts:[{text:prompt}]}]});
-    return geminiText(d,'No response');
+  let lastErr;
+  for(const model of GEMINI_MODELS){
+    // 1) with Google Search (live status needs it)
+    try{
+      const d=await geminiRequest(model,{contents:[{parts:[{text:prompt}]}],tools:[{google_search:{}}]});
+      const text=geminiText(d,''); if(text) return text;
+      throw new Error('Empty reply');
+    }catch(e1){
+      console.warn('Gemini (search) failed on '+model+':',e1.message); lastErr=e1;
+    }
+    // 2) same model without search
+    try{
+      const d=await geminiRequest(model,{contents:[{parts:[{text:prompt}]}]});
+      return geminiText(d,'No response');
+    }catch(e2){
+      console.warn('Gemini failed on '+model+':',e2.message); lastErr=e2;
+    }
   }
+  throw lastErr||new Error('Gemini request failed');
 }
 async function callGeminiFile(prompt,b64,mime){
   const body={contents:[{parts:[{inline_data:{mime_type:mime,data:b64}},{text:prompt}]}]};
-  // First attempt: primary model
-  try{
-    return geminiText(await geminiRequest('gemini-3.1-flash-lite-preview',body),'{}');
-  }catch(e1){
-    // Fallback: secondary model
-    console.warn('callGeminiFile primary failed, trying fallback model:',e1.message);
+  let lastErr;
+  for(const model of GEMINI_MODELS){
     try{
-      return geminiText(await geminiRequest('gemini-2.5-flash',body),'{}');
-    }catch(e2){
-      throw new Error('Gemini request failed ('+e2.message+')');
+      return geminiText(await geminiRequest(model,body),'{}');
+    }catch(e){
+      console.warn('callGeminiFile failed on '+model+':',e.message); lastErr=e;
     }
   }
+  throw new Error('Gemini request failed ('+(lastErr&&lastErr.message||'unknown')+')');
 }
 
 // ── Connection test (Settings) ────────────────────────────────
@@ -4014,7 +4026,7 @@ async function runConnectionTest(){
     out.innerHTML=html; return;
   }
   // 2. Gemini (called by the Apps Script using the key in its Script properties)
-  for(const model of ['gemini-3.1-flash-lite-preview','gemini-2.5-flash']){
+  for(const model of GEMINI_MODELS){
     try{ await geminiRequest(model,{contents:[{parts:[{text:'Reply with the word OK'}]}]}); html+=line(true,'Gemini works with '+model); }
     catch(e){ html+=line(false,'Gemini '+model+': '+String(e.message||e).slice(0,200)); }
   }
