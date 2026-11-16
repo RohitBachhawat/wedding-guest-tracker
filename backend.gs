@@ -12,7 +12,7 @@
 // If you created the script at script.google.com (a standalone project) you MUST paste the
 // Sheet's ID here. It's the long part of the Sheet URL between /d/ and /edit:
 //   https://docs.google.com/spreadsheets/d/  <THIS PART>  /edit
-const SPREADSHEET_ID = "";
+const SPREADSHEET_ID = "1kt-8G2-EOEKK-b5R7bifmsPAy-KpX-kpTyhjkJiFcvk";
 
 function getSS() {
   var ss = null;
@@ -68,11 +68,26 @@ function cors(output) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
+// Bump this whenever backend.gs changes. Open  <your Web App URL>?action=ping  in a browser to see
+// which version is actually deployed (if it says "Unknown action", the deployment is an old version).
+const BACKEND_VERSION = "2026-11-15-merge-tickets";
+
+function pingInfo() {
+  var info = {
+    version: BACKEND_VERSION,
+    geminiKeySet: !!PropertiesService.getScriptProperties().getProperty("GEMINI_API_KEY")
+  };
+  try { info.spreadsheet = getSS().getName(); }
+  catch (err) { info.spreadsheetError = String(err.message || err); }
+  return info;
+}
+
 function doGet(e) {
   try {
     var action = e.parameter.action;
     if (action === "getGuests")  return cors(getGuests());
     if (action === "getDrivers") return cors(getDrivers());
+    if (action === "ping")       return cors(pingInfo());
     return cors({ error: "Unknown action" });
   } catch(err) { return cors({ error: err.message }); }
 }
@@ -87,6 +102,7 @@ function handlePost(e) {
     if (action === "updateLiveStatus")  return cors(updateLiveStatus(payload.group_id, payload.live_status_text));
     if (action === "deleteGuest")       return cors(deleteGuest(payload.group_id));
     if (action === "saveTicket")        return cors(saveTicket(payload.group_id, payload.data, payload.mime, payload.name));
+    if (action === "getTicket")         return cors(getTicket(payload.group_id));
     if (action === "initSheet")         return cors(initSheet());
     if (action === "gemini")            return cors(geminiProxy(payload.model, payload.body));
     return cors({ error: "Unknown action" });
@@ -104,6 +120,17 @@ function doPost(e) {
   var lock = LockService.getScriptLock();
   try { lock.waitLock(20000); } catch (err) { return cors({ error: "Server busy, please retry" }); }
   try { return handlePost(e); } finally { lock.releaseLock(); }
+}
+
+// ── One-time authorization helper ─────────────────────────────
+// Run this ONCE from the Apps Script editor (select authorizeAll > Run > Allow) so Google asks for
+// every permission this script needs (spreadsheet, Drive, and calling external services).
+// Afterwards redeploy: Deploy > Manage deployments > pencil > Version: New version > Deploy.
+function authorizeAll() {
+  getSS();                              // spreadsheet access
+  DriveApp.getRootFolder();             // Drive access (ticket files)
+  UrlFetchApp.fetch("https://generativelanguage.googleapis.com/", { muteHttpExceptions: true }); // external requests (Gemini)
+  Logger.log("All permissions granted. Now redeploy with Deploy > Manage deployments > New version.");
 }
 
 // ── Gemini proxy ──────────────────────────────────────────────
@@ -316,6 +343,19 @@ function deleteGuest(group_id) {
   var colIndex = GUEST_HEADERS.indexOf("deleted") + 1;
   sheet.getRange(rowIndex, colIndex).setValue("yes");
   return { success: true };
+}
+
+// Returns the ticket file attached to a guest (base64) so the page can combine it with another ticket.
+function getTicket(group_id) {
+  var sheet = getSS().getSheetByName(SHEET_NAME_GUESTS);
+  var rowIndex = findGuestRow(sheet, group_id);
+  if (!rowIndex) return { error: "Guest not found" };
+  var ticketCol = GUEST_HEADERS.indexOf("ticket_url") + 1;
+  var ticketUrl = String(sheet.getRange(rowIndex, ticketCol).getValue() || "");
+  var m = ticketUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  if (!m) return { error: "This guest has no ticket attached" };
+  var blob = DriveApp.getFileById(m[1]).getBlob();
+  return { success: true, data: Utilities.base64Encode(blob.getBytes()), mime: blob.getContentType(), name: blob.getName() };
 }
 
 function findGuestRow(sheet, group_id) {

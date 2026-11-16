@@ -554,6 +554,7 @@ main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
     <div id="dup-actions-soft" class="modal-actions">
       <button class="btn btn-secondary" onclick="closeDupModal()">Cancel</button>
       <button class="btn btn-secondary" id="dup-view-btn">View Existing</button>
+      <button class="btn btn-primary" id="dup-merge-btn" style="display:none">Merge into existing group</button>
       <button class="btn btn-primary" id="dup-update-btn">Update Existing Instead</button>
     </div>
     <div id="dup-actions-hard" class="modal-actions" style="display:none">
@@ -3116,11 +3117,14 @@ function openDupModal(data, dupResult){
     `<strong>${dupResult.reason}.</strong><br><br>` +
     `Existing entry: <strong>${esc(ex.group_name)}</strong> · ${fmtDate(ex.arrival_date)} ${fmtAmPm(ex.arrival_time)} · ${esc(ex.transport_type||'')} ${esc(ex.transport_number||'')}` +
     (isHard
-      ? `<br><br>Creating a new entry would cause duplicates. You can <strong>update the existing entry</strong> with any new details (e.g. driver assignment) or cancel.`
+      ? `<br><br>Creating a new entry would cause duplicates. If this is <strong>another passenger on the same journey</strong>, use <strong>Merge into existing group</strong> to combine them into one entry (names, pax and tickets are added together). Otherwise you can <strong>update the existing entry</strong> with new details (e.g. driver assignment) or cancel.`
       : `<br><br>This might be the same person on the same journey. Updating the existing entry is recommended.`);
 
   document.getElementById('dup-actions-soft').style.display = 'flex';
   document.getElementById('dup-actions-hard').style.display = 'none';
+  // Merging only makes sense when it is the same flight/train or the same PNR (a "hard" match)
+  document.getElementById('dup-merge-btn').style.display = isHard ? '' : 'none';
+  document.getElementById('dup-update-btn').className = isHard ? 'btn btn-secondary' : 'btn btn-primary';
   document.getElementById('dup-modal').classList.add('open');
 }
 
@@ -3166,6 +3170,66 @@ document.getElementById('dup-update-btn').addEventListener('click',async()=>{
   editingId = targetId;
   await proceedSave(merged);
   editingId = prevEditingId;
+});
+
+// "Merge into existing group": add the new passenger(s) to the entry that already exists for this
+// flight/train instead of creating a second card or overwriting the first passenger.
+function mergeGuestRecords(e,d){
+  const namesOf=g=>{
+    const arr=String(g.individual_names||'').split(',').map(cleanPassengerName).filter(Boolean);
+    return arr.length?arr:[cleanPassengerName(g.group_name)].filter(Boolean);
+  };
+  const exNames=namesOf(e), newNames=namesOf(d);
+  const seen=new Set(exNames.map(n=>n.toLowerCase()));
+  const fresh=newNames.filter(n=>!seen.has(n.toLowerCase()));
+  const names=[...exNames,...fresh];
+  const m={...e};
+  m.individual_names=names.join(', ');
+  // somebody already on the entry (same ticket added twice) must not be counted again
+  m.pax=(parseInt(e.pax)||1)+(fresh.length?(parseInt(d.pax)||fresh.length):0);
+  const pn=[];
+  [e.pnr,d.pnr].forEach(x=>String(x||'').split('/').map(t=>t.trim()).filter(Boolean).forEach(t=>{ if(!pn.includes(t)) pn.push(t); }));
+  m.pnr=pn.join(' / ');
+  const surnames=names.map(n=>n.split(' ').slice(-1)[0].toLowerCase());
+  if(names.length>1 && surnames[0] && surnames.every(x=>x===surnames[0])){
+    const sn=names[0].split(' ').slice(-1)[0];
+    m.group_name=sn.charAt(0).toUpperCase()+sn.slice(1)+' Family';
+  } else if(fresh.length && d.group_name && normName(d.group_name)!==normName(e.group_name)){
+    m.group_name=e.group_name+' + '+cleanPassengerName(d.group_name);
+  }
+  // keep the existing contact; the new person's number becomes the backup if there is none yet
+  if(d.phone_primary && phoneKey(d.phone_primary)!==phoneKey(e.phone_primary) && !e.phone_backup) m.phone_backup=d.phone_primary;
+  if(d.notes && d.notes!==e.notes) m.notes=[e.notes,d.notes].filter(Boolean).join(' | ');
+  // take the new entry's driver only if the existing one has none
+  if(!e.driver_name && d.driver_name){ ['driver_name','driver_phone','car_type','car_no'].forEach(f=>{ m[f]=d[f]||''; }); }
+  return m;
+}
+document.getElementById('dup-merge-btn').addEventListener('click',async()=>{
+  const targetId=dupExistingId, data=dupPendingData;
+  const existing=allGuests.find(g=>g.group_id===targetId);
+  if(!data||!existing){closeDupModal();return;}
+  closeDupModal();
+  const merged=mergeGuestRecords(existing,data);
+  // Tickets: combine the ticket already on the entry with the newly uploaded one into ONE pdf.
+  if(pendingTicketFile && existing.ticket_url){
+    showLoading(true);
+    try{
+      const old=await apiPostRaw({action:'getTicket',group_id:targetId});
+      if(!old||!old.data) throw new Error('could not read the existing ticket');
+      const combined=await combineTicketFiles([{b64:old.data,mime:old.mime},{b64:pendingTicketFile.b64,mime:pendingTicketFile.mime}]);
+      pendingTicketFile={b64:combined,mime:'application/pdf',name:'Combined tickets.pdf'};
+    }catch(err){
+      console.warn('Ticket merge failed:',err);
+      // keep the existing ticket rather than replacing it with only the new one
+      pendingTicketFile=null;
+      setTimeout(()=>showToast('Passengers merged, but the tickets could not be combined ('+(err.message||'error')+'). The new ticket was not attached; the existing one is unchanged.','error'),2500);
+    }
+  }
+  const prevEditingId=editingId;
+  editingId=targetId;
+  await proceedSave(merged);
+  editingId=prevEditingId;
+  showToast('Merged into '+merged.group_name+' ('+merged.pax+' pax) ✓','success');
 });
 
 // ── Auto-dedup on load: detect and surface existing duplicates ─
@@ -3661,7 +3725,9 @@ async function extractTicketLegs(b64, mime){
       const stationSrc=jt==='departure'?leg.journey_origin:leg.journey_destination;
       station = mapToStation(stationSrc, leg.transport_type);
     }
-    const firstName=(leg.individual_names||'').split(',')[0].trim();
+    // strip Mr/Mrs/Dr… so the group is "Amit Jain", not "Mr Amit Jain"
+    const cleanNames=String(leg.individual_names||'').split(',').map(cleanPassengerName).filter(Boolean);
+    const firstName=cleanNames[0]||'';
     return {
       journey_type:jt,transport_type:leg.transport_type||'',
       transport_name:leg.transport_name||'',transport_number:leg.transport_number||'',
@@ -3669,7 +3735,7 @@ async function extractTicketLegs(b64, mime){
       journey_destination:leg.journey_destination||'',
       arrival_date:date||'',arrival_time:time||'',
       pickup_location:station || '',
-      individual_names:leg.individual_names||'',
+      individual_names:cleanNames.join(', '),
       pax:leg.pax||1,group_name:firstName||''
     };
   });
